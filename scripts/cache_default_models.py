@@ -5,15 +5,16 @@ is run.
 """
 
 import typer
+
+from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
-from pvnet.app import (
+from pvnet_app.app import (
     default_model_name,
     default_model_version,
     default_summation_model_name,
     default_summation_model_version,
 )
-from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 
 def main():
