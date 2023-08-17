@@ -8,12 +8,18 @@ this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text()
 install_requires = (this_directory / "requirements.txt").read_text().splitlines()
 
+with open("pvnet_app/__init__.py") as f:
+    for line in f:
+        if line.startswith("__version__"):
+            _, _, version = line.replace("'", "").split()
+            version = version.replace('"', "")
+
 setup(
-    name="cool_ocf_project",
-    version="0.0.1",
+    name="pvnet_app",
+    version=version,
     license="MIT",
     description="Super cool OCF Repo",
-    author="Jacob Bieker, Jack Kelly, Peter Dudfield",
+    author="James Fulton, Peter Dudfield",
     author_email="info@openclimatefix.org",
     company="Open Climate Fix Ltd",
     install_requires=install_requires,
