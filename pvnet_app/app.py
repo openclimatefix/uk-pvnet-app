@@ -43,6 +43,8 @@ from pvnet.data.datamodule import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import GSPLocationLookup
 
+import pvnet_app
+
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
 
@@ -497,7 +499,7 @@ def app(
     connection = DatabaseConnection(url=os.environ["DB_URL"])
     with connection.get_session() as session:
         sql_forecasts = convert_dataarray_to_forecasts(
-            da_abs_all, session, model_name=model_name_ocf_db, version=pvnet.__version__
+            da_abs_all, session, model_name=model_name_ocf_db, version=pvnet_app.__version__
         )
 
         save_sql_forecasts(
