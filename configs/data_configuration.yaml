@@ -16,7 +16,7 @@ input_data:
     metadata_only: false
 
   nwp:
-    nwp_zarr_path: !ENV ${NWP_ZARR_PATH}
+    nwp_zarr_path: nwp.zarr
     history_minutes: 120
     forecast_minutes: 480
     time_resolution_minutes: 60
@@ -27,7 +27,7 @@ input_data:
     nwp_image_size_pixels_width: 24
 
   satellite:
-    satellite_zarr_path: latest.zarr.zip
+    satellite_zarr_path: sat.zarr.zip
     history_minutes: 90
     forecast_minutes: 0
     live_delay_minutes: 60
