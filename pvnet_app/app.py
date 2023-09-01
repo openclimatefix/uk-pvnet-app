@@ -278,7 +278,7 @@ def app(
     # Download nwp data - can't load zipped zarr straight from s3 bucket
     logger.info("Downloading nwp data")
     fs = fsspec.open(os.environ["NWP_ZARR_PATH"]).fs
-    fs.get(os.environ["NWP_ZARR_PATH"], "nwp.zarr")
+    fs.get(os.environ["NWP_ZARR_PATH"], "nwp.zarr", recursive=True)
 
     # ---------------------------------------------------------------------------
     # 2. Set up data loader
