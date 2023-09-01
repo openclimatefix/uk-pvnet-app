@@ -7,7 +7,7 @@ fsspec[s3]
 xarray
 zarr
 numpy
-pandas
+pandas==2.0
 sqlalchemy
 torchdata
 pytest
