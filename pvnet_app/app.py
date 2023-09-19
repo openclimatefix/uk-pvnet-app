@@ -283,6 +283,7 @@ def app(
     ########
     # TO DO: THIS IS A TEMPORARY BUG FIX TO COMPENSATE FOR A BUG IN THE NWP CONSUMER FLIPPING THE
     # Y-AXIS IN THE NWP
+    logger.warning("Reassigning the y-axis coordinates to compensate for consumer bug")
     ds = xr.open_zarr("nwp.zarr").compute()
     os.system("rm -r nwp.zarr")
     ds["y"] = ds["y"].values[::-1]
