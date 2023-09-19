@@ -264,7 +264,7 @@ def app(
     # Set up ID location query object
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
 
-    # Download satellite data - can't load zipped zarr straight from s3 bucket
+    # Download satellite data
     logger.info("Downloading zipped satellite data")
     fs = fsspec.open(os.environ["SATELLITE_ZARR_PATH"]).fs
     fs.get(os.environ["SATELLITE_ZARR_PATH"], "sat.zarr.zip")
@@ -275,10 +275,22 @@ def app(
         logger.info("Downloading 15-minute satellite data")
         fs.get(sat_latest_15, "sat_15.zarr.zip")
 
-    # Download nwp data - can't load zipped zarr straight from s3 bucket
+    # Download nwp data
     logger.info("Downloading nwp data")
     fs = fsspec.open(os.environ["NWP_ZARR_PATH"]).fs
     fs.get(os.environ["NWP_ZARR_PATH"], "nwp.zarr", recursive=True)
+    
+    ########
+    # TO DO: THIS IS A TEMPORARY BUG FIX TO COMPENSATE FOR A BUG IN THE NWP CONSUMER FLIPPING THE
+    # Y-AXIS IN THE NWP
+    ds = xr.open_zarr("nwp.zarr").compute()
+    os.system("rm -r nwp.zarr")
+    ds["y"] = ds["y"].values[::-1]
+    ds = ds.reindex(y=ds.y.values[::-1])
+    ds["variable"] = ds.variable.astype(str)
+    ds.to_zarr("nwp.zarr")
+    ########
+    
 
     # ---------------------------------------------------------------------------
     # 2. Set up data loader
