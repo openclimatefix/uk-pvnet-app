@@ -1,8 +1,7 @@
 torch[cpu]>=2.0
 PVNet-summation>=0.0.7
 pvnet>=2.1.29
-ocf_datapipes>=1.2.44
-ocf_datapipes==1.2.48
+ocf_datapipes==1.2.44
 fsspec[s3]
 xarray
 zarr
