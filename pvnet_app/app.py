@@ -219,6 +219,8 @@ def app(
 
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
     logger.info(f"Using {num_workers} workers")
+    logger.info(f"Using adjduster: {use_adjuster}")
+    logger.info(f"Saving GSP sum: {save_gsp_sum}")
 
     # Allow environment overwrite of model
     model_name = os.getenv("APP_MODEL", default=default_model_name)
