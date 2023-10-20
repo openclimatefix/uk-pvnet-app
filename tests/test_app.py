@@ -1,4 +1,3 @@
-from pvnet_app.app import app
 import tempfile
 import zarr
 import os
@@ -39,19 +38,21 @@ def test_app(db_session, nwp_data, sat_data, gsp_yields_and_systems, me_latest):
         os.environ["SAVE_GSP_SUM"] = "True"
 
         # Run prediction
+        # This import needs to come after the environ vars have been set
+        from pvnet_app.app import app
         app(gsp_ids=list(range(1, 318)))
 
     # Check forecasts have been made
-    # (317 GSPs + 1 National) = 318 forecasts
+    # (317 GSPs + 1 National + GSP-sum) = 319 forecasts
     # Doubled for historic and forecast
     forecasts = db_session.query(ForecastSQL).all()
-    assert len(forecasts) == 318 * 2
+    assert len(forecasts) == 319 * 2
 
     # Check probabilistic added
     assert "90" in forecasts[0].forecast_values[0].properties
     assert "10" in forecasts[0].forecast_values[0].properties
 
     # 318 GSPs * 16 time steps in forecast
-    assert len(db_session.query(ForecastValueSQL).all()) == 318 * 16
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == 318 * 16
-    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 318 * 16
+    assert len(db_session.query(ForecastValueSQL).all()) == 319 * 16
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == 319 * 16
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 319 * 16
