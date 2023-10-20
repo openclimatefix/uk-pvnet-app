@@ -549,7 +549,7 @@ def app(
                 session=session,
                 update_national=True,
                 update_gsp=False,
-                apply_adjuster=apply_adjuster,
+                apply_adjuster=False,
             )
             
 
