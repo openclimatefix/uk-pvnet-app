@@ -77,6 +77,12 @@ default_summation_model_version = "ead56528a7ac5681a1d4c9db40dabd2d07c7a55f"
 model_name_ocf_db = "pvnet_v2"
 use_adjuster = os.getenv("USE_ADJUSTER", "True").lower() == "true"
 
+# If environmental variable is true, the sum-of-GSPs will be computed and saved under a different
+# model name. This can be useful to compare against the summation model and therefore monitor its
+# performance in production
+save_gsp_sum = os.getenv("SAVE_GSP_SUM", "False").lower() == "true"
+gsp_sum_model_name_ocf_db = "pvnet_gsp_sum"
+
 # ---------------------------------------------------------------------------
 # LOGGER
 formatter = logging.Formatter(
@@ -491,6 +497,18 @@ def app(
         logger.info(
             f"National forecast is {da_abs.sel(gsp_id=0, output_label='forecast_mw').values}"
         )
+        
+    if save_gsp_sum:
+        # Compute the sum if we are logging the sume of GSPs independently
+        logger.info("Summing across GSPs to for independent sum-of-GSP saving")
+        da_abs_sum_gsps = (
+            da_abs.sum(dim="gsp_id")
+            # Only select the central forecast for the GSP sum. The sums of different p-levels 
+            # are not a meaningful qauntities
+            .sel(output_label=["forecast_mw"])
+            .expand_dims(dim="gsp_id", axis=0)
+            .assign_coords(gsp_id=[0])
+        )
 
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
@@ -514,6 +532,24 @@ def app(
             update_gsp=True,
             apply_adjuster=apply_adjuster,
         )
+        
+        if save_gsp_sum:
+            # Save the sum of GSPs independently - mainly for summation model monitoring
+            sql_forecasts = convert_dataarray_to_forecasts(
+                da_abs_sum_gsps, 
+                session, 
+                model_name=gsp_sum_model_name_ocf_db, 
+                version=pvnet_app.__version__
+            )
+
+            save_sql_forecasts(
+                forecasts=sql_forecasts,
+                session=session,
+                update_national=True,
+                update_gsp=False,
+                apply_adjuster=apply_adjuster,
+            )
+            
 
     logger.info("Finished forecast")
 
