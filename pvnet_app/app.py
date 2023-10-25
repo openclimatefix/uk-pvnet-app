@@ -286,7 +286,12 @@ def app(
     # Download nwp data
     logger.info("Downloading nwp data")
     fs = fsspec.open(os.environ["NWP_ZARR_PATH"]).fs
-    fs.get(os.environ["NWP_ZARR_PATH"], "nwp.zarr", recursive=True)    
+    
+    # Hot fix as datapipes can't handle both lat-lon and osgb on same coord
+    fs.get(os.environ["NWP_ZARR_PATH"], "raw_nwp.zarr", recursive=True)
+    ds_nwp = xr.open_zarr("raw_nwp.zarr")
+    ds_nwp.drop_vars(("latitude", "longitude")).to_zarr("nwp.zarr")
+    del ds_nwp
 
     # ---------------------------------------------------------------------------
     # 2. Set up data loader
