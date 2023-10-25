@@ -33,8 +33,6 @@ def test_app(db_session, nwp_data, sat_data, gsp_yields_and_systems, me_latest):
         store.close()
 
         # Set model version
-        os.environ["APP_MODEL_VERSION"] = "96ac8c67fa8663844ddcfa82aece51ef94f34453"
-        os.environ["APP_SUMMATION_MODEL_VERSION"] = "4a145d74c725ffc72f482025d3418659a6869c94"
         os.environ["SAVE_GSP_SUM"] = "True"
 
         # Run prediction
