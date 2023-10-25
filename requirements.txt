@@ -1,6 +1,6 @@
 torch[cpu]>=2.0
 PVNet-summation>=0.0.8
-pvnet>=2.1.30
+pvnet>=2.2.0
 ocf_datapipes>=2.0.4
 nowcasting_datamodel>=1.5.10
 fsspec[s3]
