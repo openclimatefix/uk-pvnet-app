@@ -288,18 +288,6 @@ def app(
     fs = fsspec.open(os.environ["NWP_ZARR_PATH"]).fs
     fs.get(os.environ["NWP_ZARR_PATH"], "nwp.zarr", recursive=True)
     
-    ################
-    # Hot fix as datapipes can't handle both lat-lon and osgb on same coord
-    ds_nwp = xr.open_zarr("nwp.zarr").compute()
-    if "latitude" in ds_nwp:
-        ds_nwp = ds_nwp.drop_vars(("latitude", "longitude"))
-    ds_nwp["variable"] = ds_nwp.variable.astype(str)
-    os.system("rm -r nwp.zarr")
-    ds_nwp.to_zarr("nwp.zarr")
-    
-    del ds_nwp
-    ################
-    
     # ---------------------------------------------------------------------------
     # 2. Set up data loader
     logger.info("Creating DataLoader")
