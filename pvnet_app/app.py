@@ -8,6 +8,7 @@ This app expects these evironmental variables to be available:
 
 import logging
 import os
+import yaml
 import tempfile
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -121,12 +122,10 @@ def populate_data_config_sources(input_path, output_path):
     # Replace data sources
     for source in ["gsp", "nwp", "satellite", "hrvsatellite"]:
         if source in config["input_data"]:
-            assert source in production_paths, f"Missing production path: {source}"
             # If not empty - i.e. if used
             if config["input_data"][source][f"{source}_zarr_path"]!="":
-                config["input_data"][source][f"{source}_zarr_path"] = (
-                    f"{production_paths[source]}.zarr"
-                )
+                assert source in production_paths, f"Missing production path: {source}"
+                config["input_data"][source][f"{source}_zarr_path"] = production_paths[source]
 
     # We do not need to set PV path right now. This currently done through datapipes
     # TODO - Move the PV path to here
@@ -382,13 +381,12 @@ def app(
             or summation_model.pvnet_model_version != model_version
         ):
             warnings.warn(
-                f"The PVNet version running in this app is "
-                f"{model_name}/{model_version}."
-                f"The summation model running in this app was trained on outputs from PVNet "
-                f"version {summation_model.model_name}/{summation_model.model_version}. "
-                f"Combining these models may lead to an error if the shape of PVNet output doesn't "
-                f"match the expected shape of the summation model. Combining may lead to "
-                f"unreliable results even if the shapes match."
+                f"The PVNet version running in this app is {model_name}/{model_version}. "
+                "The summation model running in this app was trained on outputs from PVNet version "
+                f"{summation_model.pvnet_model_name}/{summation_model.pvnet_model_version}. "
+                "Combining these models may lead to an error if the shape of PVNet output doesn't "
+                "match the expected shape of the summation model. Combining may lead to unreliable "
+                "results even if the shapes match."
             )
 
     # 4. Make prediction
