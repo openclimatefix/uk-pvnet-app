@@ -1,4 +1,3 @@
-esmpy
 xesmf
 torch[cpu]>=2.0
 PVNet-summation>=0.0.8
