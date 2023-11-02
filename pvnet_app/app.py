@@ -8,6 +8,8 @@ This app expects these evironmental variables to be available:
 
 import logging
 import os
+import yaml
+import tempfile
 import warnings
 from datetime import datetime, timedelta, timezone
 
@@ -51,8 +53,6 @@ import pvnet_app
 # TODO: Host data config alongside model?
 this_dir = os.path.dirname(os.path.abspath(__file__))
 
-data_config_filename = f"{this_dir}/../configs/data_configuration.yaml"
-
 # Model will use GPU if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -67,7 +67,7 @@ batch_size = 10
 
 # Huggingfacehub model repo and commit for PVNet (GSP-level model)
 default_model_name = "openclimatefix/pvnet_v2"
-default_model_version = "ca621fcb8e275bdcdc586b1f971e82fc65e02735"
+default_model_version = "805ca9b2ee3120592b0b70b7c75a454e2b4e4bec"
 
 # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
 # If summation_model_name is set to None, a simple sum is computed instead
@@ -101,6 +101,37 @@ sql_logger.addHandler(logging.NullHandler())
 
 # ---------------------------------------------------------------------------
 # HELPER FUNCTIONS
+
+def populate_data_config_sources(input_path, output_path):
+    """Resave the data config and replace the source filepaths
+
+    Args:
+        input_path: Path to input datapipes configuration file
+        output_path: Location to save the output configuration file
+    """
+    with open(input_path) as infile:
+        config = yaml.load(infile, Loader=yaml.FullLoader)
+        
+    production_paths = {
+        "gsp": os.environ["DB_URL"],
+        "nwp": "nwp.zarr",
+        "satellite": "sat.zarr.zip",
+        # TODO: include hrvsatellite
+    }        
+    
+    # Replace data sources
+    for source in ["gsp", "nwp", "satellite", "hrvsatellite"]:
+        if source in config["input_data"]:
+            # If not empty - i.e. if used
+            if config["input_data"][source][f"{source}_zarr_path"]!="":
+                assert source in production_paths, f"Missing production path: {source}"
+                config["input_data"][source][f"{source}_zarr_path"] = production_paths[source]
+
+    # We do not need to set PV path right now. This currently done through datapipes
+    # TODO - Move the PV path to here
+    
+    with open(output_path, 'w') as outfile:
+        yaml.dump(config, outfile, default_flow_style=False)
 
 
 def convert_dataarray_to_forecasts(
@@ -291,6 +322,16 @@ def app(
     # ---------------------------------------------------------------------------
     # 2. Set up data loader
     logger.info("Creating DataLoader")
+    
+    # Pull the data config from huggingface
+    data_config_filename = PVNetBaseModel.get_data_config(
+        model_name,
+        revision=model_version,
+    )
+    # Populate the data config with production data paths
+    temp_dir = tempfile.TemporaryDirectory()
+    populated_data_config_filename = f"{temp_dir.name}/data_config.yaml"
+    populate_data_config_sources(data_config_filename, populated_data_config_filename)
 
     # Location and time datapipes
     location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
@@ -302,7 +343,7 @@ def app(
     # Batch datapipe
     batch_datapipe = (
         construct_sliced_data_pipeline(
-            config_filename=data_config_filename,
+            config_filename=populated_data_config_filename,
             location_pipe=location_pipe,
             t0_datapipe=t0_datapipe,
             production=True,
@@ -340,13 +381,12 @@ def app(
             or summation_model.pvnet_model_version != model_version
         ):
             warnings.warn(
-                f"The PVNet version running in this app is "
-                f"{model_name}/{model_version}."
-                f"The summation model running in this app was trained on outputs from PVNet "
-                f"version {summation_model.model_name}/{summation_model.model_version}. "
-                f"Combining these models may lead to an error if the shape of PVNet output doesn't "
-                f"match the expected shape of the summation model. Combining may lead to "
-                f"unreliable results even if the shapes match."
+                f"The PVNet version running in this app is {model_name}/{model_version}. "
+                "The summation model running in this app was trained on outputs from PVNet version "
+                f"{summation_model.pvnet_model_name}/{summation_model.pvnet_model_version}. "
+                "Combining these models may lead to an error if the shape of PVNet output doesn't "
+                "match the expected shape of the summation model. Combining may lead to unreliable "
+                "results even if the shapes match."
             )
 
     # 4. Make prediction
@@ -552,7 +592,7 @@ def app(
                 apply_adjuster=False,
             )
             
-
+    temp_dir.cleanup()
     logger.info("Finished forecast")
 
 
