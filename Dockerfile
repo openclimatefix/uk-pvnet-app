@@ -24,6 +24,7 @@ RUN pip install -r app/requirements.txt
 COPY pvnet_app/ app/pvnet_app/
 COPY tests/ app/tests/
 COPY scripts/ app/scripts/
+COPY data/ app/data/
 
 # change to app folder
 WORKDIR /app
