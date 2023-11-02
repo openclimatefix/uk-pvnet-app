@@ -1,6 +1,6 @@
 {
     "chunks": [
-        17
+        5
     ],
     "compressor": {
         "blocksize": 0,
@@ -9,16 +9,12 @@
         "id": "blosc",
         "shuffle": 1
     },
-    "dtype": "|O",
+    "dtype": "<U6",
     "fill_value": null,
-    "filters": [
-        {
-            "id": "vlen-utf8"
-        }
-    ],
+    "filters": null,
     "order": "C",
     "shape": [
-        17
+        5
     ],
     "zarr_format": 2
 }

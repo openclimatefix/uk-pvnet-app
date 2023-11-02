@@ -107,7 +107,7 @@ def regrid_nwp_data(nwp_path):
     """This function loads the NWP data, then regrids and saves it back out if the data is not on
     the same grid as expected. The data is resaved in-place.
     """
-    ds_raw = xr.open_zarr(raw_nwp_path)
+    ds_raw = xr.open_zarr(nwp_path)
 
     # These are the coords we are aiming for
     ds_target_coords = xr.load_dataset(f"{this_dir}/../data/nwp_target_coords.nc")
@@ -120,8 +120,10 @@ def regrid_nwp_data(nwp_path):
     )
     
     if not needs_regridding:
+        logger.info("No NWP regridding required - skipping this step")
         return
     
+    logger.info("Regridding NWP to expected grid")
     # Its more efficient to regrid eagerly
     ds_raw = ds_raw.compute()
     
@@ -130,9 +132,11 @@ def regrid_nwp_data(nwp_path):
     ds_regridded = regridder(ds_raw)
 
     # Re-save - including rechunking
-    os.system(f"rm -r {raw_nwp_path}")
+    os.system(f"rm -fr {nwp_path}")
     ds_regridded["variable"] = ds_regridded["variable"].astype(str)
-    ds_regridded.chunk(dict(step=12, x=100, y=100)).to_zarr(raw_nwp_path)
+    ds_regridded.chunk(dict(step=12, x=100, y=100)).to_zarr(nwp_path)
+    
+    return
     
 
 def populate_data_config_sources(input_path, output_path):

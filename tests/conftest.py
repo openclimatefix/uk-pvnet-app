@@ -88,7 +88,7 @@ def nwp_data():
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_shell.zarr"
     )
 
-    # Last init time was at least 2 hours ago and hour to 3-hour interval
+    # Last init time was at least 2 hours ago and floor to 3-hour interval
     t0_datetime_utc = time_before_present(timedelta(hours=2)).floor(timedelta(hours=3))
     ds.init_time.values[:] = pd.date_range(
         t0_datetime_utc - timedelta(hours=3 * (len(ds.init_time) - 1)),
@@ -104,17 +104,16 @@ def nwp_data():
     for v in list(ds.variables.keys()):
         if ds[v].dtype == object:
             ds[v].encoding.clear()
-
+    
     # Add data to dataset
     ds["UKV"] = xr.DataArray(
-        np.zeros([len(ds[c]) for c in ds.coords]),
-        coords=ds.coords,
+        np.zeros([len(ds[c]) for c in ds.xindexes]),
+        coords=[ds[c] for c in ds.xindexes],
     )
 
     # Add stored attributes to DataArray
     ds.UKV.attrs = ds.attrs["_data_attrs"]
     del ds.attrs["_data_attrs"]
-
     return ds
 
 
