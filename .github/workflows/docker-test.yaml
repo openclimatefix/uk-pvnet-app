@@ -1,0 +1,12 @@
+name: Python package tests
+
+on:
+  push:
+  schedule:
+    - cron: "0 12 * * 1"
+jobs:
+  call-run-python-tests:
+    uses: openclimatefix/.github/.github/workflows/docker-test.yml@1.8.0
+    with:
+      docker_file: "Dockerfile"
+
