@@ -5,8 +5,8 @@ on:
   schedule:
     - cron: "0 12 * * 1"
 jobs:
-  call-run-python-tests:
-    uses: openclimatefix/.github/.github/workflows/docker-test.yml@v1.8.0
+  call-run-docker-tests:
+    uses: openclimatefix/.github/.github/workflows/docker-test.yml@v1.8.1
     with:
       docker_file: "Dockerfile"
 
