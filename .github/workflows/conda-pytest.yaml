@@ -14,6 +14,8 @@ jobs:
           conda install -c conda-forge xesmf esmpy -y
           export ESMFMKFILE='/usr/share/miniconda/lib/esmf.mk'
           pip install -e .
-             
+
       - name: run pytest
-        run: pytest
+        run: |
+          which python
+          python -m pytest
