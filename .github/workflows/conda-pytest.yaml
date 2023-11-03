@@ -30,8 +30,6 @@ jobs:
       - name: run pytest
         shell: bash -l {0}
         run: |
-          conda init
-          export ESMFMKFILE='/usr/share/miniconda/lib/esmf.mk'
-          conda activate test
+          export ESMFMKFILE='/usr/share/miniconda3/envs/test/lib/esmf.mk'
           which python
           python -m pytest
