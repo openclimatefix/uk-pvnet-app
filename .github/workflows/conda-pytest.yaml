@@ -1,0 +1,21 @@
+name: Conda pytest
+on: push
+
+jobs:
+  push_to_registry:
+    name: Build docker file for testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: Install the repo
+        run: |
+          conda install -c conda-forge xesmf esmpy -y
+          where conda
+          export ESMFMKFILE='/opt/conda/lib/esmf.mk'
+          pip install -e .
+             
+
+      - name: run pytest
+        run: pytest
