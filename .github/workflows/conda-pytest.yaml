@@ -10,15 +10,17 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Install the repo
+        shell: bash -l {0}
         run: |
           conda create -n test python=3.10 -y
-          activate test
+          conda activate test
           conda install -c conda-forge xesmf esmpy -y
           export ESMFMKFILE='/usr/share/miniconda/lib/esmf.mk'
           pip install -e .
 
       - name: run pytest
+        shell: bash -l {0}
         run: |
-          activate test
+          conda activate test
           which python
           python -m pytest
