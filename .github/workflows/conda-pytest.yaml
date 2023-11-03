@@ -24,12 +24,9 @@ jobs:
       - name: Install the repo
         shell: bash -l {0}
         run: |
-          which python
           pip install -e .
 
       - name: run pytest
         shell: bash -l {0}
         run: |
-          export ESMFMKFILE='/usr/share/miniconda3/envs/test/lib/esmf.mk'
-          which python
           python -m pytest
