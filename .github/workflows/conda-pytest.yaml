@@ -9,24 +9,29 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniconda-version: "latest"
+          channels: bioconda, conda-forge, defaults
+          auto-update-conda: true
+          auto-activate-base: true
+
       - name: Install the conda
         shell: bash -l {0}
         run: |
-          conda create -n test python=3.10 -y
-          conda init
-          conda activate test
           conda install -c conda-forge xesmf esmpy -y
-          export ESMFMKFILE='/usr/share/miniconda/lib/esmf.mk'
 
       - name: Install the repo
         shell: bash -l {0}
         run: |
-          conda activate test
+          which python
           pip install -e .
 
       - name: run pytest
         shell: bash -l {0}
         run: |
+          conda init
+          export ESMFMKFILE='/usr/share/miniconda/lib/esmf.mk'
           conda activate test
           which python
           python -m pytest
