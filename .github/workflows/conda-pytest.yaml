@@ -12,13 +12,13 @@ jobs:
       - name: Install the repo
         run: |
           conda create -n test python=3.10 -y
-          conda activate test
+          source activate test
           conda install -c conda-forge xesmf esmpy -y
           export ESMFMKFILE='/usr/share/miniconda/lib/esmf.mk'
           pip install -e .
 
       - name: run pytest
         run: |
-          conda activate test
+          source activate test
           which python
           python -m pytest
