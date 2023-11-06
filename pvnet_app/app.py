@@ -327,11 +327,11 @@ def app(
     url = os.getenv("DB_URL")
     db_connection = DatabaseConnection(url=url, base=Base_Forecast)
     with db_connection.get_session() as session:
-        # Pandas series of most recent GSP capacities
+        #  Pandas series of most recent GSP capacities
         gsp_capacities = get_latest_gsp_capacities(session, gsp_ids)
         
         # National capacity is needed if using summation model
-        national_capacity = gsp_capacities.sum().item()
+        national_capacity = get_latest_gsp_capacities(session, [0])[0]
 
     # Set up ID location query object
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
