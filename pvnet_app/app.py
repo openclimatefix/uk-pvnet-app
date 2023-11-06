@@ -328,10 +328,10 @@ def app(
     db_connection = DatabaseConnection(url=url, base=Base_Forecast)
     with db_connection.get_session() as session:
         # Pandas series of most recent GSP capacities
-        gsp_capacities = get_latest_gsp_capacities(session, gsp_ids).values[:, None, None]
+        gsp_capacities = get_latest_gsp_capacities(session, gsp_ids)
         
         # National capacity is needed if using summation model
-        national_capacity = gsp_capacities.sum()
+        national_capacity = gsp_capacities.sum().item()
 
     # Set up ID location query object
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
@@ -512,7 +512,7 @@ def app(
 
     # Multiply normalised forecasts by capacities and clip negatives
     logger.info(f"Converting to absolute MW using {gsp_capacities}")
-    da_abs = da_normed.clip(0, None) * gsp_capacities
+    da_abs = da_normed.clip(0, None) * gsp_capacities.values
     max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
     logger.info(f"Maximum predictions: {max_preds}")
 
