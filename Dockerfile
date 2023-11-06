@@ -19,7 +19,7 @@ COPY data/ app/data/
 
 # Install requirements
 RUN conda install python=3.10
-RUN conda install -c conda-forge xesmf esmpy -y
+RUN conda install -c conda-forge xesmf esmpy h5py -y
 RUN echo "export ESMFMKFILE='/opt/conda/lib/esmf.mk'" >> ~/.bashrc
 RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
 RUN pip install -r app/requirements.txt
