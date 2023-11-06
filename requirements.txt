@@ -7,10 +7,11 @@ fsspec[s3]
 xarray
 zarr
 numpy
-pandas==2.0
+pandas
 sqlalchemy
 torchdata
 pytest
 pytest-cov
 typer
 testcontainers
+xesmf

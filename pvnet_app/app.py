@@ -19,6 +19,7 @@ import pandas as pd
 import torch
 import typer
 import xarray as xr
+import xesmf as xe
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models import (
     ForecastSQL,
@@ -101,6 +102,42 @@ sql_logger.addHandler(logging.NullHandler())
 
 # ---------------------------------------------------------------------------
 # HELPER FUNCTIONS
+
+def regrid_nwp_data(nwp_path):
+    """This function loads the NWP data, then regrids and saves it back out if the data is not on
+    the same grid as expected. The data is resaved in-place.
+    """
+    ds_raw = xr.open_zarr(nwp_path)
+
+    # These are the coords we are aiming for
+    ds_target_coords = xr.load_dataset(f"{this_dir}/../data/nwp_target_coords.nc")
+    
+    # Check if regridding step needs to be done
+    needs_regridding = not (
+        ds_raw.latitude.equals(ds_target_coords.latitude) and
+         ds_raw.longitude.equals(ds_target_coords.longitude)
+        
+    )
+    
+    if not needs_regridding:
+        logger.info("No NWP regridding required - skipping this step")
+        return
+    
+    logger.info("Regridding NWP to expected grid")
+    # Its more efficient to regrid eagerly
+    ds_raw = ds_raw.compute()
+    
+    # Regrid
+    regridder = xe.Regridder(ds_raw, ds_target_coords, method="bilinear")
+    ds_regridded = regridder(ds_raw)
+
+    # Re-save - including rechunking
+    os.system(f"rm -fr {nwp_path}")
+    ds_regridded["variable"] = ds_regridded["variable"].astype(str)
+    ds_regridded.chunk(dict(step=12, x=100, y=100)).to_zarr(nwp_path)
+    
+    return
+    
 
 def populate_data_config_sources(input_path, output_path):
     """Resave the data config and replace the source filepaths
@@ -318,6 +355,9 @@ def app(
     logger.info("Downloading nwp data")
     fs = fsspec.open(os.environ["NWP_ZARR_PATH"]).fs
     fs.get(os.environ["NWP_ZARR_PATH"], "nwp.zarr", recursive=True)
+    
+    # Regrid the nwp data if needed
+    regrid_nwp_data("nwp.zarr")
     
     # ---------------------------------------------------------------------------
     # 2. Set up data loader
