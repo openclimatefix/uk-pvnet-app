@@ -31,6 +31,9 @@ from nowcasting_datamodel.read.read import (
     get_model,
 )
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
+from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
+from nowcasting_datamodel.connection import DatabaseConnection
+from nowcasting_datamodel.models.base import Base_Forecast
 from ocf_datapipes.load import OpenGSPFromDatabase
 from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
 from ocf_datapipes.transform.numpy.batch.sun_position import ELEVATION_MEAN, ELEVATION_STD
@@ -322,23 +325,16 @@ def app(
     logger.info("Loading GSP metadata")
 
     ds_gsp = next(iter(OpenGSPFromDatabase()))
-
-    # DataArray of most recent GSP capacities
-    gsp_capacities = (
-        ds_gsp.sel(
-            time_utc=t0,
-            method="ffill",
-        )
-        .sel(gsp_id=gsp_ids)
-        .reset_coords()
-        .effective_capacity_mwp
-    )
-
-    # National capacity is needed if using summation model
-    ds_gsp_national = next(iter(OpenGSPFromDatabase(national_only=True)))
-    national_capacity = ds_gsp_national.sel(
-        time_utc=t0, method="ffill"
-    ).effective_capacity_mwp.item()
+    
+    # Get capacities from the database
+    url = os.getenv("DB_URL")
+    db_connection = DatabaseConnection(url=url, base=Base_Forecast)
+    with db_connection.get_session() as session:
+        #  Pandas series of most recent GSP capacities
+        gsp_capacities = get_latest_gsp_capacities(session, gsp_ids)
+        
+        # National capacity is needed if using summation model
+        national_capacity = get_latest_gsp_capacities(session, [0])[0]
 
     # Set up ID location query object
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
@@ -519,7 +515,7 @@ def app(
 
     # Multiply normalised forecasts by capacities and clip negatives
     logger.info(f"Converting to absolute MW using {gsp_capacities}")
-    da_abs = da_normed.clip(0, None) * gsp_capacities
+    da_abs = da_normed.clip(0, None) * gsp_capacities.values[:, None, None]
     max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
     logger.info(f"Maximum predictions: {max_preds}")
 
