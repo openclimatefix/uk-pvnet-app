@@ -512,7 +512,7 @@ def app(
 
     # Multiply normalised forecasts by capacities and clip negatives
     logger.info(f"Converting to absolute MW using {gsp_capacities}")
-    da_abs = da_normed.clip(0, None) * gsp_capacities.values
+    da_abs = da_normed.clip(0, None) * gsp_capacities.values[: None, None]
     max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
     logger.info(f"Maximum predictions: {max_preds}")
 
