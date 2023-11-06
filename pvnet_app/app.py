@@ -124,12 +124,15 @@ def regrid_nwp_data(nwp_path):
         return
     
     logger.info("Regridding NWP to expected grid")
-    # Its more efficient to regrid eagerly
+    
+    # Pull the raw data into RAM
     ds_raw = ds_raw.compute()
     
-    # Regrid
+    # Regrid in RAM efficient way by chunking first. Each step is regridded separately
     regridder = xe.Regridder(ds_raw, ds_target_coords, method="bilinear")
-    ds_regridded = regridder(ds_raw)
+    ds_regridded = regridder(
+        ds_raw.chunk(dict(x=-1, y=-1, step=1))
+    ).compute(scheduler="single-threaded")
 
     # Re-save - including rechunking
     os.system(f"rm -fr {nwp_path}")
