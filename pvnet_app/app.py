@@ -31,7 +31,7 @@ from nowcasting_datamodel.read.read import (
     get_model,
 )
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
-from nowcasting_datamodel.read.read_gsp get_latest_gsp_capacities
+from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from ocf_datapipes.load import OpenGSPFromDatabase
