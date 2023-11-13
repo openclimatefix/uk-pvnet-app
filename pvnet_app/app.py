@@ -231,7 +231,7 @@ def convert_dataarray_to_forecasts(
 
             forecast_value_sql.adjust_mw = 0.0
 
-            forecast_value_sql.properties = {}
+            properties = {}
 
             if "forecast_mw_plevel_10" in gsp_forecast_values_da.output_label:
                 val = this_da.sel(output_label="forecast_mw_plevel_10").item()
@@ -239,13 +239,16 @@ def convert_dataarray_to_forecasts(
                 # or if PVNet_summation has probabilistic outputs and PVNet doesn't.
                 # Do not log the value if NaN
                 if not np.isnan(val):
-                    forecast_value_sql.properties["10"] = val
+                    properties["10"] = val
 
             if "forecast_mw_plevel_90" in gsp_forecast_values_da.output_label:
                 val = this_da.sel(output_label="forecast_mw_plevel_90").item()
 
                 if not np.isnan(val):
-                    forecast_value_sql.properties["90"] = val
+                    properties["90"] = val
+                    
+            if len(properties)>0:
+                forecast_value_sql.properties = properties
 
             forecast_values.append(forecast_value_sql)
 
