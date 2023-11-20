@@ -143,6 +143,38 @@ def regrid_nwp_data(nwp_path):
     ds_regridded.chunk(dict(step=12, x=100, y=100)).to_zarr(nwp_path)
     
     return
+
+
+def sat_data_qualtiy_control(sat_path):
+    """This function loads the satellite data, removes timestamps which don't pass some quality
+    checks and saves it back out. The data is resaved in-place.
+    """
+    # Need to set this high enough not to catch the zeros in the 2 visible spectrum channels at 
+    # night which is valid. 2 out of a total of 11 channels + 10% of 9 others will trigger
+    zero_frac_limit = (2 + 0.1*9)/11
+    
+    # Pull the raw data into RAM
+    ds = xr.open_zarr(sat_path).compute()
+    
+    # Check fraction of zeros at each time step
+    frac_zeros = (ds.data==0).mean(dim=("y_geostationary", "x_geostationary", "variable"))
+    
+    logger.info(
+        f"Found zeros fractions in each timestamp:\n"
+        f"{frac_zeros.to_dataframe().rename({'data':'zero_fraction'}, axis=1)}"
+    )
+    
+    if (frac_zeros<=zero_frac_limit).all():
+        logger.info("No sat quality issues - skipping this step")
+    
+    else:
+        bad_timestamp_mask = frac_zeros>zero_frac_limit
+        bad_timestamps = frac_zeros.where(bad_timestamp_mask, drop=True).time.values
+        logger.info(f"Removing timestamps: {bad_timestamps}")
+        ds = ds.where(~bad_timestamp_mask, drop=True)
+        os.system(f"rm -fr {sat_path}")
+        ds.to_zarr(sat_path)
+    
     
 
 def populate_data_config_sources(input_path, output_path):
@@ -323,10 +355,9 @@ def app(
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
-    # Make pands Series of most recent GSP effective capacities
-
+    # ------------ GSP
+    
     logger.info("Loading GSP metadata")
-
     ds_gsp = next(iter(OpenGSPFromDatabase()))
     
     # Get capacities from the database
@@ -341,24 +372,34 @@ def app(
 
     # Set up ID location query object
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
-
+    
+    # ------------ SATELLITE
+    
     # Download satellite data
     logger.info("Downloading zipped satellite data")
     fs = fsspec.open(os.environ["SATELLITE_ZARR_PATH"]).fs
     fs.get(os.environ["SATELLITE_ZARR_PATH"], "sat.zarr.zip")
+    
+    # Satellite data quality control step
+    sat_data_qualtiy_control("sat.zarr.zip")
 
     # Also download 15-minute satellite if it exists
     sat_latest_15 = os.environ["SATELLITE_ZARR_PATH"].replace(".zarr.zip", "_15.zarr.zip")
     if fs.exists(sat_latest_15):
         logger.info("Downloading 15-minute satellite data")
         fs.get(sat_latest_15, "sat_15.zarr.zip")
-
-    # Download nwp data
+        
+        # 15-min satellite data quality control step
+        sat_data_qualtiy_control("sat_15.zarr.zip")
+    
+    # ------------ NWP
+    
+    # Download NWP data
     logger.info("Downloading nwp data")
     fs = fsspec.open(os.environ["NWP_ZARR_PATH"]).fs
     fs.get(os.environ["NWP_ZARR_PATH"], "nwp.zarr", recursive=True)
     
-    # Regrid the nwp data if needed
+    # Regrid the NWP data if needed
     regrid_nwp_data("nwp.zarr")
     
     # ---------------------------------------------------------------------------
