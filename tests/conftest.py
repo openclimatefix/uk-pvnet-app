@@ -135,7 +135,7 @@ def sat_data():
 
     # Add data to dataset
     ds["data"] = xr.DataArray(
-        np.zeros([len(ds[c]) for c in ds.coords]),
+        np.ones([len(ds[c]) for c in ds.coords]),
         coords=ds.coords,
     )
 
