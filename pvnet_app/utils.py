@@ -70,8 +70,31 @@ def populate_data_config_sources(input_path, output_path):
     
     with open(output_path, 'w') as outfile:
         yaml.dump(config, outfile, default_flow_style=False)
+    
         
+def preds_to_dataarray(preds, model, valid_times, gsp_ids):
+    """Put numpy array of predictions into a dataarray"""
+    
+    if model.use_quantile_regression:
+        output_labels = model.output_quantiles
+        output_labels = [f"forecast_mw_plevel_{int(q*100):02}" for q in model.output_quantiles]
+        output_labels[output_labels.index("forecast_mw_plevel_50")] = "forecast_mw"
+    else:
+        output_labels = ["forecast_mw"]
+        normed_preds = normed_preds[..., np.newaxis]
 
+    da = xr.DataArray(
+        data=preds,
+        dims=["gsp_id", "target_datetime_utc", "output_label"],
+        coords=dict(
+            gsp_id=gsp_ids,
+            target_datetime_utc=valid_times,
+            output_label=output_labels,
+        ),
+    )
+    return da
+        
+        
 def convert_dataarray_to_forecasts(
     forecast_values_dataarray: xr.DataArray, session: Session, model_name: str, version: str
 ) -> list[ForecastSQL]:

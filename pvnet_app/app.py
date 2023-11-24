@@ -18,6 +18,7 @@ import pandas as pd
 import torch
 import typer
 import xarray as xr
+import dask
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
@@ -38,7 +39,7 @@ from pvnet.utils import GSPLocationLookup
 
 import pvnet_app
 from pvnet_app.utils import (
-    worker_init_fn, populate_data_config_sources, convert_dataarray_to_forecasts
+    worker_init_fn, populate_data_config_sources, convert_dataarray_to_forecasts, preds_to_dataarray
 )
 from pvnet_app.data import regrid_nwp_data, download_sat_data, download_nwp_data
 
@@ -92,31 +93,7 @@ sql_logger = logging.getLogger("sqlalchemy.engine.Engine")
 sql_logger.addHandler(logging.NullHandler())
 
 # ---------------------------------------------------------------------------
-# HELPER FUNCTIONS
-
-
-def preds_to_dataarray(preds, model, valid_times, gsp_ids):
-    
-    if model.use_quantile_regression:
-        output_labels = model.output_quantiles
-        output_labels = [f"forecast_mw_plevel_{int(q*100):02}" for q in model.output_quantiles]
-        output_labels[output_labels.index("forecast_mw_plevel_50")] = "forecast_mw"
-    else:
-        output_labels = ["forecast_mw"]
-        normed_preds = normed_preds[..., np.newaxis]
-
-    da = xr.DataArray(
-        data=preds,
-        dims=["gsp_id", "target_datetime_utc", "output_label"],
-        coords=dict(
-            gsp_id=gsp_ids,
-            target_datetime_utc=valid_times,
-            output_label=output_labels,
-        ),
-    )
-    
-    return da
-
+# APP MAIN
 
 def app(
     t0=None,
@@ -144,6 +121,9 @@ def app(
 
     if num_workers == -1:
         num_workers = os.cpu_count() - 1
+    if num_workers>0:
+        # Without this line the dataloader will hang if multiple workers are used
+        dask.config.set(scheduler='single-threaded')
 
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
     logger.info(f"Using {num_workers} workers")
@@ -233,9 +213,7 @@ def app(
             location_pipe=location_pipe,
             t0_datapipe=t0_datapipe,
             production=True,
-            check_satellite_no_zeros=False,
-            block_sat=True,
-            block_nwp=False,
+            check_satellite_no_zeros=True,
         )
         .batch(batch_size)
         .map(stack_np_examples_into_batch)
