@@ -1,6 +1,7 @@
 import tempfile
 import zarr
 import os
+import logging
 
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
@@ -38,7 +39,7 @@ def test_app(db_session, nwp_data, sat_data, gsp_yields_and_systems, me_latest):
         # Run prediction
         # This import needs to come after the environ vars have been set
         from pvnet_app.app import app
-        app(gsp_ids=list(range(1, 318)))
+        app(gsp_ids=list(range(1, 318)), num_workers=2)
 
     # Check forecasts have been made
     # (317 GSPs + 1 National + GSP-sum) = 319 forecasts
