@@ -1,3 +1,4 @@
+import pandas as pd
 import xarray as xr
 import xesmf as xe
 import logging
