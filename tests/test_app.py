@@ -55,7 +55,3 @@ def test_app(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest
     assert len(db_session.query(ForecastValueSQL).all()) == 319 * 16
     assert len(db_session.query(ForecastValueLatestSQL).all()) == 319 * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 319 * 16
-    
-    # Clean up
-    db_session.query(ForecastSQL).delete()
-    db_session.commit()
