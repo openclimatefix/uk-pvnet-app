@@ -11,7 +11,7 @@ from nowcasting_datamodel.models.forecast import (
 )
 
 
-def test_app(db_session, nwp_data, sat_data, gsp_yields_and_systems, me_latest):
+def test_app(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest):
     # Environment variable DB_URL is set in engine_url, which is called by db_session
     # set NWP_ZARR_PATH
     # save nwp_data to temporary file, and set NWP_ZARR_PATH
@@ -21,7 +21,7 @@ def test_app(db_session, nwp_data, sat_data, gsp_yields_and_systems, me_latest):
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         # The app loads sat and NWP data from environment variable
-        # Save out data and set paths
+        # Save out data, and set paths as environmental variables 
         temp_nwp_path = f"{tmpdirname}/nwp.zarr"
         os.environ["NWP_ZARR_PATH"] = temp_nwp_path
         nwp_data.to_zarr(temp_nwp_path)
@@ -30,9 +30,9 @@ def test_app(db_session, nwp_data, sat_data, gsp_yields_and_systems, me_latest):
         temp_sat_path = f"{tmpdirname}/sat.zarr.zip"
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
         store = zarr.storage.ZipStore(temp_sat_path, mode="x")
-        sat_data.to_zarr(store)
+        sat_5_data.to_zarr(store)
         store.close()
-
+        
         # Set model version
         os.environ["SAVE_GSP_SUM"] = "True"
 
@@ -40,7 +40,7 @@ def test_app(db_session, nwp_data, sat_data, gsp_yields_and_systems, me_latest):
         # This import needs to come after the environ vars have been set
         from pvnet_app.app import app
         app(gsp_ids=list(range(1, 318)), num_workers=2)
-
+        
     # Check forecasts have been made
     # (317 GSPs + 1 National + GSP-sum) = 319 forecasts
     # Doubled for historic and forecast
