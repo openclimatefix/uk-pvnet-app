@@ -11,7 +11,7 @@ from nowcasting_datamodel.models.forecast import (
 )
 
 
-def _test_app(db_session, nwp_data, sat_5_data, sat_15_data, gsp_yields_and_systems, me_latest):
+def test_app(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest):
     # Environment variable DB_URL is set in engine_url, which is called by db_session
     # set NWP_ZARR_PATH
     # save nwp_data to temporary file, and set NWP_ZARR_PATH
@@ -32,13 +32,6 @@ def _test_app(db_session, nwp_data, sat_5_data, sat_15_data, gsp_yields_and_syst
         store = zarr.storage.ZipStore(temp_sat_path, mode="x")
         sat_5_data.to_zarr(store)
         store.close()
-
-        # Maybe save the 15-minute data too
-        if sat_15_data is not None:
-            temp_sat_path = os.environ["SATELLITE_ZARR_PATH"].replace("sat.zarr", "sat_15.zarr")
-            store = zarr.storage.ZipStore(temp_sat_path, mode="x")
-            sat_15_data.to_zarr(store)
-            store.close()
         
         # Set model version
         os.environ["SAVE_GSP_SUM"] = "True"
@@ -66,28 +59,3 @@ def _test_app(db_session, nwp_data, sat_5_data, sat_15_data, gsp_yields_and_syst
     # Clean up
     db_session.query(ForecastSQL).delete()
     db_session.commit()
-
-
-def test_app_5(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest):
-    
-    _test_app(
-        db_session=db_session, 
-        nwp_data=nwp_data, 
-        sat_5_data=sat_5_data, 
-        sat_15_data=None,
-        gsp_yields_and_systems=gsp_yields_and_systems, 
-        me_latest=me_latest
-    )
-    
-
-def test_app_15(
-    db_session, nwp_data, sat_5_data_delayed, sat_15_data, gsp_yields_and_systems, me_latest
-):
-    _test_app(
-        db_session=db_session, 
-        nwp_data=nwp_data, 
-        sat_5_data=sat_5_data_delayed, 
-        sat_15_data=sat_15_data,
-        gsp_yields_and_systems=gsp_yields_and_systems, 
-        me_latest=me_latest
-    )

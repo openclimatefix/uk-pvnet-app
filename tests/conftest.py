@@ -147,12 +147,11 @@ def sat_5_data():
 
 @pytest.fixture()
 def sat_5_data_delayed(sat_5_data):
-    sat_5_delayed = sat_5_data.copy(deep=True)
-    
     # Set the most recent timestamp to 2 - 2.5 hours ago
     t_most_recent = time_before_present(timedelta(hours=2)).floor(timedelta(minutes=30))
-    offset = sat_5_delayed.time.max().values - t_most_recent
-    sat_5_delayed.time.values[:] = sat_5_delayed.time.values - offset
+    offset = sat_5_data.time.max().values - t_most_recent
+    sat_5_delayed = sat_5_data.copy(deep=True)
+    sat_5_delayed["time"] = sat_5_data.time.values - offset
     return sat_5_delayed
 
 

@@ -55,7 +55,9 @@ def preprocess_sat_data(t0):
         logger.info(f"Latest 15-minute timestamp is {latest_time_15} for t0 time {t0}.")
         
         logger.debug("Resampling 15 minute data to 5 mins")
-        ds_sat_15.resample(time="5T").interpolate("linear").to_zarr(sat_path)
+        #ds_sat_15.resample(time="5T").interpolate("linear").to_zarr(sat_path)
+        ds_sat_15.attrs["source"] = "15-minute"
+        ds_sat_15.to_zarr(sat_path)
                 
         
 def download_nwp_data():
