@@ -124,9 +124,8 @@ def sat_data():
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr"
     )
 
-    # Change times so they lead up to present. Delayed by at most 1 hour
-    t0_datetime_utc = time_before_present(timedelta(minutes=0)).floor(timedelta(minutes=30))
-    t0_datetime_utc = t0_datetime_utc - timedelta(minutes=30)
+    # Change times so they lead up to present. Delayed by 30-60 mins
+    t0_datetime_utc = time_before_present(timedelta(minutes=30)).floor(timedelta(minutes=30))
     ds.time.values[:] = pd.date_range(
         t0_datetime_utc - timedelta(minutes=5 * (len(ds.time) - 1)),
         t0_datetime_utc,
@@ -144,6 +143,28 @@ def sat_data():
     del ds.attrs["_data_attrs"]
 
     return ds
+
+
+@pytest.fixture()
+def sat_data_delayed(sat_data):
+    sat_delayed = sat_data.copy(deep=True)
+    
+    # Set the most recent timestamp to 2 - 2.5 hours ago
+    t_most_recent = time_before_present(timedelta(hours=2)).floor(timedelta(minutes=30))
+    offset = sat_delayed.time.max().values - t_most_recent
+    sat_delayed.time.values[:] = sat_delayed.time.values - offset
+    return sat_delayed
+
+
+@pytest.fixture()
+def sat_15_data(sat_data):
+    freq = timedelta(minutes=15)
+    times_15 = pd.date_range(
+        pd.to_datetime(sat_data.time.min().values).ceil(freq),
+        pd.to_datetime(sat_data.time.max().values).floor(freq),
+        freq=freq,
+    )
+    return sat_data.sel(time=times_15)
 
 
 @pytest.fixture()
