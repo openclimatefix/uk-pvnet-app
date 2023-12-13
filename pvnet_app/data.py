@@ -19,16 +19,20 @@ sat_15_path = "sat_15_min.zarr"
 
 def download_sat_data():
     """Download the sat data"""
+    
+    # Clean out old files
+    os.system(f"rm -r {sat_path} {sat_5_path} {sat_15_path}")
+    
     fs = fsspec.open(os.environ["SATELLITE_ZARR_PATH"]).fs
     fs.get(os.environ["SATELLITE_ZARR_PATH"], "sat_5_min.zarr.zip")
-    os.system(f"rm -r {sat_5_path} {sat_15_path} {sat_path}")
+    
     os.system(f"unzip sat_5_min.zarr.zip -d {sat_5_path}")
     
     # Also download 15-minute satellite if it exists
-    sat_latest_15 = os.environ["SATELLITE_ZARR_PATH"].replace("sat.zarr", "sat_15.zarr")
-    if fs.exists(sat_latest_15):
+    sat_15_dl_path = os.environ["SATELLITE_ZARR_PATH"].replace("sat.zarr", "sat_15.zarr")
+    if fs.exists(sat_15_dl_path):
         logger.info("Downloading 15-minute satellite data")
-        fs.get(sat_latest_15, sat_15_path)
+        fs.get(sat_15_dl_path, "sat_15_min.zarr.zip")
         os.system(f"unzip sat_15_min.zarr.zip -d {sat_15_path}")
         
 

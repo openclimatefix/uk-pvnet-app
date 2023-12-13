@@ -35,7 +35,7 @@ def _test_app(db_session, nwp_data, sat_5_data, sat_15_data, gsp_yields_and_syst
 
         # Maybe save the 15-minute data too
         if sat_15_data is not None:
-            temp_sat_path = f"{tmpdirname}/sat_15.zarr.zip"
+            temp_sat_path = os.environ["SATELLITE_ZARR_PATH"].replace("sat.zarr", "sat_15.zarr")
             store = zarr.storage.ZipStore(temp_sat_path, mode="x")
             sat_15_data.to_zarr(store)
             store.close()
