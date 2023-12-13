@@ -47,19 +47,7 @@ def _test_app(db_session, nwp_data, sat_5_data, sat_15_data, gsp_yields_and_syst
         # This import needs to come after the environ vars have been set
         from pvnet_app.app import app
         app(gsp_ids=list(range(1, 318)), num_workers=2)
-
-
-def test_app(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest):
-    
-    _test_app(
-        db_session=db_session, 
-        nwp_data=nwp_data, 
-        sat_5_data=sat_5_data, 
-        sat_15_data=None,
-        gsp_yields_and_systems=gsp_yields_and_systems, 
-        me_latest=me_latest
-    )
-
+        
     # Check forecasts have been made
     # (317 GSPs + 1 National + GSP-sum) = 319 forecasts
     # Doubled for historic and forecast
@@ -74,6 +62,22 @@ def test_app(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest
     assert len(db_session.query(ForecastValueSQL).all()) == 319 * 16
     assert len(db_session.query(ForecastValueLatestSQL).all()) == 319 * 16
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 319 * 16
+    
+    # Clean up
+    db_session.query(ForecastSQL).delete()
+    db_session.commit()
+
+
+def test_app_5(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest):
+    
+    _test_app(
+        db_session=db_session, 
+        nwp_data=nwp_data, 
+        sat_5_data=sat_5_data, 
+        sat_15_data=None,
+        gsp_yields_and_systems=gsp_yields_and_systems, 
+        me_latest=me_latest
+    )
     
 
 def test_app_15(
@@ -87,18 +91,3 @@ def test_app_15(
         gsp_yields_and_systems=gsp_yields_and_systems, 
         me_latest=me_latest
     )
-
-    # Check forecasts have been made
-    # (317 GSPs + 1 National + GSP-sum) = 319 forecasts
-    # Doubled for historic and forecast
-    forecasts = db_session.query(ForecastSQL).all()
-    assert len(forecasts) == 319 * 2
-
-    # Check probabilistic added
-    assert "90" in forecasts[0].forecast_values[0].properties
-    assert "10" in forecasts[0].forecast_values[0].properties
-
-    # 318 GSPs * 16 time steps in forecast
-    assert len(db_session.query(ForecastValueSQL).all()) == 319 * 16
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == 319 * 16
-    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 319 * 16
