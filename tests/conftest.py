@@ -51,7 +51,7 @@ def engine_url():
 
 @pytest.fixture()
 def db_connection(engine_url):
-    database_connection = DatabaseConnection(engine_url, echo=True)
+    database_connection = DatabaseConnection(engine_url, echo=False)
 
     engine = database_connection.engine
     # connection = engine.connect()
