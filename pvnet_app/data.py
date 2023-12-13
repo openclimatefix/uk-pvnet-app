@@ -44,7 +44,7 @@ def preprocess_sat_data(t0):
         logger.info(f"5-min satellite delay is only {sat_delay_5} - Using 5-minutely data.")
         os.system(f"mv {sat_5_path} {sat_path}")
     else:
-        logger.info(f"5-min satellite delay is {sat_delay} - Switching to 15-minutely data.")
+        logger.info(f"5-min satellite delay is {sat_delay_5} - Switching to 15-minutely data.")
         
         ds_sat_15 = xr.open_zarr(sat_15_path)
         latest_time_15 = pd.to_datetime(ds_sat_15.time.max().values)        

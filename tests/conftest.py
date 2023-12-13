@@ -118,7 +118,7 @@ def nwp_data():
 
 
 @pytest.fixture()
-def sat_data():
+def sat_5_data():
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr"
@@ -146,25 +146,25 @@ def sat_data():
 
 
 @pytest.fixture()
-def sat_data_delayed(sat_data):
-    sat_delayed = sat_data.copy(deep=True)
+def sat_5_data_delayed(sat_5_data):
+    sat_5_delayed = sat_5_data.copy(deep=True)
     
     # Set the most recent timestamp to 2 - 2.5 hours ago
     t_most_recent = time_before_present(timedelta(hours=2)).floor(timedelta(minutes=30))
-    offset = sat_delayed.time.max().values - t_most_recent
-    sat_delayed.time.values[:] = sat_delayed.time.values - offset
-    return sat_delayed
+    offset = sat_5_delayed.time.max().values - t_most_recent
+    sat_5_delayed.time.values[:] = sat_5_delayed.time.values - offset
+    return sat_5_delayed
 
 
 @pytest.fixture()
-def sat_15_data(sat_data):
+def sat_15_data(sat_5_data):
     freq = timedelta(minutes=15)
     times_15 = pd.date_range(
-        pd.to_datetime(sat_data.time.min().values).ceil(freq),
-        pd.to_datetime(sat_data.time.max().values).floor(freq),
+        pd.to_datetime(sat_5_data.time.min().values).ceil(freq),
+        pd.to_datetime(sat_5_data.time.max().values).floor(freq),
         freq=freq,
     )
-    return sat_data.sel(time=times_15)
+    return sat_5_data.sel(time=times_15)
 
 
 @pytest.fixture()
