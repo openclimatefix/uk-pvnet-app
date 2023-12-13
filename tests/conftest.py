@@ -32,7 +32,7 @@ def engine_url():
         url = postgres.get_connection_url()
         os.environ["DB_URL"] = url
 
-        database_connection = DatabaseConnection(url, echo=True)
+        database_connection = DatabaseConnection(url, echo=False)
 
         engine = database_connection.engine
 
