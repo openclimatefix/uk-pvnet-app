@@ -41,7 +41,9 @@ import pvnet_app
 from pvnet_app.utils import (
     worker_init_fn, populate_data_config_sources, convert_dataarray_to_forecasts, preds_to_dataarray
 )
-from pvnet_app.data import regrid_nwp_data, download_sat_data, download_nwp_data
+from pvnet_app.data import (
+    download_sat_data, download_nwp_data, preprocess_sat_data, regrid_nwp_data,
+)
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
@@ -177,6 +179,9 @@ def app(
     logger.info("Downloading satellite data")
     download_sat_data()
 
+    # Process the 5/15 minutely satellite data
+    preprocess_sat_data(t0)
+    
     # Download NWP data
     logger.info("Downloading NWP data")
     download_nwp_data()

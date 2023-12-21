@@ -1,30 +1,65 @@
+import pandas as pd
 import xarray as xr
 import xesmf as xe
 import logging
 import os
 import fsspec
+from datetime import timedelta
+import ocf_blosc2
 
-from pvnet_app.consts import sat_path, sat_15_path, nwp_path
+from pvnet_app.consts import sat_path, nwp_path
 
 logger = logging.getLogger(__name__)
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 
+sat_5_path = "sat_5_min.zarr"
+sat_15_path = "sat_15_min.zarr"
+
+
 def download_sat_data():
     """Download the sat data"""
+    
+    # Clean out old files
+    os.system(f"rm -r {sat_path} {sat_5_path} {sat_15_path}")
+    
     fs = fsspec.open(os.environ["SATELLITE_ZARR_PATH"]).fs
-    fs.get(os.environ["SATELLITE_ZARR_PATH"], "sat.zarr.zip")
-    os.system(f"rm -r {sat_path}")
-    os.system(f"unzip sat.zarr.zip -d {sat_path}")
+    fs.get(os.environ["SATELLITE_ZARR_PATH"], "sat_5_min.zarr.zip")
+    
+    os.system(f"unzip sat_5_min.zarr.zip -d {sat_5_path}")
     
     # Also download 15-minute satellite if it exists
-    sat_latest_15 = os.environ["SATELLITE_ZARR_PATH"].replace("sat.zarr", "sat_15.zarr")
-    if fs.exists(sat_latest_15):
+    sat_15_dl_path = os.environ["SATELLITE_ZARR_PATH"].replace("sat.zarr", "sat_15.zarr")
+    if fs.exists(sat_15_dl_path):
         logger.info("Downloading 15-minute satellite data")
-        fs.get(sat_latest_15, "sat_15.zarr")
-        os.system(f"unzip sat_15.zarr.zip -d {sat_15_path}")
+        fs.get(sat_15_dl_path, "sat_15_min.zarr.zip")
+        os.system(f"unzip sat_15_min.zarr.zip -d {sat_15_path}")
         
 
+def preprocess_sat_data(t0):
+    """Select and/or combine the 5 and 15-minutely satellite data"""
+    
+    ds_sat_5 = xr.open_zarr(sat_5_path)
+    latest_time_5 = pd.to_datetime(ds_sat_5.time.max().values)
+    sat_delay_5 = t0 - latest_time_5
+    logger.info(f"Latest 5-minute timestamp is {latest_time_5} for t0 time {t0}.")
+    
+    if sat_delay_5 < timedelta(minutes=60):
+        logger.info(f"5-min satellite delay is only {sat_delay_5} - Using 5-minutely data.")
+        os.system(f"mv {sat_5_path} {sat_path}")
+    else:
+        logger.info(f"5-min satellite delay is {sat_delay_5} - Switching to 15-minutely data.")
+        
+        ds_sat_15 = xr.open_zarr(sat_15_path)
+        latest_time_15 = pd.to_datetime(ds_sat_15.time.max().values)        
+        logger.info(f"Latest 15-minute timestamp is {latest_time_15} for t0 time {t0}.")
+        
+        logger.debug("Resampling 15 minute data to 5 mins")
+        #ds_sat_15.resample(time="5T").interpolate("linear").to_zarr(sat_path)
+        ds_sat_15.attrs["source"] = "15-minute"
+        ds_sat_15.to_zarr(sat_path)
+                
+        
 def download_nwp_data():
     """Download the NWP data"""
     fs = fsspec.open(os.environ["NWP_ZARR_PATH"]).fs
