@@ -65,7 +65,7 @@ def populate_data_config_sources(input_path, output_path):
                 config["input_data"][source][f"{source}_zarr_path"] = production_paths[source]
         
     # NWP is nested so much be treated separately
-    if ("ukv" in config["input_data"]):
+    if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
             if nwp_config[nwp_source][f"nwp_zarr_path"]!="":
