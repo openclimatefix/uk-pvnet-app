@@ -52,18 +52,26 @@ def populate_data_config_sources(input_path, output_path):
         
     production_paths = {
         "gsp": os.environ["DB_URL"],
-        "nwp": nwp_path,
+        "nwp": {"ukv": nwp_path},
         "satellite": sat_path,
         # TODO: include hrvsatellite
     }        
     
     # Replace data sources
-    for source in ["gsp", "nwp", "satellite", "hrvsatellite"]:
-        if source in config["input_data"]:
-            # If not empty - i.e. if used
+    for source in ["gsp", "satellite", "hrvsatellite"]:
+        if source in config["input_data"] :
             if config["input_data"][source][f"{source}_zarr_path"]!="":
                 assert source in production_paths, f"Missing production path: {source}"
                 config["input_data"][source][f"{source}_zarr_path"] = production_paths[source]
+        
+    # NWP is nested so much be treated separately
+    if ("ukv" in config["input_data"]):
+        nwp_config = config["input_data"]["nwp"]
+        for nwp_source in nwp_config.keys():
+            if nwp_config[nwp_source][f"nwp_zarr_path"]!="":
+                assert "nwp" in production_paths, f"Missing production path: nwp"
+                assert nwp_source in production_paths["nwp"], f"Missing NWP path: {nwp_source}"
+                nwp_config[nwp_source][f"nwp_zarr_path"] = production_paths["nwp"][nwp_source]
 
     # We do not need to set PV path right now. This currently done through datapipes
     # TODO - Move the PV path to here
