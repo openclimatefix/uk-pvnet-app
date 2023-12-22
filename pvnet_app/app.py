@@ -25,15 +25,14 @@ from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 from nowcasting_datamodel.models.base import Base_Forecast
 from ocf_datapipes.load import OpenGSPFromDatabase
 from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
-from ocf_datapipes.transform.numpy.batch.sun_position import ELEVATION_MEAN, ELEVATION_STD
-from ocf_datapipes.utils.consts import BatchKey
-from ocf_datapipes.utils.utils import stack_np_examples_into_batch
+from ocf_datapipes.utils.consts import ELEVATION_MEAN, ELEVATION_STD
+from ocf_datapipes.batch import BatchKey, stack_np_examples_into_batch
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter import IterableWrapper
 
 import pvnet
-from pvnet.data.datamodule import batch_to_tensor, copy_batch_to_device
+from pvnet.data.utils import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import GSPLocationLookup
 
@@ -62,12 +61,12 @@ batch_size = 10
 
 # Huggingfacehub model repo and commit for PVNet (GSP-level model)
 default_model_name = "openclimatefix/pvnet_v2"
-default_model_version = "805ca9b2ee3120592b0b70b7c75a454e2b4e4bec"
+default_model_version = "22e577100d55787eb2547d701275b9bb48f7bfa0"
 
 # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
 # If summation_model_name is set to None, a simple sum is computed instead
 default_summation_model_name = "openclimatefix/pvnet_v2_summation"
-default_summation_model_version = "6c5361101b461ae991662bdff05f7a0b77b4040b"
+default_summation_model_version = "e14bc98039511b2e383100a27f0c8e3b558d6c36"
 
 model_name_ocf_db = "pvnet_v2"
 use_adjuster = os.getenv("USE_ADJUSTER", "True").lower() == "true"
