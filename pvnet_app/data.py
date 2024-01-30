@@ -29,9 +29,10 @@ def download_sat_data():
     os.system(f"unzip sat_5_min.zarr.zip -d {sat_5_path}")
     
     # Also download 15-minute satellite if it exists
-    sat_15_dl_path = os.environ["SATELLITE_ZARR_PATH"].replace("sat.zarr", "sat_15.zarr")
+    sat_15_dl_path = os.environ["SATELLITE_ZARR_PATH"]\
+        .replace("sat.zarr", "sat_15.zarr").replace("latest.zarr", "latest_15.zarr")
     if fs.exists(sat_15_dl_path):
-        logger.info("Downloading 15-minute satellite data")
+        logger.info(f"Downloading 15-minute satellite data {sat_15_dl_path}")
         fs.get(sat_15_dl_path, "sat_15_min.zarr.zip")
         os.system(f"unzip sat_15_min.zarr.zip -d {sat_15_path}")
         
@@ -57,6 +58,8 @@ def preprocess_sat_data(t0):
         logger.debug("Resampling 15 minute data to 5 mins")
         #ds_sat_15.resample(time="5T").interpolate("linear").to_zarr(sat_path)
         ds_sat_15.attrs["source"] = "15-minute"
+
+        logger.debug(f"Saving 15 minute data to {sat_path}")
         ds_sat_15.to_zarr(sat_path)
                 
         
