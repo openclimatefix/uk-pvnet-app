@@ -167,7 +167,7 @@ def app(
     
     # Get capacities from the database
     url = os.getenv("DB_URL")
-    db_connection = DatabaseConnection(url=url, base=Base_Forecast)
+    db_connection = DatabaseConnection(url=url, base=Base_Forecast, echo=False)
     with db_connection.get_session() as session:
         #  Pandas series of most recent GSP capacities
         gsp_capacities = get_latest_gsp_capacities(session, gsp_ids)
