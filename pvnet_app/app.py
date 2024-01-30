@@ -85,8 +85,12 @@ formatter = logging.Formatter(
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 
+logging.basicConfig(
+    level=getattr(logging, os.getenv("LOGLEVEL", "INFO")),
+    format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
+)
+
 logger = logging.getLogger(__name__)
-logger.setLevel(getattr(logging, os.getenv("LOGLEVEL", "INFO")))
 logger.addHandler(stream_handler)
 
 # Get rid of these verbose logs
