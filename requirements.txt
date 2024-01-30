@@ -1,4 +1,4 @@
-pydantic<2.0
+pydantic
 torch[cpu]>=2.0.0
 PVNet-summation==0.1.*
 pvnet>=2.6.7,<2.7
