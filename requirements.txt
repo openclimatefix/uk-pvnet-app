@@ -2,7 +2,7 @@ pydantic
 torch[cpu]==2.1.2
 PVNet-summation==0.1.*
 pvnet>=2.6.7,<2.7
-ocf_datapipes==3.2.5
+ocf_datapipes==3.2.7
 nowcasting_datamodel>=1.5.30
 fsspec[s3]
 xarray
