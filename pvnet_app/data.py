@@ -22,11 +22,13 @@ def download_sat_data():
     
     # Clean out old files
     os.system(f"rm -r {sat_path} {sat_5_path} {sat_15_path}")
-    
-    fs = fsspec.open(os.environ["SATELLITE_ZARR_PATH"]).fs
-    fs.get(os.environ["SATELLITE_ZARR_PATH"], "sat_5_min.zarr.zip")
-    
-    os.system(f"unzip sat_5_min.zarr.zip -d {sat_5_path}")
+
+    # download 5 minute satellite data
+    sat_download_path = os.environ["SATELLITE_ZARR_PATH"]
+    fs = fsspec.open(sat_download_path).fs
+    if fs.exists(sat_download_path):
+        fs.get(sat_download_path, "sat_5_min.zarr.zip")
+        os.system(f"unzip sat_5_min.zarr.zip -d {sat_5_path}")
     
     # Also download 15-minute satellite if it exists
     sat_15_dl_path = os.environ["SATELLITE_ZARR_PATH"]\
@@ -39,17 +41,28 @@ def download_sat_data():
 
 def preprocess_sat_data(t0):
     """Select and/or combine the 5 and 15-minutely satellite data"""
-    
-    ds_sat_5 = xr.open_zarr(sat_5_path)
-    latest_time_5 = pd.to_datetime(ds_sat_5.time.max().values)
-    sat_delay_5 = t0 - latest_time_5
-    logger.info(f"Latest 5-minute timestamp is {latest_time_5} for t0 time {t0}.")
-    
-    if sat_delay_5 < timedelta(minutes=60):
-        logger.info(f"5-min satellite delay is only {sat_delay_5} - Using 5-minutely data.")
-        os.system(f"mv {sat_5_path} {sat_path}")
+
+    use_15_minute = False
+    if not os.path.exists(sat_5_path):
+        use_15_minute = True
+        logger.debug(f"5-minute satellite data not found at {sat_5_path}. "
+                     f"Using 15-minute data.")
     else:
-        logger.info(f"5-min satellite delay is {sat_delay_5} - Switching to 15-minutely data.")
+        ds_sat_5 = xr.open_zarr(sat_5_path)
+        latest_time_5 = pd.to_datetime(ds_sat_5.time.max().values)
+        sat_delay_5 = t0 - latest_time_5
+        logger.info(f"Latest 5-minute timestamp is {latest_time_5} for t0 time {t0}.")
+
+        if sat_delay_5 < timedelta(minutes=60):
+            logger.info(f"5-min satellite delay is only {sat_delay_5} - Using 5-minutely data.")
+            os.system(f"mv {sat_5_path} {sat_path}")
+        else:
+            use_15_minute = True
+            logger.info(f"5-min satellite delay is {sat_delay_5} - "
+                        f"Switching to 15-minutely data.")
+
+    if use_15_minute:
+        logger.info(f"Using 15-minute satellite data")
         
         ds_sat_15 = xr.open_zarr(sat_15_path)
         latest_time_15 = pd.to_datetime(ds_sat_15.time.max().values)        
