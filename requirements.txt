@@ -1,5 +1,5 @@
 pydantic
-torch[cpu]==2.2.0
+torch[cpu]==2.1.2
 PVNet-summation==0.1.*
 pvnet==2.6.10
 ocf_datapipes==3.2.7
