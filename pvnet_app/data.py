@@ -74,6 +74,8 @@ def preprocess_sat_data(t0):
 
         logger.debug(f"Saving 15 minute data to {sat_path}")
         ds_sat_15.to_zarr(sat_path)
+
+    return use_15_minute
                 
         
 def download_nwp_data():
