@@ -23,6 +23,9 @@ RUN conda install -c conda-forge xesmf esmpy h5py -y
 RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
 RUN pip install git+https://github.com/SheffieldSolar/PV_Live-API#pvlive_api
 
+# install cpu torch
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
 # Change to app folder
 WORKDIR /app
 
