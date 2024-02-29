@@ -150,7 +150,7 @@ def regrid_nwp_data(nwp_zarr, target_coords_path, method):
     ).to_zarr(nwp_zarr)
 
     
-def rename_ecmwf_variables():
+def fix_ecmwf_data():
     
     ds = xr.open_zarr(nwp_ecmwf_path).compute()
     ds["variable"] = ds["variable"].astype(str)
@@ -160,12 +160,16 @@ def rename_ecmwf_variables():
         "clt": "tcc"
     }
     
-    if not any(v in name_sub for v in ds["variable"].values):
+    if any(v in name_sub for v in ds["variable"].values):
+        logger.info(f"Renaming the ECMWF variables")
+        ds["variable"] = np.array([name_sub[v] if v in name_sub else v for v in ds["variable"].values])
+    else:
         logger.info(f"No ECMWF renaming required - skipping this step")
-        return
     
-    logger.info(f"Renaming the ECMWF variables")
-    ds["variable"] = np.array([name_sub[v] if v in name_sub else v for v in ds["variable"].values])
+    logger.info(f"Extending the ECMWF data to reach the shetlands")
+    # Thw data must be extended to reach the shetlands. This will fill missing lats with NaNs
+    # and reflects what the model saw in training
+    ds = ds.reindex(latitude=np.concatenate([np.arange(62, 60, -0.05), ds.latitude.values]))
     
     # Re-save inplace
     os.system(f"rm -rf {nwp_ecmwf_path}")
@@ -188,5 +192,5 @@ def preprocess_nwp_data():
         method="conservative" # this is needed to avoid zeros around edges of ECMWF data
     )
     
-    # Names need to be aligned between training and prod
-    rename_ecmwf_variables()
+    # Names need to be aligned between training and prod, and we need to infill the shetlands
+    fix_ecmwf_data()
