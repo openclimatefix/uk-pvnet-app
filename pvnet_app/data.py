@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import xarray as xr
 import xesmf as xe
@@ -7,7 +8,7 @@ import fsspec
 from datetime import timedelta
 import ocf_blosc2
 
-from pvnet_app.consts import sat_path, nwp_path
+from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ sat_5_path = "sat_5_min.zarr"
 sat_15_path = "sat_15_min.zarr"
 
 
-def download_sat_data():
+def download_all_sat_data():
     """Download the sat data"""
     
     # Clean out old files
@@ -76,23 +77,28 @@ def preprocess_sat_data(t0):
         ds_sat_15.to_zarr(sat_path)
 
     return use_15_minute
-                
-        
-def download_nwp_data():
-    """Download the NWP data"""
-    fs = fsspec.open(os.environ["NWP_ZARR_PATH"]).fs
-    fs.get(os.environ["NWP_ZARR_PATH"], nwp_path, recursive=True)
+               
+    
+def _download_nwp_data(source, destination):
+    fs = fsspec.open(source).fs
+    fs.get(source, destination, recursive=True)
 
     
-def regrid_nwp_data():
-    """This function loads the NWP data, then regrids and saves it back out if the data is not on
-    the same grid as expected. The data is resaved in-place.
+def download_all_nwp_data():
+    """Download the NWP data"""
+    _download_nwp_data(os.environ["NWP_UKV_ZARR_PATH"], nwp_ukv_path)
+    _download_nwp_data(os.environ["NWP_ECMWF_ZARR_PATH"], nwp_ecmwf_path)
+
+
+def regrid_nwp_data(nwp_zarr, target_coords_path, method):
+    """This function loads the  NWP data, then regrids and saves it back out if the data is not
+    on the same grid as expected. The data is resaved in-place.
     """
     
-    ds_raw = xr.open_zarr(nwp_path)
+    ds_raw = xr.open_zarr(nwp_zarr)
 
     # These are the coords we are aiming for
-    ds_target_coords = xr.load_dataset(f"{this_dir}/../data/nwp_target_coords.nc")
+    ds_target_coords = xr.load_dataset(target_coords_path)
     
     # Check if regridding step needs to be done
     needs_regridding = not (
@@ -102,23 +108,85 @@ def regrid_nwp_data():
     )
     
     if not needs_regridding:
-        logger.info("No NWP regridding required - skipping this step")
+        logger.info(f"No NWP regridding required for {nwp_zarr} - skipping this step")
         return
     
-    logger.info("Regridding NWP to expected grid")
+    logger.info(f"Regridding NWP {nwp_zarr} to expected grid")
     
     # Pull the raw data into RAM
     ds_raw = ds_raw.compute()
     
     # Regrid in RAM efficient way by chunking first. Each step is regridded separately
-    regridder = xe.Regridder(ds_raw, ds_target_coords, method="bilinear")
+    regrid_chunk_dict = {
+        "step": 1,
+        "latitude": -1,
+        "longitude": -1,
+        "x": -1,
+        "y": -1,
+    }
+    
+    regridder = xe.Regridder(ds_raw, ds_target_coords, method=method)
     ds_regridded = regridder(
-        ds_raw.chunk(dict(x=-1, y=-1, step=1))
+        ds_raw.chunk(
+            {k: regrid_chunk_dict[k] for k in list(ds_raw.xindexes) if k in regrid_chunk_dict}
+        )
     ).compute(scheduler="single-threaded")
 
     # Re-save - including rechunking
-    os.system(f"rm -fr {nwp_path}")
+    os.system(f"rm -rf {nwp_zarr}")
     ds_regridded["variable"] = ds_regridded["variable"].astype(str)
-    ds_regridded.chunk(dict(step=12, x=100, y=100)).to_zarr(nwp_path)
     
-    return
+    # Rechunk to these dimensions when saving
+    save_chunk_dict = {
+        "step": 5,
+        "latitude": 100,
+        "longitude": 100,
+        "x": 100,
+        "y": 100,
+    }
+    
+    ds_regridded.chunk(
+        {k: save_chunk_dict[k] for k in list(ds_raw.xindexes) if k in save_chunk_dict}
+    ).to_zarr(nwp_zarr)
+
+    
+def rename_ecmwf_variables():
+    
+    ds = xr.open_zarr(nwp_ecmwf_path).compute()
+    ds["variable"] = ds["variable"].astype(str)
+    
+    name_sub = {
+        "t": "t2m",
+        "clt": "tcc"
+    }
+    
+    if not any(v in name_sub for v in ds["variable"].values):
+        logger.info(f"No ECMWF renaming required - skipping this step")
+        return
+    
+    logger.info(f"Renaming the ECMWF variables")
+    ds["variable"] = np.array([name_sub[v] if v in name_sub else v for v in ds["variable"].values])
+    
+    # Re-save inplace
+    os.system(f"rm -rf {nwp_ecmwf_path}")
+    ds.to_zarr(nwp_ecmwf_path)
+    
+
+def preprocess_nwp_data():
+    
+    # Regrid the UKV data
+    regrid_nwp_data(
+        nwp_zarr=nwp_ukv_path, 
+        target_coords_path=f"{this_dir}/../data/nwp_ukv_target_coords.nc",
+        method="bilinear"
+    )
+    
+    # Regrid the ECMWF data
+    regrid_nwp_data(
+        nwp_zarr=nwp_ecmwf_path, 
+        target_coords_path=f"{this_dir}/../data/nwp_ecmwf_target_coords.nc",
+        method="conservative" # this is needed to avoid zeros around edges of ECMWF data
+    )
+    
+    # Names need to be aligned between training and prod
+    rename_ecmwf_variables()

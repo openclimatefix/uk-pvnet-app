@@ -81,12 +81,9 @@ def db_session(db_connection, engine_url):
         s.rollback()
 
 
-@pytest.fixture
-def nwp_data():
+def make_nwp_data(shell_path, varname):
     # Load dataset which only contains coordinates, but no data
-    ds = xr.open_zarr(
-        f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_shell.zarr"
-    )
+    ds = xr.open_zarr(shell_path)
 
     # Last init time was at least 2 hours ago and floor to 3-hour interval
     t0_datetime_utc = time_before_present(timedelta(hours=2)).floor(timedelta(hours=3))
@@ -106,15 +103,32 @@ def nwp_data():
             ds[v].encoding.clear()
     
     # Add data to dataset
-    ds["UKV"] = xr.DataArray(
+    ds[varname] = xr.DataArray(
         np.zeros([len(ds[c]) for c in ds.xindexes]),
         coords=[ds[c] for c in ds.xindexes],
     )
 
     # Add stored attributes to DataArray
-    ds.UKV.attrs = ds.attrs["_data_attrs"]
+    ds[varname].attrs = ds.attrs["_data_attrs"]
     del ds.attrs["_data_attrs"]
+
     return ds
+        
+
+@pytest.fixture
+def nwp_ukv_data():
+    return make_nwp_data(
+        shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ukv_shell.zarr",
+        varname="UKV",
+    )
+
+
+@pytest.fixture
+def nwp_ecmwf_data():
+    return make_nwp_data(
+        shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ecmwf_shell.zarr",
+        varname="UKV",
+    )
 
 
 @pytest.fixture()

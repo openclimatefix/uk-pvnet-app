@@ -10,8 +10,12 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 
+from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
+from pvnet_app.data import sat_5_path, sat_15_path
 
-def test_app(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest):
+def test_app(
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+):
     # Environment variable DB_URL is set in engine_url, which is called by db_session
     # set NWP_ZARR_PATH
     # save nwp_data to temporary file, and set NWP_ZARR_PATH
@@ -22,9 +26,13 @@ def test_app(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest
     with tempfile.TemporaryDirectory() as tmpdirname:
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables 
-        temp_nwp_path = f"{tmpdirname}/nwp.zarr"
-        os.environ["NWP_ZARR_PATH"] = temp_nwp_path
-        nwp_data.to_zarr(temp_nwp_path)
+        temp_nwp_path = f"{tmpdirname}/nwp_ukv.zarr"
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        nwp_ukv_data.to_zarr(temp_nwp_path)
+        
+        temp_nwp_path = f"{tmpdirname}/nwp_ecmwf.zarr"
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         # In production sat zarr is zipped
         temp_sat_path = f"{tmpdirname}/sat.zarr.zip"
@@ -41,6 +49,11 @@ def test_app(db_session, nwp_data, sat_5_data, gsp_yields_and_systems, me_latest
         from pvnet_app.app import app
         app(gsp_ids=list(range(1, 318)), num_workers=2)
         
+    os.system(f"rm {sat_5_path}")
+    os.system(f"rm {sat_15_path}")
+    os.system(f"rm -r {sat_path}")
+    os.system(f"rm -r {nwp_ukv_path}")
+    os.system(f"rm -r {nwp_ecmwf_path}")
     # Check forecasts have been made
     # (317 GSPs + 1 National + GSP-sum) = 319 forecasts
     # Doubled for historic and forecast

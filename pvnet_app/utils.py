@@ -18,7 +18,7 @@ from nowcasting_datamodel.read.read import (
 
 from datetime import timezone, datetime
 
-from pvnet_app.consts import sat_path, nwp_path
+from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def populate_data_config_sources(input_path, output_path):
         
     production_paths = {
         "gsp": os.environ["DB_URL"],
-        "nwp": {"ukv": nwp_path},
+        "nwp": {"ukv": nwp_ukv_path, "ecmwf": nwp_ecmwf_path},
         "satellite": sat_path,
         # TODO: include hrvsatellite
     }        
