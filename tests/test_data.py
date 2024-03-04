@@ -11,7 +11,7 @@ Tests for download_sat_data and preprocess_sat_data
 Note that I'm not sure these tests will work in parallel, due to files being saved in the same places
 """
 
-from pvnet_app.data import download_sat_data, preprocess_sat_data, sat_path, sat_5_path, sat_15_path
+from pvnet_app.data import download_all_sat_data, preprocess_sat_data, sat_path, sat_5_path, sat_15_path
 import zarr
 import os
 import pandas as pd
@@ -36,7 +36,7 @@ def test_download_sat_data(sat_5_data):
         save_to_zarr_zip(sat_5_data, filename=filename)
 
         os.environ["SATELLITE_ZARR_PATH"] = filename
-        download_sat_data()
+        download_all_sat_data()
 
         # assert that the file 'sat_5_path' exists
         assert os.path.exists(sat_5_path)
@@ -54,7 +54,7 @@ def test_download_sat_15_data(sat_5_data):
         save_to_zarr_zip(sat_5_data, filename=filename)
 
         os.environ["SATELLITE_ZARR_PATH"] = os.path.join(tmpdirname, "latest.zarr.zip")
-        download_sat_data()
+        download_all_sat_data()
 
         assert not os.path.exists(sat_5_path)
         assert os.path.exists(sat_15_path)
@@ -72,7 +72,7 @@ def test_download_sat_both_data(sat_5_data):
         save_to_zarr_zip(sat_5_data, filename=filename)
 
         os.environ["SATELLITE_ZARR_PATH"] = os.path.join(tmpdirname, "latest.zarr.zip")
-        download_sat_data()
+        download_all_sat_data()
 
         assert os.path.exists(sat_5_path)
         assert os.path.exists(sat_15_path)
@@ -90,7 +90,7 @@ def test_preprocess_sat_data(sat_5_data):
         save_to_zarr_zip(sat_5_data, filename=filename)
 
         os.environ["SATELLITE_ZARR_PATH"] = filename
-        download_sat_data()
+        download_all_sat_data()
         use_15_minute = preprocess_sat_data(pd.Timestamp.now(tz=None))
         assert use_15_minute == False
 
@@ -106,7 +106,7 @@ def test_preprocess_sat_15_data(sat_5_data):
         save_to_zarr_zip(sat_5_data, filename=filename)
 
         os.environ["SATELLITE_ZARR_PATH"] = os.path.join(tmpdirname, "latest.zarr.zip")
-        download_sat_data()
+        download_all_sat_data()
         assert not os.path.exists(sat_5_path)
         assert os.path.exists(sat_15_path)
 
@@ -132,7 +132,7 @@ def test_preprocess_old_sat_5_data_(sat_5_data):
         save_to_zarr_zip(sat_5_data, filename=filename)
 
         os.environ["SATELLITE_ZARR_PATH"] = os.path.join(tmpdirname, "latest.zarr.zip")
-        download_sat_data()
+        download_all_sat_data()
         assert os.path.exists(sat_5_path)
         assert os.path.exists(sat_15_path)
 

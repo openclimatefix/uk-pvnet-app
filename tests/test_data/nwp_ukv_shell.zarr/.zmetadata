@@ -7,7 +7,6 @@
                 "GRIB_centreDescription": "U.K. Met Office - Exeter",
                 "GRIB_edition": 2,
                 "GRIB_subCentre": 5,
-                "history": "2023-10-26T12:56 GRIB to CDM+CF via cfgrib-0.9.10.3/ecCodes-2.31.0 with {\"source\": \"../tmp/nwpc/ground_snow-depth-water-equivalent_2023102609.grib\", \"filter_by_keys\": {}, \"encode_cf\": [\"parameter\", \"time\", \"geography\", \"vertical\"]}",
                 "institution": "U.K. Met Office - Exeter"
             },
             "coordinates": "latitude longitude"
@@ -136,7 +135,7 @@
         },
         "variable/.zarray": {
             "chunks": [
-                5
+                12
             ],
             "compressor": {
                 "blocksize": 0,
@@ -150,7 +149,7 @@
             "filters": null,
             "order": "C",
             "shape": [
-                5
+                12
             ],
             "zarr_format": 2
         },

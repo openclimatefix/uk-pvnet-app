@@ -2,7 +2,8 @@
 
 This app expects these evironmental variables to be available:
     - DB_URL
-    - NWP_ZARR_PATH
+    - NWP_UKV_ZARR_PATH
+    - NWP_ECMWF_ZARR_PATH
     - SATELLITE_ZARR_PATH
 """
 
@@ -41,7 +42,7 @@ from pvnet_app.utils import (
     worker_init_fn, populate_data_config_sources, convert_dataarray_to_forecasts, preds_to_dataarray
 )
 from pvnet_app.data import (
-    download_sat_data, download_nwp_data, preprocess_sat_data, regrid_nwp_data,
+    download_all_sat_data, download_all_nwp_data, preprocess_sat_data, preprocess_nwp_data,
 )
 
 # ---------------------------------------------------------------------------
@@ -61,7 +62,7 @@ batch_size = 10
 
 # Huggingfacehub model repo and commit for PVNet (GSP-level model)
 default_model_name = "openclimatefix/pvnet_v2"
-default_model_version = "4203e12e719efd93da641c43d2e38527648f4915"
+default_model_version = "4491e1ea440ee5f32e5a430391b3d338ff612900"
 
 # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
 # If summation_model_name is set to None, a simple sum is computed instead
@@ -111,7 +112,8 @@ def app(
 
     This app expects these evironmental variables to be available:
         - DB_URL
-        - NWP_ZARR_PATH
+        - NWP_UKV_ZARR_PATH
+        - NWP_ECMWF_ZARR_PATH
         - SATELLITE_ZARR_PATH
     Args:
         t0 (datetime): Datetime at which forecast is made
@@ -180,18 +182,18 @@ def app(
 
     # Download satellite data
     logger.info("Downloading satellite data")
-    download_sat_data()
+    download_all_sat_data()
 
     # Process the 5/15 minutely satellite data
     preprocess_sat_data(t0)
     
     # Download NWP data
     logger.info("Downloading NWP data")
-    download_nwp_data()
+    download_all_nwp_data()
     
-    # Regrid the NWP data if needed
-    regrid_nwp_data()
-    
+    # Preprocess the NWP data
+    preprocess_nwp_data()
+        
     # ---------------------------------------------------------------------------
     # 2. Set up data loader
     logger.info("Creating DataLoader")
@@ -201,6 +203,7 @@ def app(
         model_name,
         revision=model_version,
     )
+        
     # Populate the data config with production data paths
     temp_dir = tempfile.TemporaryDirectory()
     populated_data_config_filename = f"{temp_dir.name}/data_config.yaml"
@@ -390,9 +393,10 @@ def app(
             da_abs.sum(dim="gsp_id").expand_dims(dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
         )
         da_abs_all = xr.concat([da_abs_national, da_abs], dim="gsp_id")
-        logger.info(
-            f"National forecast is {da_abs.sel(gsp_id=0, output_label='forecast_mw').values}"
-        )
+
+    logger.info(
+        f"National forecast is {da_abs_all.sel(gsp_id=0, output_label='forecast_mw').values}"
+    )
         
     if save_gsp_sum:
         # Compute the sum if we are logging the sume of GSPs independently

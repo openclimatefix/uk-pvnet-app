@@ -1,9 +1,9 @@
 pydantic
 pytorch-lightning==2.1.3
 torch[cpu]==2.2.0
-PVNet-summation==0.1.2
-pvnet==2.6.10
-ocf_datapipes==3.2.7
+PVNet-summation==0.1.3
+pvnet==3.0.11
+ocf_datapipes==3.2.11
 nowcasting_datamodel>=1.5.30
 fsspec[s3]
 xarray
