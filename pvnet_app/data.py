@@ -174,6 +174,23 @@ def fix_ecmwf_data():
     # Re-save inplace
     os.system(f"rm -rf {nwp_ecmwf_path}")
     ds.to_zarr(nwp_ecmwf_path)
+
+
+def fix_ukv_data():
+    """Extra steps to align UKV production data with training
+    
+     - In training the UKV data is float16. This causes it to overflow into inf values which are then 
+       clipped.
+    """
+    
+    ds = xr.open_zarr(nwp_ukv_path).compute()
+    ds = ds.astype(np.float16)
+    
+    ds["variable"] = ds["variable"].astype(str)
+    
+    # Re-save inplace
+    os.system(f"rm -rf {nwp_ukv_path}")
+    ds.to_zarr(nwp_ukv_path)
     
 
 def preprocess_nwp_data():
@@ -191,6 +208,9 @@ def preprocess_nwp_data():
         target_coords_path=f"{this_dir}/../data/nwp_ecmwf_target_coords.nc",
         method="conservative" # this is needed to avoid zeros around edges of ECMWF data
     )
+    
+    # UKV data must be float16 to allow overflow to inf like in training
+    fix_ukv_data()
     
     # Names need to be aligned between training and prod, and we need to infill the shetlands
     fix_ecmwf_data()
