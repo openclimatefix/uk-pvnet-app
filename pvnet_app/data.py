@@ -56,6 +56,7 @@ def preprocess_sat_data(t0):
         logger.info(f"Latest 5-minute timestamp is {latest_time_5} for t0 time {t0}.")
 
         if sat_delay_5 < timedelta(minutes=60):
+            delay_minutes_5 = int((sat_delay_5.total_seconds() + 15 * 60) / 60)  # Adjust for t0
             logger.info(f"5-min satellite delay is only {delay_minutes_5} minutes - Using 5-minutely data.")
             os.system(f"mv {sat_5_path} {sat_path}")
         else:
@@ -68,6 +69,7 @@ def preprocess_sat_data(t0):
         
         ds_sat_15 = xr.open_zarr(sat_15_path)
         latest_time_15 = pd.to_datetime(ds_sat_15.time.max().values)        
+        delay_minutes_15 = int((latest_time_15 - t0).total_seconds() / 60)  # Calculate delay for 15-minute data
         logger.info(f"Latest 15-minute timestamp is {latest_time_15} for t0 time {t0}.")
         
         logger.debug("Resampling 15 minute data to 5 mins")
