@@ -6,7 +6,7 @@ import logging
 import os
 import fsspec
 from datetime import timedelta
-import ocf_blosc2
+#import ocf_blosc2
 
 from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 
