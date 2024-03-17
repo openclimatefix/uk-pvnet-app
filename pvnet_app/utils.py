@@ -89,7 +89,7 @@ def preds_to_dataarray(preds, model, valid_times, gsp_ids):
         output_labels[output_labels.index("forecast_mw_plevel_50")] = "forecast_mw"
     else:
         output_labels = ["forecast_mw"]
-        normed_preds = normed_preds[..., np.newaxis]
+        preds = preds[..., np.newaxis]
 
     da = xr.DataArray(
         data=preds,
