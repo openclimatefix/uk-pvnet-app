@@ -29,7 +29,7 @@ def download_all_sat_data():
     fs = fsspec.open(sat_download_path).fs
     if fs.exists(sat_download_path):
         fs.get(sat_download_path, "sat_5_min.zarr.zip")
-        os.system(f"unzip sat_5_min.zarr.zip -d {sat_5_path}")
+        os.system(f"unzip -qq sat_5_min.zarr.zip -d {sat_5_path}")
     
     # Also download 15-minute satellite if it exists
     sat_15_dl_path = os.environ["SATELLITE_ZARR_PATH"]\

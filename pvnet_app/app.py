@@ -80,23 +80,28 @@ gsp_sum_model_name_ocf_db = "pvnet_gsp_sum"
 
 # ---------------------------------------------------------------------------
 # LOGGER
+
+class SQLAlchemyFilter(logging.Filter):
+
+    def filter(self, record):
+        return "sqlalchemy" not in record.pathname
+
+# Create a logger
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 formatter = logging.Formatter(
     fmt="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s"
 )
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
-
-logging.basicConfig(
-    level=getattr(logging, os.getenv("LOGLEVEL", "INFO")),
-    format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
-)
-
-logger = logging.getLogger(__name__)
 logger.addHandler(stream_handler)
 
-# Get rid of these verbose logs
+# Get rid of the verbose sqlalchemy logs
+stream_handler.addFilter(SQLAlchemyFilter())
 sql_logger = logging.getLogger("sqlalchemy.engine.Engine")
 sql_logger.addHandler(logging.NullHandler())
+
 
 # ---------------------------------------------------------------------------
 # APP MAIN
