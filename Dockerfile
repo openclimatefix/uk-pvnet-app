@@ -31,6 +31,7 @@ WORKDIR /app
 
 # Install library
 RUN pip install -e .
+RUN pip install --upgrade pandas
 
 # Download models so app can used cached versions instead of pulling from huggingface
 RUN python scripts/cache_default_models.py
