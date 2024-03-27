@@ -6,7 +6,7 @@ SHELL ["/bin/bash", "-l", "-c"]
 
 RUN apt-get update
 RUN apt-get install git -y
-RUN apt-get install unzip g++ gcc libgeos++-dev libproj-dev proj-data proj-bin -y
+RUN apt-get install unzip g++ gcc libgeos++-dev libproj-dev libstdc++6 proj-data proj-bin -y
 
 # Copy files
 COPY setup.py app/setup.py
@@ -33,7 +33,7 @@ WORKDIR /app
 RUN pip install -e .
 
 # Download models so app can used cached versions instead of pulling from huggingface
-#RUN python scripts/cache_default_models.py
+RUN python scripts/cache_default_models.py
 
 RUN if [ "$TESTING" = 1 ]; then pip install pytest pytest-cov coverage; fi
 
