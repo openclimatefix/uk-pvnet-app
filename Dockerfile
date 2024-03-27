@@ -6,7 +6,7 @@ SHELL ["/bin/bash", "-l", "-c"]
 
 RUN apt-get update
 RUN apt-get install git -y
-RUN apt-get install unzip g++ gcc libgeos++-dev libproj-dev libstdc++6 proj-data proj-bin -y
+RUN apt-get install unzip g++ gcc libgeos++-dev libproj-dev proj-data proj-bin -y
 
 # Copy files
 COPY setup.py app/setup.py
@@ -31,7 +31,6 @@ WORKDIR /app
 
 # Install library
 RUN pip install -e .
-RUN pip install --upgrade pandas
 
 # Download models so app can used cached versions instead of pulling from huggingface
 RUN python scripts/cache_default_models.py
