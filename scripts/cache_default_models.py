@@ -16,6 +16,7 @@ from pvnet_app.app import (
     default_summation_model_version,
 )
 
+
 def main():
     """Download model from Huggingface and save it to cache."""
     # Model will be downloaded and saved to cache on disk
