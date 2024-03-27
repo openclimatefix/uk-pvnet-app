@@ -15,7 +15,6 @@ from pvnet_app.app import (
     default_summation_model_name,
     default_summation_model_version,
 )
-import pandas
 
 def main():
     """Download model from Huggingface and save it to cache."""
