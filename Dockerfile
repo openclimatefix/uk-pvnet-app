@@ -7,8 +7,6 @@ SHELL ["/bin/bash", "-l", "-c"]
 RUN apt-get update
 RUN apt-get install git -y
 RUN apt-get install unzip g++ gcc libgeos++-dev libproj-dev proj-data proj-bin -y
-RUN add-apt-repository ppa:ubuntu-toolchain-r/test -y
-RUN apt-get update
 RUN apt-get upgrade libstdc++6 -y
 
 # Copy files
