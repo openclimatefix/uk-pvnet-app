@@ -67,7 +67,7 @@ default_model_version = "5ed2b179974993d8804a1e60fdc850dc547e9025"
 # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
 # If summation_model_name is set to None, a simple sum is computed instead
 default_summation_model_name = "openclimatefix/pvnet_v2_summation"
-default_summation_model_version = "e14bc98039511b2e383100a27f0c8e3b558d6c36"
+default_summation_model_version = "22a264a55babcc2f1363b3985cede088a6b08977"
 
 model_name_ocf_db = "pvnet_v2"
 use_adjuster = os.getenv("USE_ADJUSTER", "True").lower() == "true"
