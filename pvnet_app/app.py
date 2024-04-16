@@ -27,13 +27,14 @@ from nowcasting_datamodel.models.base import Base_Forecast
 from ocf_datapipes.load import OpenGSPFromDatabase
 from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
 from ocf_datapipes.utils.consts import ELEVATION_MEAN, ELEVATION_STD
-from ocf_datapipes.batch import BatchKey, stack_np_examples_into_batch
+from ocf_datapipes.batch import (
+    BatchKey, stack_np_examples_into_batch, batch_to_tensor, copy_batch_to_device
+)
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter import IterableWrapper
 
 import pvnet
-from pvnet.data.utils import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import GSPLocationLookup
 
@@ -61,8 +62,8 @@ all_gsp_ids = list(range(1, 318))
 batch_size = 10
 
 # Huggingfacehub model repo and commit for PVNet (GSP-level model)
-default_model_name = "openclimatefix/pvnet_v2"
-default_model_version = "5ed2b179974993d8804a1e60fdc850dc547e9025"
+default_model_name = "openclimatefix/pvnet_uk_region"
+default_model_version = "9cc2bf5859e129b3816041b657c8875d31ced0d6"
 
 # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
 # If summation_model_name is set to None, a simple sum is computed instead
@@ -164,10 +165,42 @@ def app(
     logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
 
     # ---------------------------------------------------------------------------
-    # 1. Prepare data sources
+    # 1. set up model
+    logger.info(f"Loading model: {model_name} - {model_version}")
+
+    model = PVNetBaseModel.from_pretrained(
+        model_name,
+        revision=model_version,
+    ).to(device)
+
+    if summation_model_name is not None:
+        summation_model = SummationBaseModel.from_pretrained(
+            summation_model_name,
+            revision=summation_model_version,
+        ).to(device)
+
+        if (
+            summation_model.pvnet_model_name != model_name
+            or summation_model.pvnet_model_version != model_version
+        ):
+            warnings.warn(
+                f"The PVNet version running in this app is {model_name}/{model_version}. "
+                "The summation model running in this app was trained on outputs from PVNet version "
+                f"{summation_model.pvnet_model_name}/{summation_model.pvnet_model_version}. "
+                "Combining these models may lead to an error if the shape of PVNet output doesn't "
+                "match the expected shape of the summation model. Combining may lead to unreliable "
+                "results even if the shapes match."
+            )
+    # ---------------------------------------------------------------------------
+    # 2. Prepare data sources
+    
+    # Pull the data config from huggingface
+    data_config_filename = PVNetBaseModel.get_data_config(
+        model_name,
+        revision=model_version,
+    )
 
     # Make pands Series of most recent GSP effective capacities
-
     logger.info("Loading GSP metadata")
 
     ds_gsp = next(iter(OpenGSPFromDatabase()))
@@ -190,7 +223,7 @@ def app(
     download_all_sat_data()
 
     # Process the 5/15 minutely satellite data
-    preprocess_sat_data(t0)
+    preprocess_sat_data(t0, data_config_filename)    
     
     # Download NWP data
     logger.info("Downloading NWP data")
@@ -202,12 +235,6 @@ def app(
     # ---------------------------------------------------------------------------
     # 2. Set up data loader
     logger.info("Creating DataLoader")
-    
-    # Pull the data config from huggingface
-    data_config_filename = PVNetBaseModel.get_data_config(
-        model_name,
-        revision=model_version,
-    )
         
     # Populate the data config with production data paths
     temp_dir = tempfile.TemporaryDirectory()
@@ -253,33 +280,7 @@ def app(
     
     dataloader = DataLoader(batch_datapipe, **dataloader_kwargs)
 
-    # ---------------------------------------------------------------------------
-    # 3. set up model
-    logger.info(f"Loading model: {model_name} - {model_version}")
 
-    model = PVNetBaseModel.from_pretrained(
-        model_name,
-        revision=model_version,
-    ).to(device)
-
-    if summation_model_name is not None:
-        summation_model = SummationBaseModel.from_pretrained(
-            summation_model_name,
-            revision=summation_model_version,
-        ).to(device)
-
-        if (
-            summation_model.pvnet_model_name != model_name
-            or summation_model.pvnet_model_version != model_version
-        ):
-            warnings.warn(
-                f"The PVNet version running in this app is {model_name}/{model_version}. "
-                "The summation model running in this app was trained on outputs from PVNet version "
-                f"{summation_model.pvnet_model_name}/{summation_model.pvnet_model_version}. "
-                "Combining these models may lead to an error if the shape of PVNet output doesn't "
-                "match the expected shape of the summation model. Combining may lead to unreliable "
-                "results even if the shapes match."
-            )
 
     # 4. Make prediction
     logger.info("Processing batches")
