@@ -1,7 +1,7 @@
 pydantic
 pytorch-lightning==2.1.3
 torch[cpu]==2.2.0
-PVNet-summation==0.1.3
+PVNet-summation==0.1.4
 pvnet==3.0.25
 ocf_datapipes==3.3.19
 nowcasting_datamodel>=1.5.39
