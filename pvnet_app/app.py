@@ -76,7 +76,6 @@ use_adjuster = os.getenv("USE_ADJUSTER", "True").lower() == "true"
 # If environmental variable is true, the sum-of-GSPs will be computed and saved under a different
 # model name. This can be useful to compare against the summation model and therefore monitor its
 # performance in production
-save_gsp_sum = os.getenv("SAVE_GSP_SUM", "False").lower() == "true"
 gsp_sum_model_name_ocf_db = "pvnet_gsp_sum"
 
 # ---------------------------------------------------------------------------
@@ -137,6 +136,8 @@ def app(
     if num_workers>0:
         # Without this line the dataloader will hang if multiple workers are used
         dask.config.set(scheduler='single-threaded')
+
+    save_gsp_sum = os.getenv("SAVE_GSP_SUM", "False").lower() == "true"
 
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
     logger.info(f"Using {num_workers} workers")
@@ -437,6 +438,8 @@ def app(
         #     update_gsp=True,
         #     apply_adjuster=apply_adjuster,
         # )
+
+        print(f'{save_gsp_sum=}')
         
         if save_gsp_sum:
             # Save the sum of GSPs independently - mainly for summation model monitoring
