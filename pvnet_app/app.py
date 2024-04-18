@@ -429,7 +429,7 @@ def app(
         sql_forecasts = convert_dataarray_to_forecasts(
             da_abs_all, session, model_name=model_name_ocf_db, version=pvnet_app.__version__
         )
-
+        print(f'Saving {len(sql_forecasts)} forecasts')
         save_sql_forecasts(
             forecasts=sql_forecasts,
             session=session,
@@ -447,6 +447,7 @@ def app(
                 version=pvnet_app.__version__
             )
 
+            print(f'Saving {len(sql_forecasts)} forecasts, for gsp sum')
             save_sql_forecasts(
                 forecasts=sql_forecasts,
                 session=session,
