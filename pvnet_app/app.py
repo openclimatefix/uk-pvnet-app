@@ -430,13 +430,13 @@ def app(
             da_abs_all, session, model_name=model_name_ocf_db, version=pvnet_app.__version__
         )
         print(f'Saving {len(sql_forecasts)} forecasts')
-        save_sql_forecasts(
-            forecasts=sql_forecasts,
-            session=session,
-            update_national=True,
-            update_gsp=True,
-            apply_adjuster=apply_adjuster,
-        )
+        # save_sql_forecasts(
+        #     forecasts=sql_forecasts,
+        #     session=session,
+        #     update_national=True,
+        #     update_gsp=True,
+        #     apply_adjuster=apply_adjuster,
+        # )
         
         if save_gsp_sum:
             # Save the sum of GSPs independently - mainly for summation model monitoring
