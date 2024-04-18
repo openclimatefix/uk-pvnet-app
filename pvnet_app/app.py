@@ -73,11 +73,6 @@ default_summation_model_version = "22a264a55babcc2f1363b3985cede088a6b08977"
 model_name_ocf_db = "pvnet_v2"
 use_adjuster = os.getenv("USE_ADJUSTER", "True").lower() == "true"
 
-# If environmental variable is true, the sum-of-GSPs will be computed and saved under a different
-# model name. This can be useful to compare against the summation model and therefore monitor its
-# performance in production
-gsp_sum_model_name_ocf_db = "pvnet_gsp_sum"
-
 # ---------------------------------------------------------------------------
 # LOGGER
 
@@ -137,6 +132,10 @@ def app(
         # Without this line the dataloader will hang if multiple workers are used
         dask.config.set(scheduler='single-threaded')
 
+    # If environmental variable is true, the sum-of-GSPs will be computed and saved under a different
+    # model name. This can be useful to compare against the summation model and therefore monitor its
+    # performance in production
+    gsp_sum_model_name_ocf_db = "pvnet_gsp_sum"
     save_gsp_sum = os.getenv("SAVE_GSP_SUM", "False").lower() == "true"
 
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
@@ -430,16 +429,13 @@ def app(
         sql_forecasts = convert_dataarray_to_forecasts(
             da_abs_all, session, model_name=model_name_ocf_db, version=pvnet_app.__version__
         )
-        print(f'Saving {len(sql_forecasts)} forecasts')
-        # save_sql_forecasts(
-        #     forecasts=sql_forecasts,
-        #     session=session,
-        #     update_national=True,
-        #     update_gsp=True,
-        #     apply_adjuster=apply_adjuster,
-        # )
-
-        print(f'{save_gsp_sum=}')
+        save_sql_forecasts(
+            forecasts=sql_forecasts,
+            session=session,
+            update_national=True,
+            update_gsp=True,
+            apply_adjuster=apply_adjuster,
+        )
         
         if save_gsp_sum:
             # Save the sum of GSPs independently - mainly for summation model monitoring
@@ -450,7 +446,6 @@ def app(
                 version=pvnet_app.__version__
             )
 
-            print(f'Saving {len(sql_forecasts)} forecasts, for gsp sum')
             save_sql_forecasts(
                 forecasts=sql_forecasts,
                 session=session,
