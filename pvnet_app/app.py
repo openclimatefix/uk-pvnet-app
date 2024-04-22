@@ -27,13 +27,14 @@ from nowcasting_datamodel.models.base import Base_Forecast
 from ocf_datapipes.load import OpenGSPFromDatabase
 from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
 from ocf_datapipes.utils.consts import ELEVATION_MEAN, ELEVATION_STD
-from ocf_datapipes.batch import BatchKey, stack_np_examples_into_batch
+from ocf_datapipes.batch import (
+    BatchKey, stack_np_examples_into_batch, batch_to_tensor, copy_batch_to_device
+)
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter import IterableWrapper
 
 import pvnet
-from pvnet.data.utils import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import GSPLocationLookup
 
@@ -61,8 +62,8 @@ all_gsp_ids = list(range(1, 318))
 batch_size = 10
 
 # Huggingfacehub model repo and commit for PVNet (GSP-level model)
-default_model_name = "openclimatefix/pvnet_v2"
-default_model_version = "5ed2b179974993d8804a1e60fdc850dc547e9025"
+default_model_name = "openclimatefix/pvnet_uk_region"
+default_model_version = "d64e8f03466cf101021c6b9a0933bf2f3fa79976"
 
 # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
 # If summation_model_name is set to None, a simple sum is computed instead
@@ -71,12 +72,6 @@ default_summation_model_version = "22a264a55babcc2f1363b3985cede088a6b08977"
 
 model_name_ocf_db = "pvnet_v2"
 use_adjuster = os.getenv("USE_ADJUSTER", "True").lower() == "true"
-
-# If environmental variable is true, the sum-of-GSPs will be computed and saved under a different
-# model name. This can be useful to compare against the summation model and therefore monitor its
-# performance in production
-save_gsp_sum = os.getenv("SAVE_GSP_SUM", "False").lower() == "true"
-gsp_sum_model_name_ocf_db = "pvnet_gsp_sum"
 
 # ---------------------------------------------------------------------------
 # LOGGER
@@ -137,6 +132,12 @@ def app(
         # Without this line the dataloader will hang if multiple workers are used
         dask.config.set(scheduler='single-threaded')
 
+    # If environmental variable is true, the sum-of-GSPs will be computed and saved under a different
+    # model name. This can be useful to compare against the summation model and therefore monitor its
+    # performance in production
+    gsp_sum_model_name_ocf_db = "pvnet_gsp_sum"
+    save_gsp_sum = os.getenv("SAVE_GSP_SUM", "False").lower() == "true"
+
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using adjduster: {use_adjuster}")
@@ -164,97 +165,7 @@ def app(
     logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
 
     # ---------------------------------------------------------------------------
-    # 1. Prepare data sources
-
-    # Make pands Series of most recent GSP effective capacities
-
-    logger.info("Loading GSP metadata")
-
-    ds_gsp = next(iter(OpenGSPFromDatabase()))
-    
-    # Get capacities from the database
-    url = os.getenv("DB_URL")
-    db_connection = DatabaseConnection(url=url, base=Base_Forecast, echo=False)
-    with db_connection.get_session() as session:
-        #  Pandas series of most recent GSP capacities
-        gsp_capacities = get_latest_gsp_capacities(session, gsp_ids)
-        
-        # National capacity is needed if using summation model
-        national_capacity = get_latest_gsp_capacities(session, [0])[0]
-
-    # Set up ID location query object
-    gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
-
-    # Download satellite data
-    logger.info("Downloading satellite data")
-    download_all_sat_data()
-
-    # Process the 5/15 minutely satellite data
-    preprocess_sat_data(t0)
-    
-    # Download NWP data
-    logger.info("Downloading NWP data")
-    download_all_nwp_data()
-    
-    # Preprocess the NWP data
-    preprocess_nwp_data()
-        
-    # ---------------------------------------------------------------------------
-    # 2. Set up data loader
-    logger.info("Creating DataLoader")
-    
-    # Pull the data config from huggingface
-    data_config_filename = PVNetBaseModel.get_data_config(
-        model_name,
-        revision=model_version,
-    )
-        
-    # Populate the data config with production data paths
-    temp_dir = tempfile.TemporaryDirectory()
-    populated_data_config_filename = f"{temp_dir.name}/data_config.yaml"
-    
-    populate_data_config_sources(data_config_filename, populated_data_config_filename)
-
-    # Location and time datapipes
-    location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
-    t0_datapipe = IterableWrapper([t0]).repeat(len(location_pipe))
-
-    location_pipe = location_pipe.sharding_filter()
-    t0_datapipe = t0_datapipe.sharding_filter()
-
-    # Batch datapipe
-    batch_datapipe = (
-        construct_sliced_data_pipeline(
-            config_filename=populated_data_config_filename,
-            location_pipe=location_pipe,
-            t0_datapipe=t0_datapipe,
-            production=True,
-            check_satellite_no_zeros=True,
-        )
-        .batch(batch_size)
-        .map(stack_np_examples_into_batch)
-    )
-
-    # Set up dataloader for parallel loading
-    dataloader_kwargs = dict(
-        shuffle=False,
-        batch_size=None,  # batched in datapipe step
-        sampler=None,
-        batch_sampler=None,
-        num_workers=num_workers,
-        collate_fn=None,
-        pin_memory=False,
-        drop_last=False,
-        timeout=0,
-        worker_init_fn=worker_init_fn,
-        prefetch_factor=None if num_workers == 0 else 2,
-        persistent_workers=False,
-    )
-    
-    dataloader = DataLoader(batch_datapipe, **dataloader_kwargs)
-
-    # ---------------------------------------------------------------------------
-    # 3. set up model
+    # 1. set up model
     logger.info(f"Loading model: {model_name} - {model_version}")
 
     model = PVNetBaseModel.from_pretrained(
@@ -280,6 +191,95 @@ def app(
                 "match the expected shape of the summation model. Combining may lead to unreliable "
                 "results even if the shapes match."
             )
+    # ---------------------------------------------------------------------------
+    # 2. Prepare data sources
+    
+    # Pull the data config from huggingface
+    data_config_filename = PVNetBaseModel.get_data_config(
+        model_name,
+        revision=model_version,
+    )
+
+    # Make pands Series of most recent GSP effective capacities
+    logger.info("Loading GSP metadata")
+
+    ds_gsp = next(iter(OpenGSPFromDatabase()))
+    
+    # Get capacities from the database
+    url = os.getenv("DB_URL")
+    db_connection = DatabaseConnection(url=url, base=Base_Forecast, echo=False)
+    with db_connection.get_session() as session:
+        #  Pandas series of most recent GSP capacities
+        gsp_capacities = get_latest_gsp_capacities(session, gsp_ids)
+        
+        # National capacity is needed if using summation model
+        national_capacity = get_latest_gsp_capacities(session, [0])[0]
+
+    # Set up ID location query object
+    gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
+
+    # Download satellite data
+    logger.info("Downloading satellite data")
+    download_all_sat_data()
+
+    # Process the 5/15 minutely satellite data
+    preprocess_sat_data(t0, data_config_filename)    
+    
+    # Download NWP data
+    logger.info("Downloading NWP data")
+    download_all_nwp_data()
+    
+    # Preprocess the NWP data
+    preprocess_nwp_data()
+        
+    # ---------------------------------------------------------------------------
+    # 2. Set up data loader
+    logger.info("Creating DataLoader")
+        
+    # Populate the data config with production data paths
+    temp_dir = tempfile.TemporaryDirectory()
+    populated_data_config_filename = f"{temp_dir.name}/data_config.yaml"
+    
+    populate_data_config_sources(data_config_filename, populated_data_config_filename)
+
+    # Location and time datapipes
+    location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
+    t0_datapipe = IterableWrapper([t0]).repeat(len(location_pipe))
+
+    location_pipe = location_pipe.sharding_filter()
+    t0_datapipe = t0_datapipe.sharding_filter()
+
+    # Batch datapipe
+    batch_datapipe = (
+        construct_sliced_data_pipeline(
+            config_filename=populated_data_config_filename,
+            location_pipe=location_pipe,
+            t0_datapipe=t0_datapipe,
+            production=True,
+        )
+        .batch(batch_size)
+        .map(stack_np_examples_into_batch)
+    )
+
+    # Set up dataloader for parallel loading
+    dataloader_kwargs = dict(
+        shuffle=False,
+        batch_size=None,  # batched in datapipe step
+        sampler=None,
+        batch_sampler=None,
+        num_workers=num_workers,
+        collate_fn=None,
+        pin_memory=False,
+        drop_last=False,
+        timeout=0,
+        worker_init_fn=worker_init_fn,
+        prefetch_factor=None if num_workers == 0 else 2,
+        persistent_workers=False,
+    )
+    
+    dataloader = DataLoader(batch_datapipe, **dataloader_kwargs)
+
+
 
     # 4. Make prediction
     logger.info("Processing batches")
@@ -429,7 +429,6 @@ def app(
         sql_forecasts = convert_dataarray_to_forecasts(
             da_abs_all, session, model_name=model_name_ocf_db, version=pvnet_app.__version__
         )
-
         save_sql_forecasts(
             forecasts=sql_forecasts,
             session=session,
