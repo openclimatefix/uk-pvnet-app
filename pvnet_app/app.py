@@ -63,7 +63,7 @@ batch_size = 10
 
 # Huggingfacehub model repo and commit for PVNet (GSP-level model)
 default_model_name = "openclimatefix/pvnet_uk_region"
-default_model_version = "d64e8f03466cf101021c6b9a0933bf2f3fa79976"
+default_model_version = "9989666ae3792a576dbc16872e152985c950a42e"
 
 # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
 # If summation_model_name is set to None, a simple sum is computed instead
