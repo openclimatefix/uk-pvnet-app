@@ -33,7 +33,7 @@ WORKDIR /app
 RUN pip install -e .
 
 # Download models so app can used cached versions instead of pulling from huggingface
-RUN . scripts/cache_default_models.sh
+RUN python scripts/cache_default_models.py
 
 RUN if [ "$TESTING" = 1 ]; then pip install pytest pytest-cov coverage; fi
 

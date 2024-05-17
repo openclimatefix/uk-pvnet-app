@@ -5,6 +5,7 @@ is run.
 """
 
 import typer
+import pvnet_app.app # noqa: F401
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
