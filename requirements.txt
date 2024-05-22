@@ -1,4 +1,5 @@
 pydantic
+requests<2.32.0
 pytorch-lightning==2.1.3
 torch[cpu]==2.2.0
 PVNet-summation==0.1.4

@@ -23,15 +23,15 @@ from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_app.data import (
     download_all_sat_data, preprocess_sat_data, sat_path, sat_5_path, sat_15_path
 )
-from pvnet_app.app import default_model_name, default_model_version
+from pvnet_app.app import models_dict
 
 
 @pytest.fixture()
 def data_config_filename():
     # Pull the data config from huggingface
     filename = PVNetBaseModel.get_data_config(
-        default_model_name,
-        revision=default_model_version,
+        models_dict["pvnet_v2"]["pvnet"]["name"],
+        revision=models_dict["pvnet_v2"]["pvnet"]["version"],
     )
     return filename
 

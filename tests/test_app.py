@@ -41,12 +41,13 @@ def test_app(
         sat_5_data.to_zarr(store)
         store.close()
         
-        # Set model version
+        # Set environmental variables
         os.environ["SAVE_GSP_SUM"] = "True"
+        os.environ["RUN_EXTRA_MODELS"] = "True"
 
         # Run prediction
         # This import needs to come after the environ vars have been set
-        from pvnet_app.app import app
+        from pvnet_app.app import app, models_dict
         app(gsp_ids=list(range(1, 318)), num_workers=2)
         
     os.system(f"rm {sat_5_path}")
@@ -54,17 +55,22 @@ def test_app(
     os.system(f"rm -r {sat_path}")
     os.system(f"rm -r {nwp_ukv_path}")
     os.system(f"rm -r {nwp_ecmwf_path}")
-    # Check forecasts have been made
-    # (317 GSPs + 1 National + GSP-sum) = 319 forecasts
-    # Doubled for historic and forecast
+    # Check correct number of forecasts have been made
+    # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
+    # Forecast made with multiple models
+    expected_forecast_results = 0
+    for model_config in models_dict.values():
+        expected_forecast_results += (318 + model_config["save_gsp_sum"])
+
     forecasts = db_session.query(ForecastSQL).all()
-    assert len(forecasts) == 319 * 2
+    # Doubled for historic and forecast
+    assert len(forecasts) == expected_forecast_results * 2
 
     # Check probabilistic added
     assert "90" in forecasts[0].forecast_values[0].properties
     assert "10" in forecasts[0].forecast_values[0].properties
 
     # 318 GSPs * 16 time steps in forecast
-    assert len(db_session.query(ForecastValueSQL).all()) == 319 * 16
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == 319 * 16
-    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == 319 * 16
+    assert len(db_session.query(ForecastValueSQL).all()) == expected_forecast_results * 16
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_forecast_results * 16
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
