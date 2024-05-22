@@ -133,7 +133,7 @@ def nwp_ecmwf_data(test_t0):
     )
 
 
-def _get_sat_data(test_t0, delay_mins, freq_mins):
+def make_sat_data(test_t0, delay_mins, freq_mins):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr"
@@ -149,8 +149,8 @@ def _get_sat_data(test_t0, delay_mins, freq_mins):
 
     # Add data to dataset
     ds["data"] = xr.DataArray(
-        np.zeros([len(ds[c]) for c in ds.coords]),
-        coords=ds.coords,
+        np.zeros([len(ds[c]) for c in ds.xindexes]),
+        coords=[ds[c] for c in ds.xindexes],
     )
 
     # Add stored attributes to DataArray
@@ -161,17 +161,17 @@ def _get_sat_data(test_t0, delay_mins, freq_mins):
 
 @pytest.fixture()
 def sat_5_data(test_t0):
-    return _get_sat_data(test_t0, delay_mins=10, freq_mins=5)
+    return make_sat_data(test_t0, delay_mins=10, freq_mins=5)
 
 
 @pytest.fixture()
 def sat_5_data_delayed(test_t0):
-    return _get_sat_data(test_t0, delay_mins=120, freq_mins=5)
+    return make_sat_data(test_t0, delay_mins=120, freq_mins=5)
 
 
 @pytest.fixture()
 def sat_15_data(test_t0):
-    return _get_sat_data(test_t0, delay_mins=0, freq_mins=15)
+    return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
 
 
 @pytest.fixture()
