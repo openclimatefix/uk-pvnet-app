@@ -5,7 +5,7 @@ torch[cpu]==2.2.0
 PVNet-summation==0.1.4
 pvnet==3.0.25
 ocf_datapipes==3.3.19
-nowcasting_datamodel>=1.5.41
+nowcasting_datamodel>=1.5.43
 fsspec[s3]
 xarray
 zarr
