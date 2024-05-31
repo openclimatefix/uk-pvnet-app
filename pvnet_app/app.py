@@ -69,7 +69,7 @@ models_dict = {
         # Huggingfacehub model repo and commit for PVNet (GSP-level model)
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "849f19b0c774a1a3fe10e20f901e225131f5645b",
+            "version": "9989666ae3792a576dbc16872e152985c950a42e",
         },
         # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
         # If summation_model_name is set to None, a simple sum is computed instead
@@ -86,6 +86,21 @@ models_dict = {
     },
     
     # Extra models which will be run on dev only
+    "pvnet_v2-sat0min-v8-batches": {
+        "pvnet": {
+            "name": "openclimatefix/pvnet_uk_region",
+            "version": "849f19b0c774a1a3fe10e20f901e225131f5645b",
+        },
+        "summation": {
+            "name": "openclimatefix/pvnet_v2_summation",
+            "version": "22a264a55babcc2f1363b3985cede088a6b08977",
+        },
+        "use_adjuster": False,
+        "save_gsp_sum": False,
+        "verbose": False,
+    },
+    
+    
     "pvnet_v2-sat60min-v8-batches": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
