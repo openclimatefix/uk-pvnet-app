@@ -100,20 +100,6 @@ models_dict = {
         "verbose": False,
     },
     
-    
-    "pvnet_v2-sat60min-v8-batches": {
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": "9989666ae3792a576dbc16872e152985c950a42e",
-        },
-        "summation": {
-            "name": "openclimatefix/pvnet_v2_summation",
-            "version": "22a264a55babcc2f1363b3985cede088a6b08977",
-        },
-        "use_adjuster": False,
-        "save_gsp_sum": False,
-        "verbose": False,
-    },
 }
 
 # Remove extra models if not configured to run them
