@@ -40,7 +40,11 @@ from pvnet.utils import GSPLocationLookup
 
 import pvnet_app
 from pvnet_app.utils import (
-    worker_init_fn, populate_data_config_sources, convert_dataarray_to_forecasts
+    worker_init_fn, 
+    populate_data_config_sources, 
+    convert_dataarray_to_forecasts, 
+    find_min_satellite_delay_config,
+    save_yaml_config,
 )
 from pvnet_app.data import (
     download_all_sat_data, download_all_nwp_data, preprocess_sat_data, preprocess_nwp_data,
@@ -105,6 +109,24 @@ models_dict = {
 # Remove extra models if not configured to run them
 if os.getenv("RUN_EXTRA_MODELS", "false").lower() == "false":
     models_dict = {"pvnet_v2": models_dict["pvnet_v2"]}
+    
+    
+# Pull the data configs from huggingface
+data_config_filenames = []
+for model in models_dict.values():
+    data_config_filenames.append(
+        PVNetBaseModel.get_data_config(
+            model["pvnet"]["name"],
+            revision=model["pvnet"]["version"],
+        )
+    )
+
+# Find the config with satellite delay suitable for all models running
+common_config = find_min_satellite_delay_config(data_config_filenames)
+
+common_config_path = "common_config_path.yaml"
+
+save_yaml_config(common_config, common_config_path)
 
 # ---------------------------------------------------------------------------
 # LOGGER
@@ -184,12 +206,6 @@ def app(
 
     # ---------------------------------------------------------------------------
     # Prepare data sources
-    
-    # Pull the data config from huggingface
-    data_config_filename = PVNetBaseModel.get_data_config(
-        models_dict[ "pvnet_v2"]["pvnet"]["name"],
-        revision=models_dict[ "pvnet_v2"]["pvnet"]["version"],
-    )
 
     # Make pands Series of most recent GSP effective capacities
     logger.info("Loading GSP metadata")
@@ -213,7 +229,7 @@ def app(
     download_all_sat_data()
 
     # Process the 5/15 minutely satellite data
-    preprocess_sat_data(t0, data_config_filename)    
+    preprocess_sat_data(t0, common_config_path)    
     
     # Download NWP data
     logger.info("Downloading NWP data")
@@ -230,7 +246,7 @@ def app(
     temp_dir = tempfile.TemporaryDirectory()
     populated_data_config_filename = f"{temp_dir.name}/data_config.yaml"
     
-    populate_data_config_sources(data_config_filename, populated_data_config_filename)
+    populate_data_config_sources(common_config_path, populated_data_config_filename)
 
     # Location and time datapipes
     location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
@@ -316,8 +332,7 @@ def app(
     # Write predictions to database
     logger.info("Writing to database")
 
-    connection = db_connection# DatabaseConnection(url=os.environ["DB_URL"])
-    with connection.get_session() as session:
+    with db_connection.get_session() as session:
         
         for model_name, forecast_compiler in forecast_compilers.items():
         

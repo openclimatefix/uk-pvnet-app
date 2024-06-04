@@ -1,11 +1,17 @@
+from datetime import timezone, datetime
 import fsspec.asyn
 import yaml
 import os
+import copy
 import xarray as xr
 import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
 import logging
+
+def config_union(config_paths):
+    from ocf_datapipes.config.load import load_yaml_configuration
+
 from nowcasting_datamodel.models import (
     ForecastSQL,
     ForecastValue,
@@ -16,7 +22,7 @@ from nowcasting_datamodel.read.read import (
 )
 from nowcasting_datamodel.read.read_models import get_model
 
-from datetime import timezone, datetime
+
 
 from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 
@@ -39,6 +45,19 @@ def worker_init_fn(worker_id):
     fsspec.asyn.iothread[0] = None
     fsspec.asyn.loop[0] = None
 
+    
+def load_yaml_config(path):
+    """Load config file from path"""
+    with open(path) as file:
+        config = yaml.load(file, Loader=yaml.FullLoader)
+    return config
+
+
+def save_yaml_config(config, path):
+    """Save config file to path"""
+    with open(path, 'w') as file:
+        yaml.dump(config, file, default_flow_style=False)
+
 
 def populate_data_config_sources(input_path, output_path):
     """Resave the data config and replace the source filepaths
@@ -47,8 +66,7 @@ def populate_data_config_sources(input_path, output_path):
         input_path: Path to input datapipes configuration file
         output_path: Location to save the output configuration file
     """
-    with open(input_path) as infile:
-        config = yaml.load(infile, Loader=yaml.FullLoader)
+    config = load_yaml_config(input_path)
         
     production_paths = {
         "gsp": os.environ["DB_URL"],
@@ -76,9 +94,27 @@ def populate_data_config_sources(input_path, output_path):
     # We do not need to set PV path right now. This currently done through datapipes
     # TODO - Move the PV path to here
     
-    with open(output_path, 'w') as outfile:
-        yaml.dump(config, outfile, default_flow_style=False)
+    save_yaml_config(config, output_path)
+        
     
+def find_min_satellite_delay_config(config_paths):
+    """Find the config with the minimum satallite delay across from list of config paths"""
+    # Load all the configs
+    configs = [load_yaml_config(config_path) for config_path in config_paths]
+    
+    min_sat_delay = np.inf
+    
+    for config in configs:
+
+        min_sat_delay = min(
+            min_sat_delay,
+            config["input_data"]["satellite"]["live_delay_minutes"]
+        )
+        
+    config = configs[0] 
+    config["input_data"]["satellite"]["live_delay_minutes"] = min_sat_delay
+    return config
+
         
 def preds_to_dataarray(preds, model, valid_times, gsp_ids):
     """Put numpy array of predictions into a dataarray"""
@@ -191,3 +227,7 @@ def convert_dataarray_to_forecasts(
         forecasts.append(forecast)
 
     return forecasts
+
+
+
+    
