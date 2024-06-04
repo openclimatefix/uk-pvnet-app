@@ -9,9 +9,6 @@ import pandas as pd
 from sqlalchemy.orm import Session
 import logging
 
-def config_union(config_paths):
-    from ocf_datapipes.config.load import load_yaml_configuration
-
 from nowcasting_datamodel.models import (
     ForecastSQL,
     ForecastValue,
