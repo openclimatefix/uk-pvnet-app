@@ -316,9 +316,10 @@ def app(
     with torch.no_grad():
         for i, batch in enumerate(dataloader):
             logger.info(f"Predicting for batch: {i}")
-            device_batch = copy_batch_to_device(batch_to_tensor(batch), device)
-            
+
             for forecast_compiler in forecast_compilers.values():
+                # need to do copy the batch for each model, as a model might change the batch
+                device_batch = copy_batch_to_device(batch_to_tensor(batch), device)
                 forecast_compiler.predict_batch(device_batch)
                 
     # ---------------------------------------------------------------------------
