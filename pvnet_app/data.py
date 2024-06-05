@@ -5,7 +5,7 @@ import xesmf as xe
 import logging
 import os
 import fsspec
-from datetime import timedelta
+from datetime import timedelta, datetime
 import ocf_blosc2
 from ocf_datapipes.config.load import load_yaml_configuration
 
@@ -51,111 +51,103 @@ def _get_latest_time_and_mins_delay(sat_zarr_path, t0):
     return latest_time, delay_mins
 
 
-def combine_5_and_15_sat_data(t0, max_sat_delay_allowed_mins):
+def combine_5_and_15_sat_data(t0):
     """Select and/or combine the 5 and 15-minutely satellite data"""
+    
+    # Check which satellite data exists
+    exists_5_minute = os.path.exists(sat_5_path)
+    exists_15_minute = os.path.exists(sat_15_path)  
 
-    use_5_minute = os.path.exists(sat_5_path)
-    if not use_5_minute:
-        logger.info(f"5-minute satellite data not found at {sat_5_path}. Trying 15-minute data.")
-    else:
+    if not exists_5_minute and not exists_15_minute:
+        raise FileNotFoundError("Neither 5- nor 15-minutely data was found.")
+    
+    # Find the delay in the 5- and 15-minutely data
+    if exists_5_minute:
         latest_time_5, delay_mins_5 = _get_latest_time_and_mins_delay(sat_5_path, t0)
         logger.info(f"Latest 5-minute timestamp is {latest_time_5} for t0 time {t0}.")
+    else:
+        latest_time_5, delay_mins_5 = datetime.min, np.inf
+        logger.info(f"No 5-minute data was found.")
         
-        if delay_mins_5 <= max_sat_delay_allowed_mins:  
-            logger.info(
-                f"5-min satellite delay is only {delay_mins_5} minutes. "
-                f"Maximum delay for this model is {max_sat_delay_allowed_mins} minutes - "
-                "Using 5-minutely data."
-            )
-            os.system(f"mv {sat_5_path} {sat_path}")
-        else:
-            logger.info(
-                f"5-min satellite delay is {delay_mins_5} minutes. "
-                f"Maximum delay for this model is {max_sat_delay_allowed_mins} minutes - "
-                "Trying 15-minutely data."
-            )
-            use_5_minute = False
+    if exists_15_minute:
+        latest_time_15, delay_mins_15 = _get_latest_time_and_mins_delay(sat_15_path, t0)
+        logger.info(f"Latest 5-minute timestamp is {latest_time_15} for t0 time {t0}.")
+    else:
+        latest_time_15, delay_mins_15 = datetime.min, np.inf
+        logger.info(f"No 15-minute data was found.")
+        
+    # Move the data with the most recent timestamp to the expected path
+    if latest_time_5>=latest_time_15:
+        logger.info(f"Using 5-minutely data.")
+        os.system(f"mv {sat_5_path} {sat_path}")
+        latest_time = latest_time_5
+        delay_mins = delay_mins_5
+    else:
+        logger.info(f"Using 15-minutely data.")
+        os.system(f"mv {sat_15_path} {sat_path}")
+        latest_time = latest_time_15
+        delay_mins = delay_mins_15
+        
+    return latest_time, delay_mins
 
-    if not use_5_minute:
-        # Make sure the 15-minute data is actually there
-        if not os.path.exists(sat_15_path):
-            raise ValueError(f"15-minute satellite data not found at {sat_15_path}")
-        
-        latest_time_15, delay_mins_15 = _get_latest_time_and_mins_delay(sat_15_path, t0)     
-        logger.info(f"Latest 15-minute timestamp is {latest_time_15} for t0 time {t0}.")
-        
-        # If the 15-minute satellite data is too delayed the run fails
-        if delay_mins_15 > max_sat_delay_allowed_mins:
-            raise ValueError(
-                f"15-min satellite delay is {delay_mins_15} minutes. "
-                f"Maximum delay for this model is {max_sat_delay_allowed_mins} minutes"
-            )
-        
-        ds_sat_15 = xr.open_zarr(sat_15_path)
-        
-        #logger.debug("Resampling 15 minute data to 5 mins")
-        #ds_sat_15.resample(time="5T").interpolate("linear").to_zarr(sat_path)
-        ds_sat_15.attrs["source"] = "15-minute"
 
-        ds_sat_15.to_zarr(sat_path)
-        
+def extend_satellite_data_with_nans(t0):
+    """Fill the satellite data with NaNs out to time t0"""
 
-def extend_satellite_data_with_nans(t0, min_sat_delay_used_mins):
-    """Fill the satellite data with NaNs if needed by the model"""
-
-    # Check how the expected satellite delay compares with the satellite data available and fill
-    # if required
-    latest_time, delay_mins = _get_latest_time_and_mins_delay(sat_path, t0)
+    # Find how delayed the satellite data is
+    _, delay_mins = _get_latest_time_and_mins_delay(sat_path, t0)
     
-    if min_sat_delay_used_mins < delay_mins:
-        fill_mins = delay_mins - min_sat_delay_used_mins
-        logger.info(f"Filling most recent {fill_mins} mins with NaNs")
+    if delay_mins > 0:
+        logger.info(f"Filling most recent {delay_mins} mins with NaNs")
         
         # Load into memory so we can delete it on disk
         ds_sat = xr.open_zarr(sat_path).compute()
         
         # Pad with zeros
         fill_times = pd.date_range(
-            latest_time+timedelta(minutes=5), 
-            latest_time+timedelta(minutes=fill_mins), 
+            t0+timedelta(minutes=(-delay_mins+5)), 
+            t0, 
             freq="5min"
         )
-        
         
         ds_sat = ds_sat.reindex(time=np.concatenate([ds_sat.time, fill_times]), fill_value=np.nan)    
 
         # Re-save inplace
         os.system(f"rm -rf {sat_path}")
         ds_sat.to_zarr(sat_path)
-        
-
-def preprocess_sat_data(t0, data_config_filename):
     
-    # Find the max delay w.r.t t0 that this model was trained with
+    return delay_mins
+        
+    
+def check_model_inputs_available(data_config_filename, sat_delay_mins):
+    """Checks whether the model can be run given the current satellite delay"""
+    
     data_config = load_yaml_configuration(data_config_filename)
-        
-    # Take into account how recently the model tries to slice data from
-    max_sat_delay_allowed_mins = data_config.input_data.satellite.live_delay_minutes
     
+    # Take into account how recently the model tries to slice satellite data from
+    max_sat_delay_allowed_mins = data_config.input_data.satellite.live_delay_minutes
+
     # Take into account the dropout the model was trained with, if any
     if data_config.input_data.satellite.dropout_fraction>0:
         max_sat_delay_allowed_mins = max(
             max_sat_delay_allowed_mins, 
             np.abs(data_config.input_data.satellite.dropout_timedeltas_minutes).max()
         )
+        
+    return sat_delay_mins <= max_sat_delay_allowed_mins
     
-    # The model will not ever try to use data more recent than this
-    min_sat_delay_used_mins = data_config.input_data.satellite.live_delay_minutes
+
+def preprocess_sat_data(t0):
+    """Combine and 5- and 15-minutely satellite data and extend to t0 if required"""
     
     # Deal with switching between the 5 and 15 minutely satellite data
-    combine_5_and_15_sat_data(t0, max_sat_delay_allowed_mins)
+    combine_5_and_15_sat_data(t0)
     
-    # Extend the satellite data with NaNs if needed by the model
-    extend_satellite_data_with_nans(t0, min_sat_delay_used_mins)
+    # Extend the satellite data with NaNs if needed by the model and record the delay of most recent
+    # non-nan timestamp
+    delay_mins = extend_satellite_data_with_nans(t0)
     
-    ds_sat = xr.open_zarr(sat_path)
-    ds_sat.data.isnull().mean().compute()
-    #assert False
+    return delay_mins
 
     
 def _download_nwp_data(source, destination):
