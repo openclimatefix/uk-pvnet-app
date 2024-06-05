@@ -106,28 +106,6 @@ models_dict = {
     
 }
 
-# Remove extra models if not configured to run them
-if os.getenv("RUN_EXTRA_MODELS", "false").lower() == "false":
-    models_dict = {"pvnet_v2": models_dict["pvnet_v2"]}
-    
-    
-# Pull the data configs from huggingface
-data_config_filenames = []
-for model in models_dict.values():
-    data_config_filenames.append(
-        PVNetBaseModel.get_data_config(
-            model["pvnet"]["name"],
-            revision=model["pvnet"]["version"],
-        )
-    )
-
-# Find the config with satellite delay suitable for all models running
-common_config = find_min_satellite_delay_config(data_config_filenames)
-
-common_config_path = "common_config_path.yaml"
-
-save_yaml_config(common_config, common_config_path)
-
 # ---------------------------------------------------------------------------
 # LOGGER
 
@@ -183,13 +161,40 @@ def app(
         num_workers = os.cpu_count() - 1
     if num_workers>0:
         # Without this line the dataloader will hang if multiple workers are used
-        dask.config.set(scheduler='single-threaded')    
+        dask.config.set(scheduler='single-threaded')   
+        
+
+    # Remove extra models if not configured to run them
+    if os.getenv("RUN_EXTRA_MODELS", "false").lower() == "false":
+        model_to_run_dict = {"pvnet_v2": models_dict["pvnet_v2"]}
+    else:
+        model_to_run_dict = models_dict
+
+    assert os.environ.get("RUN_EXTRA_MODELS", "false").lower() == "true", os.environ["RUN_EXTRA_MODELS"]
+
+    # Pull the data configs from huggingface
+    data_config_filenames = []
+    for model in model_to_run_dict.values():
+        data_config_filenames.append(
+            PVNetBaseModel.get_data_config(
+                model["pvnet"]["name"],
+                revision=model["pvnet"]["version"],
+            )
+        )
+
+    # Find the config with satellite delay suitable for all models running
+    common_config = find_min_satellite_delay_config(data_config_filenames)
+
+    common_config_path = "common_config_path.yaml"
+
+    save_yaml_config(common_config, common_config_path)
+        
 
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
     logger.info(f"Using `pvnet_app` library version: {pvnet_app.__version__}")
     logger.info(f"Using {num_workers} workers")
-    logger.info(f"Using adjduster: {models_dict['pvnet_v2']['use_adjuster']}")
-    logger.info(f"Saving GSP sum: {models_dict['pvnet_v2']['save_gsp_sum']}")
+    logger.info(f"Using adjduster: {model_to_run_dict['pvnet_v2']['use_adjuster']}")
+    logger.info(f"Saving GSP sum: {model_to_run_dict['pvnet_v2']['save_gsp_sum']}")
 
     # ---------------------------------------------------------------------------
     # 0. If inference datetime is None, round down to last 30 minutes
@@ -288,7 +293,7 @@ def app(
     # ---------------------------------------------------------------------------
     # Set up models
     forecast_compilers = {}
-    for model_name, model_config in models_dict.items():
+    for model_name, model_config in model_to_run_dict.items():
         forecast_compilers[model_name] = ForecastCompiler(
             model_name=model_config["pvnet"]["name"], 
             model_version=model_config["pvnet"]["version"], 
@@ -326,7 +331,7 @@ def app(
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
-        return forecast_compiler["pvnet_v2"].da_abs_all
+        return forecast_compilers["pvnet_v2"].da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to database
@@ -347,11 +352,11 @@ def app(
                 session=session,
                 update_national=True,
                 update_gsp=True,
-                apply_adjuster=models_dict[model_name]["use_adjuster"],
+                apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
             )
 
 
-            if models_dict[model_name]["save_gsp_sum"]:
+            if model_to_run_dict[model_name]["save_gsp_sum"]:
                 # Compute the sum if we are logging the sume of GSPs independently
                 da_abs_sum_gsps = (
                     forecast_compiler.da_abs_all.sel(gsp_id=slice(1, 317)).sum(dim="gsp_id")

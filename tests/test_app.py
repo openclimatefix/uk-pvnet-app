@@ -9,12 +9,11 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSevenDaysSQL,
     ForecastValueSQL,
 )
-
 from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 from pvnet_app.data import sat_5_path, sat_15_path
 
 def test_app(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, gsp_yields_and_systems, me_latest
 ):
     # Environment variable DB_URL is set in engine_url, which is called by db_session
     # set NWP_ZARR_PATH
@@ -38,7 +37,7 @@ def test_app(
         temp_sat_path = f"{tmpdirname}/sat.zarr.zip"
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
         store = zarr.storage.ZipStore(temp_sat_path, mode="x")
-        sat_5_data.to_zarr(store)
+        sat_5_data_zero_delay.to_zarr(store)
         store.close()
         
         # Set environmental variables
@@ -46,8 +45,9 @@ def test_app(
         os.environ["RUN_EXTRA_MODELS"] = "True"
 
         # Run prediction
-        # This import needs to come after the environ vars have been set
+        # Thes import needs to come after the environ vars have been set
         from pvnet_app.app import app, models_dict
+        
         app(gsp_ids=list(range(1, 318)), num_workers=2)
         
     os.system(f"rm {sat_5_path}")

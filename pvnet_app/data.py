@@ -31,6 +31,7 @@ def download_all_sat_data():
     if fs.exists(sat_download_path):
         fs.get(sat_download_path, "sat_5_min.zarr.zip")
         os.system(f"unzip -qq sat_5_min.zarr.zip -d {sat_5_path}")
+        os.system(f"rm sat_5_min.zarr.zip")
     
     # Also download 15-minute satellite if it exists
     sat_15_dl_path = os.environ["SATELLITE_ZARR_PATH"]\
@@ -39,6 +40,7 @@ def download_all_sat_data():
         logger.info(f"Downloading 15-minute satellite data {sat_15_dl_path}")
         fs.get(sat_15_dl_path, "sat_15_min.zarr.zip")
         os.system(f"unzip sat_15_min.zarr.zip -d {sat_15_path}")
+        os.system(f"rm sat_15_min.zarr.zip")
 
         
 def _get_latest_time_and_mins_delay(sat_zarr_path, t0):
@@ -77,7 +79,7 @@ def combine_5_and_15_sat_data(t0, max_sat_delay_allowed_mins):
     if not use_5_minute:
         # Make sure the 15-minute data is actually there
         if not os.path.exists(sat_15_path):
-            raise ValueError(f"5-minute satellite data not found at {sat_15_path}")
+            raise ValueError(f"15-minute satellite data not found at {sat_15_path}")
         
         latest_time_15, delay_mins_15 = _get_latest_time_and_mins_delay(sat_15_path, t0)     
         logger.info(f"Latest 15-minute timestamp is {latest_time_15} for t0 time {t0}.")
