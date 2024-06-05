@@ -11,6 +11,7 @@ This app expects these evironmental variables to be available:
 """
 
 import logging
+import warnings
 import os
 import tempfile
 from datetime import timedelta
@@ -47,7 +48,11 @@ from pvnet_app.utils import (
     save_yaml_config,
 )
 from pvnet_app.data import (
-    download_all_sat_data, download_all_nwp_data, preprocess_sat_data, preprocess_nwp_data,
+    download_all_sat_data, 
+    download_all_nwp_data, 
+    preprocess_sat_data, 
+    preprocess_nwp_data,
+    check_model_inputs_available,
 )
 from pvnet_app.forecast_compiler import ForecastCompiler
 
@@ -106,28 +111,6 @@ models_dict = {
     
 }
 
-# Remove extra models if not configured to run them
-if os.getenv("RUN_EXTRA_MODELS", "false").lower() == "false":
-    models_dict = {"pvnet_v2": models_dict["pvnet_v2"]}
-    
-    
-# Pull the data configs from huggingface
-data_config_filenames = []
-for model in models_dict.values():
-    data_config_filenames.append(
-        PVNetBaseModel.get_data_config(
-            model["pvnet"]["name"],
-            revision=model["pvnet"]["version"],
-        )
-    )
-
-# Find the config with satellite delay suitable for all models running
-common_config = find_min_satellite_delay_config(data_config_filenames)
-
-common_config_path = "common_config_path.yaml"
-
-save_yaml_config(common_config, common_config_path)
-
 # ---------------------------------------------------------------------------
 # LOGGER
 
@@ -183,13 +166,16 @@ def app(
         num_workers = os.cpu_count() - 1
     if num_workers>0:
         # Without this line the dataloader will hang if multiple workers are used
-        dask.config.set(scheduler='single-threaded')    
+        dask.config.set(scheduler='single-threaded')
 
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
     logger.info(f"Using `pvnet_app` library version: {pvnet_app.__version__}")
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using adjduster: {models_dict['pvnet_v2']['use_adjuster']}")
     logger.info(f"Saving GSP sum: {models_dict['pvnet_v2']['save_gsp_sum']}")
+    
+    # Used for temporarily storing things
+    temp_dir = tempfile.TemporaryDirectory()
 
     # ---------------------------------------------------------------------------
     # 0. If inference datetime is None, round down to last 30 minutes
@@ -205,7 +191,7 @@ def app(
     logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
 
     # ---------------------------------------------------------------------------
-    # Prepare data sources
+    # 1. Prepare data sources
 
     # Make pands Series of most recent GSP effective capacities
     logger.info("Loading GSP metadata")
@@ -227,9 +213,9 @@ def app(
     # Download satellite data
     logger.info("Downloading satellite data")
     download_all_sat_data()
-
-    # Process the 5/15 minutely satellite data
-    preprocess_sat_data(t0, common_config_path)    
+    
+    # Preprocess the satellite data and record the delay of the most recent non-nan timestep
+    sat_delay_mins = preprocess_sat_data(t0)
     
     # Download NWP data
     logger.info("Downloading NWP data")
@@ -237,13 +223,65 @@ def app(
     
     # Preprocess the NWP data
     preprocess_nwp_data()
+    
+    # ---------------------------------------------------------------------------
+    # 2. Set up models
+    
+    # Remove extra models if not configured to run them
+    if os.getenv("RUN_EXTRA_MODELS", "false").lower() == "false":
+        model_to_run_dict = {"pvnet_v2": models_dict["pvnet_v2"]}
+    else:
+        model_to_run_dict = models_dict
+
+    # Prepare all the models which can be run
+    forecast_compilers = {}
+    data_config_filenames = []
+    for model_name, model_config in model_to_run_dict.items():
+        
+        # First load the data config
+        data_config_filename = PVNetBaseModel.get_data_config(
+            model_config["pvnet"]["name"],
+            revision=model_config["pvnet"]["version"],
+        )
+        
+        # Check if the data available will allow the model to run
+        model_can_run = check_model_inputs_available(data_config_filename, sat_delay_mins)
+        
+        if model_can_run:
+            # Set up a forecast compiler for the model
+            forecast_compilers[model_name] = ForecastCompiler(
+                model_name=model_config["pvnet"]["name"], 
+                model_version=model_config["pvnet"]["version"], 
+                summation_name=model_config["summation"]["name"], 
+                summation_version=model_config["summation"]["version"], 
+                device=device,
+                t0=t0,
+                gsp_capacities=gsp_capacities, 
+                national_capacity=national_capacity,
+                verbose=model_config["verbose"]
+            )
+            
+            # Store the config filename so we can create batches suitable for all models
+            data_config_filenames.append(data_config_filename)
+        else:
+            warnings.warn(f"The model {model_name} cannot be run with input data available")
+            
+    if len(forecast_compilers)==0:
+        raise Exception(f"No models were compatible with the available input data. Sat delay {sat_delay_mins} mins")
+
+    # Find the config with satellite delay suitable for all models running
+    common_config = find_min_satellite_delay_config(data_config_filenames)
+    
+    # Save the commmon config
+    common_config_path = f"{temp_dir.name}/common_config_path.yaml"
+    save_yaml_config(common_config, common_config_path)        
+
         
     # ---------------------------------------------------------------------------
     # Set up data loader
     logger.info("Creating DataLoader")
         
     # Populate the data config with production data paths
-    temp_dir = tempfile.TemporaryDirectory()
     populated_data_config_filename = f"{temp_dir.name}/data_config.yaml"
     
     populate_data_config_sources(common_config_path, populated_data_config_filename)
@@ -284,22 +322,6 @@ def app(
     )
     
     dataloader = DataLoader(batch_datapipe, **dataloader_kwargs)
-    
-    # ---------------------------------------------------------------------------
-    # Set up models
-    forecast_compilers = {}
-    for model_name, model_config in models_dict.items():
-        forecast_compilers[model_name] = ForecastCompiler(
-            model_name=model_config["pvnet"]["name"], 
-            model_version=model_config["pvnet"]["version"], 
-            summation_name=model_config["summation"]["name"], 
-            summation_version=model_config["summation"]["version"], 
-            device=device,
-            t0=t0,
-            gsp_capacities=gsp_capacities, 
-            national_capacity=national_capacity,
-            verbose=model_config["verbose"]
-        )
 
     # ---------------------------------------------------------------------------
     # Make predictions
@@ -327,7 +349,8 @@ def app(
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
-        return forecast_compiler["pvnet_v2"].da_abs_all
+        temp_dir.cleanup()
+        return forecast_compilers["pvnet_v2"].da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to database
@@ -348,11 +371,11 @@ def app(
                 session=session,
                 update_national=True,
                 update_gsp=True,
-                apply_adjuster=models_dict[model_name]["use_adjuster"],
+                apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
             )
 
 
-            if models_dict[model_name]["save_gsp_sum"]:
+            if model_to_run_dict[model_name]["save_gsp_sum"]:
                 # Compute the sum if we are logging the sume of GSPs independently
                 da_abs_sum_gsps = (
                     forecast_compiler.da_abs_all.sel(gsp_id=slice(1, 317)).sum(dim="gsp_id")

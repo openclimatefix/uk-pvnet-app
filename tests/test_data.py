@@ -26,16 +26,6 @@ from pvnet_app.data import (
 from pvnet_app.app import models_dict
 
 
-@pytest.fixture()
-def data_config_filename():
-    # Pull the data config from huggingface
-    filename = PVNetBaseModel.get_data_config(
-        models_dict["pvnet_v2"]["pvnet"]["name"],
-        revision=models_dict["pvnet_v2"]["pvnet"]["version"],
-    )
-    return filename
-
-
 def save_to_zarr_zip(ds, filename):
     encoding = {"data": {"dtype": "int16"}}
     with zarr.ZipStore(filename) as store:
@@ -125,7 +115,7 @@ def test_download_sat_both_data(sat_5_data, sat_15_data):
         check_timesteps(sat_15_path, expected_mins=15)
 
 
-def test_preprocess_sat_data(sat_5_data, data_config_filename, test_t0):
+def test_preprocess_sat_data(sat_5_data, test_t0):
     """Download and process only the 5 minute satellite data"""
 
     # make temporary directory
@@ -140,13 +130,13 @@ def test_preprocess_sat_data(sat_5_data, data_config_filename, test_t0):
         os.environ["SATELLITE_ZARR_PATH"] = "latest.zarr.zip"
         download_all_sat_data()
         
-        preprocess_sat_data(test_t0, data_config_filename)
+        preprocess_sat_data(test_t0)
         
          # Check the satellite data is 5-minutely
         check_timesteps(sat_path, expected_mins=5)
 
 
-def test_preprocess_sat_15_data(sat_15_data, data_config_filename, test_t0):
+def test_preprocess_sat_15_data(sat_15_data, test_t0):
     """Download and process only the 15 minute satellite data"""
 
     # make temporary directory
@@ -161,13 +151,13 @@ def test_preprocess_sat_15_data(sat_15_data, data_config_filename, test_t0):
         os.environ["SATELLITE_ZARR_PATH"] = "latest.zarr.zip"
         download_all_sat_data()
         
-        preprocess_sat_data(test_t0, data_config_filename)
+        preprocess_sat_data(test_t0)
         
          # Check the satellite data being used is 15-minutely
         check_timesteps(sat_path, expected_mins=15)
 
 
-def test_preprocess_old_sat_5_data(sat_5_data_delayed, sat_15_data, data_config_filename, test_t0):
+def test_preprocess_old_sat_5_data(sat_5_data_delayed, sat_15_data, test_t0):
     """Download and process 5 and 15 minute satellite data. Use the 15 minute data since the
     5 minute data is too delayed
     """
@@ -184,7 +174,7 @@ def test_preprocess_old_sat_5_data(sat_5_data_delayed, sat_15_data, data_config_
         os.environ["SATELLITE_ZARR_PATH"] = "latest.zarr.zip"
         download_all_sat_data()
         
-        preprocess_sat_data(test_t0, data_config_filename)
+        preprocess_sat_data(test_t0)
 
          # Check the satellite data being used is 15-minutely
         check_timesteps(sat_path, expected_mins=15)

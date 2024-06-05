@@ -19,8 +19,6 @@ from nowcasting_datamodel.read.read import (
 )
 from nowcasting_datamodel.read.read_models import get_model
 
-
-
 from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 
 

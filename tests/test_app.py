@@ -9,7 +9,6 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSevenDaysSQL,
     ForecastValueSQL,
 )
-
 from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 from pvnet_app.data import sat_5_path, sat_15_path
 
@@ -46,8 +45,9 @@ def test_app(
         os.environ["RUN_EXTRA_MODELS"] = "True"
 
         # Run prediction
-        # This import needs to come after the environ vars have been set
+        # Thes import needs to come after the environ vars have been set
         from pvnet_app.app import app, models_dict
+        
         app(gsp_ids=list(range(1, 318)), num_workers=2)
         
     os.system(f"rm {sat_5_path}")
