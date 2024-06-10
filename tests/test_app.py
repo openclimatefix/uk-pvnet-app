@@ -77,7 +77,9 @@ def test_app(
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
 
-def test_app_day_ahead_model(db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data):
+def test_app_day_ahead_model(
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+):
     # Test app with day ahead model config
     # Environment variable DB_URL is set in engine_url, which is called by db_session
     # set NWP_ZARR_PATH
