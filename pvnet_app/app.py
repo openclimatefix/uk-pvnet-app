@@ -112,16 +112,16 @@ day_ahead_model_dict = {
         # Huggingfacehub model repo and commit for PVNet (GSP-level model)
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region_day_ahead",
-            "version": "afc6c327eb406d6ee0a06c9427482f4165efc5fa",
+            "version": "d87565731692a6003e43caac4feaed0f69e79272",
         },
         "summation": {
             "name": None,
             "version": None,
         },
         # Whether to use the adjuster for this model - for pvnet_v2 is set by environmental variable
-        "use_adjuster": os.getenv("USE_ADJUSTER", "true").lower() == "true",
+        "use_adjuster": False,
         # Whether to save the GSP sum for this model - for pvnet_v2 is set by environmental variable
-        "save_gsp_sum": os.getenv("SAVE_GSP_SUM", "false").lower() == "true",
+        "save_gsp_sum": True,
         # Where to log information through prediction steps for this model
         "verbose": True,
     },
