@@ -4,9 +4,8 @@ ARG TESTING=0
 
 SHELL ["/bin/bash", "-l", "-c"]
 
-RUN apt-get update
-RUN apt-get install git -y
-RUN apt-get install unzip g++ gcc libgeos++-dev libproj-dev proj-data proj-bin -y
+RUN apt-get update && \
+    apt-get install git unzip g++ gcc libgeos++-dev libproj-dev proj-data proj-bin -y
 
 # Copy files
 COPY setup.py app/setup.py
