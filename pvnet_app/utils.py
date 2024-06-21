@@ -100,11 +100,12 @@ def find_min_satellite_delay_config(config_paths):
     min_sat_delay = np.inf
     
     for config in configs:
-
-        min_sat_delay = min(
-            min_sat_delay,
-            config["input_data"]["satellite"]["live_delay_minutes"]
-        )
+        
+        if "satellite" in config["input_data"]:
+            min_sat_delay = min(
+                min_sat_delay,
+                config["input_data"]["satellite"]["live_delay_minutes"]
+            )
         
     config = configs[0] 
     config["input_data"]["satellite"]["live_delay_minutes"] = min_sat_delay
