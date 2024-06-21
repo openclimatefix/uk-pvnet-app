@@ -82,7 +82,7 @@ models_dict = {
         # If summation_model_name is set to None, a simple sum is computed instead
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "5a1f6031a2a6c1908c311678822ddf4ecc7f4204",
+            "version": "f97fe0463eb12e98377ece122f223e2f46d54772",
         },
         # Whether to use the adjuster for this model - for pvnet_v2 is set by environmental variable
         "use_adjuster": os.getenv("USE_ADJUSTER", "true").lower() == "true",
@@ -99,7 +99,7 @@ models_dict = {
         },
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "11f4a77b138b3cdd99c9f62d9184b828ff25e902",
+            "version": "b905207545ae02a7456830281b9ff62b974fd546",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
@@ -113,7 +113,7 @@ models_dict = {
         },
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "10ade7851ac638575bd66703c64b5849ab6c5e86",
+            "version": "a7fd71727f4cb2b933992b2108638985e24fa5a3",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
