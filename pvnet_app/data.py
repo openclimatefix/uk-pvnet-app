@@ -124,18 +124,25 @@ def check_model_inputs_available(data_config_filename, sat_delay_mins):
     
     data_config = load_yaml_configuration(data_config_filename)
     
-    # Take into account how recently the model tries to slice satellite data from
-    max_sat_delay_allowed_mins = data_config.input_data.satellite.live_delay_minutes
-
-    # Take into account the dropout the model was trained with, if any
-    if data_config.input_data.satellite.dropout_fraction>0:
-        max_sat_delay_allowed_mins = max(
-            max_sat_delay_allowed_mins, 
-            np.abs(data_config.input_data.satellite.dropout_timedeltas_minutes).max()
-        )
-        
-    return sat_delay_mins <= max_sat_delay_allowed_mins
+    available = True
     
+    # check satellite if using
+    if data_config.input_data.satellite is not None:
+
+        # Take into account how recently the model tries to slice satellite data from
+        max_sat_delay_allowed_mins = data_config.input_data.satellite.live_delay_minutes
+
+        # Take into account the dropout the model was trained with, if any
+        if data_config.input_data.satellite.dropout_fraction>0:
+            max_sat_delay_allowed_mins = max(
+                max_sat_delay_allowed_mins, 
+                np.abs(data_config.input_data.satellite.dropout_timedeltas_minutes).max()
+            )
+
+        available = available and (sat_delay_mins <= max_sat_delay_allowed_mins)
+        
+    return available
+
 
 def preprocess_sat_data(t0):
     """Combine and 5- and 15-minutely satellite data and extend to t0 if required"""
