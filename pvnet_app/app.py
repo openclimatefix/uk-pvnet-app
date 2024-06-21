@@ -120,6 +120,50 @@ models_dict = {
         "verbose": False,
     },
     
+    
+    # single source models
+    "pvnet_v2-sat_delay0_only-v9-batches": {
+        "pvnet": {
+            "name": "openclimatefix/pvnet_uk_region",
+            "version": "319431c66261b55eaed0be09b067bf96a119d38c",
+        },
+        "summation": {
+            "name": None,
+            "version": None,
+        },
+        "use_adjuster": False,
+        "save_gsp_sum": False,
+        "verbose": False,
+    },
+    
+    "pvnet_v2-ukv_only-v9-batches": {
+        "pvnet": {
+            "name": "openclimatefix/pvnet_uk_region",
+            "version": "41e38b4005b737582c4f3b7ae78f01e651f11d66",
+        },
+        "summation": {
+            "name": None,
+            "version": None,
+        },
+        "use_adjuster": False,
+        "save_gsp_sum": False,
+        "verbose": False,
+    },
+    
+    "pvnet_v2-ecmwf_only-v9-batches": {
+        "pvnet": {
+            "name": "openclimatefix/pvnet_uk_region",
+            "version": "787462f07c12b53dda42aa7dec4fc3a43c6d3df3",
+        },
+        "summation": {
+            "name": None,
+            "version": None,
+        },
+        "use_adjuster": False,
+        "save_gsp_sum": False,
+        "verbose": False,
+    },
+    
 }
 
 day_ahead_model_dict = {
