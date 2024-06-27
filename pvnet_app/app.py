@@ -427,13 +427,13 @@ def app(
                     forecasts=sql_forecasts[0:1],
                     session=session,
                     update_national=True,
-                    update_gsp=True,
+                    update_gsp=False,
                     apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
                 )
                 save_sql_forecasts(
                     forecasts=sql_forecasts[1:],
                     session=session,
-                    update_national=True,
+                    update_national=False,
                     update_gsp=True,
                     apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
                     save_to_last_seven_days=False
