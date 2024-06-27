@@ -74,6 +74,13 @@ def test_app(
     # 318 GSPs * 16 time steps in forecast
     assert len(db_session.query(ForecastValueSQL).all()) == expected_forecast_results * 16
     assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_forecast_results * 16
+
+    expected_forecast_results = 0
+    for model_config in models_dict.values():
+        expected_forecast_results += 1  # national
+        expected_forecast_results += 317 * model_config["save_gsp_to_forecast_value_last_seven_days"]
+        expected_forecast_results += model_config["save_gsp_sum"]  # gsp sum national
+
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
 
