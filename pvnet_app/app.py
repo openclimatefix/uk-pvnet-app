@@ -427,7 +427,7 @@ def app(
                     forecasts=sql_forecasts[0:1],
                     session=session,
                     update_national=True,
-                    update_gsp=False,
+                    update_gsp=True,
                     apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
                 )
                 save_sql_forecasts(
