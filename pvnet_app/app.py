@@ -90,6 +90,7 @@ models_dict = {
         "save_gsp_sum": os.getenv("SAVE_GSP_SUM", "false").lower() == "true",
         # Where to log information through prediction steps for this model
         "verbose": True,
+        "save_gsp_to_forecast_value_last_seven_days": True,
     },
     # Extra models which will be run on dev only
     
@@ -107,6 +108,7 @@ models_dict = {
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
+        "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
     "pvnet_v2-ecmwf_only-v9-batches": {
@@ -121,6 +123,7 @@ models_dict = {
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
+        "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
 }
@@ -140,6 +143,7 @@ day_ahead_model_dict = {
         # Since no summation model the sum of GSPs is already calculated
         "save_gsp_sum": False,
         "verbose": True,
+        "save_gsp_to_forecast_value_last_seven_days": True,
     },
 }
 
@@ -408,13 +412,33 @@ def app(
                 model_name=model_name,
                 version=pvnet_app.__version__,
             )
-            save_sql_forecasts(
-                forecasts=sql_forecasts,
-                session=session,
-                update_national=True,
-                update_gsp=True,
-                apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
-            )
+            if model_to_run_dict[model_name]["save_gsp_to_forecast_value_last_seven_days"]:
+
+                save_sql_forecasts(
+                    forecasts=sql_forecasts,
+                    session=session,
+                    update_national=True,
+                    update_gsp=True,
+                    apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
+                )
+            else:
+                # national
+                save_sql_forecasts(
+                    forecasts=sql_forecasts[0:1],
+                    session=session,
+                    update_national=True,
+                    update_gsp=False,
+                    apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
+                )
+                save_sql_forecasts(
+                    forecasts=sql_forecasts[1:],
+                    session=session,
+                    update_national=False,
+                    update_gsp=True,
+                    apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
+                    save_to_last_seven_days=False
+
+                )
 
             if model_to_run_dict[model_name]["save_gsp_sum"]:
                 # Compute the sum if we are logging the sume of GSPs independently
