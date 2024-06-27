@@ -92,49 +92,8 @@ models_dict = {
         "verbose": True,
     },
     # Extra models which will be run on dev only
-    "pvnet_v2-sat0min-v9-batches": {
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": "5e3505c0503b7d0f8031be0be54efdd4f0a73b7c",
-        },
-        "summation": {
-            "name": "openclimatefix/pvnet_v2_summation",
-            "version": "b905207545ae02a7456830281b9ff62b974fd546",
-        },
-        "use_adjuster": False,
-        "save_gsp_sum": False,
-        "verbose": False,
-    },
-    
-    "pvnet_v2-sat30min-v9-batches": {
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": "c901db311441476deab8bf8e2038d1e61aea11f2",
-        },
-        "summation": {
-            "name": "openclimatefix/pvnet_v2_summation",
-            "version": "a7fd71727f4cb2b933992b2108638985e24fa5a3",
-        },
-        "use_adjuster": False,
-        "save_gsp_sum": False,
-        "verbose": False,
-    },
-    
     
     # single source models
-    "pvnet_v2-sat_delay0_only-v9-batches": {
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": "319431c66261b55eaed0be09b067bf96a119d38c",
-        },
-        "summation": {
-            "name": None,
-            "version": None,
-        },
-        "use_adjuster": False,
-        "save_gsp_sum": False,
-        "verbose": False,
-    },
     
     "pvnet_v2-ukv_only-v9-batches": {
         "pvnet": {
