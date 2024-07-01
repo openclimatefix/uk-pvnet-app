@@ -90,6 +90,7 @@ models_dict = {
         "save_gsp_sum": os.getenv("SAVE_GSP_SUM", "false").lower() == "true",
         # Where to log information through prediction steps for this model
         "verbose": True,
+        "save_gsp_to_forecast_value_last_seven_days": True,
     },
     
     # Extra models which will be run on dev only
@@ -105,6 +106,8 @@ models_dict = {
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
+        "save_gsp_to_forecast_value_last_seven_days": False,
+        
     },
     
     "pvnet_v2-sat30min-v9-batches": {
@@ -119,6 +122,7 @@ models_dict = {
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
+        "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
     # single source models
@@ -134,6 +138,7 @@ models_dict = {
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
+        "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
     "pvnet_v2-ukv_only-v9-batches": {
@@ -148,6 +153,7 @@ models_dict = {
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
+        "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
     "pvnet_v2-ecmwf_only-v9-batches": {
@@ -162,6 +168,7 @@ models_dict = {
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
+        "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
 }
