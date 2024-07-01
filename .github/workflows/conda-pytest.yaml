@@ -1,5 +1,8 @@
 name: Conda pytest
-on: push
+on: 
+  push:
+  pull_request:
+    types: [opened, reopened]
 
 jobs:
   push_to_registry:

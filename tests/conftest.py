@@ -20,9 +20,9 @@ from datetime import timedelta
 
 xr.set_options(keep_attrs=True)
 
-
-def time_before_present(dt: timedelta):
-    return pd.Timestamp.now(tz=None) - dt
+@pytest.fixture()
+def test_t0():
+    return pd.Timestamp.now(tz=None).floor(timedelta(minutes=30))
 
 
 @pytest.fixture(scope="session")
@@ -81,15 +81,12 @@ def db_session(db_connection, engine_url):
         s.rollback()
 
 
-@pytest.fixture
-def nwp_data():
+def make_nwp_data(shell_path, varname, test_t0):
     # Load dataset which only contains coordinates, but no data
-    ds = xr.open_zarr(
-        f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_shell.zarr"
-    )
+    ds = xr.open_zarr(shell_path)
 
     # Last init time was at least 2 hours ago and floor to 3-hour interval
-    t0_datetime_utc = time_before_present(timedelta(hours=2)).floor(timedelta(hours=3))
+    t0_datetime_utc = (test_t0 - timedelta(hours=2)).floor(timedelta(hours=3))
     ds.init_time.values[:] = pd.date_range(
         t0_datetime_utc - timedelta(hours=3 * (len(ds.init_time) - 1)),
         t0_datetime_utc,
@@ -106,36 +103,54 @@ def nwp_data():
             ds[v].encoding.clear()
     
     # Add data to dataset
-    ds["UKV"] = xr.DataArray(
+    ds[varname] = xr.DataArray(
         np.zeros([len(ds[c]) for c in ds.xindexes]),
         coords=[ds[c] for c in ds.xindexes],
     )
 
     # Add stored attributes to DataArray
-    ds.UKV.attrs = ds.attrs["_data_attrs"]
+    ds[varname].attrs = ds.attrs["_data_attrs"]
     del ds.attrs["_data_attrs"]
+
     return ds
+        
+
+@pytest.fixture
+def nwp_ukv_data(test_t0):
+    return make_nwp_data(
+        shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ukv_shell.zarr",
+        varname="UKV",
+        test_t0=test_t0,
+    )
 
 
-@pytest.fixture()
-def sat_5_data():
+@pytest.fixture
+def nwp_ecmwf_data(test_t0):
+    return make_nwp_data(
+        shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ecmwf_shell.zarr",
+        varname="ECMWF_UK",
+        test_t0=test_t0,
+    )
+
+
+def make_sat_data(test_t0, delay_mins, freq_mins):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr"
     )
 
-    # Change times so they lead up to present. Delayed by 30-60 mins
-    t0_datetime_utc = time_before_present(timedelta(minutes=30)).floor(timedelta(minutes=30))
+    # Change times so they lead up to present
+    t0_datetime_utc = test_t0 - timedelta(minutes=delay_mins)
     ds.time.values[:] = pd.date_range(
-        t0_datetime_utc - timedelta(minutes=5 * (len(ds.time) - 1)),
+        t0_datetime_utc - timedelta(minutes=freq_mins * (len(ds.time) - 1)),
         t0_datetime_utc,
-        freq=timedelta(minutes=5),
+        freq=timedelta(minutes=freq_mins),
     )
 
     # Add data to dataset
     ds["data"] = xr.DataArray(
-        np.zeros([len(ds[c]) for c in ds.coords]),
-        coords=ds.coords,
+        np.zeros([len(ds[c]) for c in ds.xindexes]),
+        coords=[ds[c] for c in ds.xindexes],
     )
 
     # Add stored attributes to DataArray
@@ -144,34 +159,30 @@ def sat_5_data():
 
     return ds
 
+@pytest.fixture()
+def sat_5_data(test_t0):
+    return make_sat_data(test_t0, delay_mins=10, freq_mins=5)
 
 @pytest.fixture()
-def sat_5_data_delayed(sat_5_data):
-    # Set the most recent timestamp to 2 - 2.5 hours ago
-    t_most_recent = time_before_present(timedelta(hours=2)).floor(timedelta(minutes=30))
-    offset = sat_5_data.time.max().values - t_most_recent
-    sat_5_delayed = sat_5_data.copy(deep=True)
-    sat_5_delayed["time"] = sat_5_data.time.values - offset
-    return sat_5_delayed
-
+def sat_5_data_zero_delay(test_t0):
+    return make_sat_data(test_t0, delay_mins=0, freq_mins=5)
 
 @pytest.fixture()
-def sat_15_data(sat_5_data):
-    freq = timedelta(minutes=15)
-    times_15 = pd.date_range(
-        pd.to_datetime(sat_5_data.time.min().values).ceil(freq),
-        pd.to_datetime(sat_5_data.time.max().values).floor(freq),
-        freq=freq,
-    )
-    return sat_5_data.sel(time=times_15)
+def sat_5_data_delayed(test_t0):
+    return make_sat_data(test_t0, delay_mins=120, freq_mins=5)
 
 
 @pytest.fixture()
-def gsp_yields_and_systems(db_session):
+def sat_15_data(test_t0):
+    return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
+
+
+@pytest.fixture()
+def gsp_yields_and_systems(db_session, test_t0):
     """Create gsp yields and systems"""
 
     # GSP data is mostly up to date
-    t0_datetime_utc = time_before_present(timedelta(minutes=0)).floor(timedelta(minutes=30))
+    t0_datetime_utc = test_t0
 
     # this pv systems has same coordiantes as the first gsp
     gsp_yields = []
