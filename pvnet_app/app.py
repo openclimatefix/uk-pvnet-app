@@ -76,7 +76,7 @@ models_dict = {
         # Huggingfacehub model repo and commit for PVNet (GSP-level model)
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "4ec1cda7e01da552439a48a642731e8f4649f60d",
+            "version": "92266cd9040c590a9e90ee33eafd0e7b92548be8",
         },
         # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
         # If summation_model_name is set to None, a simple sum is computed instead
@@ -90,16 +90,42 @@ models_dict = {
         "save_gsp_sum": os.getenv("SAVE_GSP_SUM", "false").lower() == "true",
         # Where to log information through prediction steps for this model
         "verbose": True,
-        "save_gsp_to_forecast_value_last_seven_days": True,
     },
+    
     # Extra models which will be run on dev only
-    
-    # single source models
-    
-    "pvnet_v2-ukv_only-v9-batches": {
+    "pvnet_v2-sat0min-v9-batches": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "41e38b4005b737582c4f3b7ae78f01e651f11d66",
+            "version": "5bea453ebacba8303afa60dd8dac42508ecca4ab",
+        },
+        "summation": {
+            "name": "openclimatefix/pvnet_v2_summation",
+            "version": "b905207545ae02a7456830281b9ff62b974fd546",
+        },
+        "use_adjuster": False,
+        "save_gsp_sum": False,
+        "verbose": False,
+    },
+    
+    "pvnet_v2-sat30min-v9-batches": {
+        "pvnet": {
+            "name": "openclimatefix/pvnet_uk_region",
+            "version": "aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac",
+        },
+        "summation": {
+            "name": "openclimatefix/pvnet_v2_summation",
+            "version": "a7fd71727f4cb2b933992b2108638985e24fa5a3",
+        },
+        "use_adjuster": False,
+        "save_gsp_sum": False,
+        "verbose": False,
+    },
+    
+    # single source models
+    "pvnet_v2-sat_delay0_only-v9-batches": {
+        "pvnet": {
+            "name": "openclimatefix/pvnet_uk_region",
+            "version": "319431c66261b55eaed0be09b067bf96a119d38c",
         },
         "summation": {
             "name": None,
@@ -108,7 +134,20 @@ models_dict = {
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
-        "save_gsp_to_forecast_value_last_seven_days": False,
+    },
+    
+    "pvnet_v2-ukv_only-v9-batches": {
+        "pvnet": {
+            "name": "openclimatefix/pvnet_uk_region",
+            "version": "52da9bc561ea5a6e81a778f976b1ce4633d82418",
+        },
+        "summation": {
+            "name": None,
+            "version": None,
+        },
+        "use_adjuster": False,
+        "save_gsp_sum": False,
+        "verbose": False,
     },
     
     "pvnet_v2-ecmwf_only-v9-batches": {
@@ -123,7 +162,6 @@ models_dict = {
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
-        "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
 }
