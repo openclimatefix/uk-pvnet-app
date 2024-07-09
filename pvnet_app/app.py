@@ -175,18 +175,17 @@ models_dict = {
 
 day_ahead_model_dict = {
     "pvnet_day_ahead": {
-        # Huggingfacehub model repo and commit for PVNet day ahead (GSP-level model)
+        # Huggingfacehub model repo and commit for PVNet day ahead models
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region_day_ahead",
             "version": "d87565731692a6003e43caac4feaed0f69e79272",
         },
         "summation": {
-            "name": None,
-            "version": None,
+            "name": "openclimatefix/pvnet_summation_uk_national_day_ahead",
+            "version": "06e7df9572738f46f1da2112147bc2b8ea3283ec",
         },
         "use_adjuster": False,
-        # Since no summation model the sum of GSPs is already calculated
-        "save_gsp_sum": False,
+        "save_gsp_sum": True,
         "verbose": True,
         "save_gsp_to_forecast_value_last_seven_days": True,
     },
@@ -443,7 +442,9 @@ def app(
     # Escape clause for making predictions locally
     if not write_predictions:
         temp_dir.cleanup()
-        return forecast_compilers["pvnet_v2"].da_abs_all
+        if not day_ahead_model_used:
+            return forecast_compilers["pvnet_v2"].da_abs_all
+        return forecast_compilers["pvnet_day_ahead"].da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to database
