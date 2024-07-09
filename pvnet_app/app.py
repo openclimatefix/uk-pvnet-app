@@ -442,7 +442,9 @@ def app(
     # Escape clause for making predictions locally
     if not write_predictions:
         temp_dir.cleanup()
-        return forecast_compilers["pvnet_v2"].da_abs_all
+        if not day_ahead_model_used:
+            return forecast_compilers["pvnet_v2"].da_abs_all
+        return forecast_compilers["pvnet_day_ahead"].da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to database
