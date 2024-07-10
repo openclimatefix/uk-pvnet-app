@@ -76,13 +76,13 @@ models_dict = {
         # Huggingfacehub model repo and commit for PVNet (GSP-level model)
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "92266cd9040c590a9e90ee33eafd0e7b92548be8",
+            "version": "aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac",
         },
         # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
         # If summation_model_name is set to None, a simple sum is computed instead
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "f97fe0463eb12e98377ece122f223e2f46d54772",
+            "version": "a7fd71727f4cb2b933992b2108638985e24fa5a3",
         },
         # Whether to use the adjuster for this model - for pvnet_v2 is set by environmental variable
         "use_adjuster": os.getenv("USE_ADJUSTER", "true").lower() == "true",
@@ -108,21 +108,6 @@ models_dict = {
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
         
-    },
-    
-    "pvnet_v2-sat30min-v9-batches": {
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": "aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac",
-        },
-        "summation": {
-            "name": "openclimatefix/pvnet_v2_summation",
-            "version": "a7fd71727f4cb2b933992b2108638985e24fa5a3",
-        },
-        "use_adjuster": False,
-        "save_gsp_sum": False,
-        "verbose": False,
-        "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
     # single source models
