@@ -169,7 +169,7 @@ day_ahead_model_dict = {
             "name": "openclimatefix/pvnet_summation_uk_national_day_ahead",
             "version": "ed60c5d32a020242ca4739dcc6dbc8864f783a08",
         },
-        "use_adjuster": False,
+        "use_adjuster": True,
         "save_gsp_sum": True,
         "verbose": True,
         "save_gsp_to_forecast_value_last_seven_days": True,
