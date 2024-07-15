@@ -9,7 +9,7 @@ nowcasting_datamodel>=1.5.45
 fsspec[s3]
 xarray
 zarr
-numpy
+numpy==1.*
 pandas
 sqlalchemy
 pytest
