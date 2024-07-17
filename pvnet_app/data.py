@@ -139,6 +139,9 @@ def check_model_inputs_available(data_config_filename, sat_delay_mins):
                 np.abs(data_config.input_data.satellite.dropout_timedeltas_minutes).max()
             )
 
+        logger.info(f'Checking satellite data availability, '
+                    f'{sat_delay_mins=} {max_sat_delay_allowed_mins=}')
+
         available = available and (sat_delay_mins <= max_sat_delay_allowed_mins)
         
     return available
@@ -158,6 +161,9 @@ def preprocess_sat_data(t0):
 
     
 def _download_nwp_data(source, destination):
+
+    logger.info(f"Downloading NWP data from {source} to {destination}")
+
     fs = fsspec.open(source).fs
     fs.get(source, destination, recursive=True)
 
@@ -172,6 +178,8 @@ def regrid_nwp_data(nwp_zarr, target_coords_path, method):
     """This function loads the  NWP data, then regrids and saves it back out if the data is not
     on the same grid as expected. The data is resaved in-place.
     """
+
+    logger.info(f'Regridding NWP data {nwp_zarr} to expected grid to {target_coords_path}')
     
     ds_raw = xr.open_zarr(nwp_zarr)
 
