@@ -128,21 +128,22 @@ def check_model_inputs_available(data_config_filename, sat_delay_mins):
     
     # check satellite if using
     if hasattr(data_config.input_data, "satellite"):
+        if data_config.input_data.satellite is not None:
 
-        # Take into account how recently the model tries to slice satellite data from
-        max_sat_delay_allowed_mins = data_config.input_data.satellite.live_delay_minutes
+            # Take into account how recently the model tries to slice satellite data from
+            max_sat_delay_allowed_mins = data_config.input_data.satellite.live_delay_minutes
 
-        # Take into account the dropout the model was trained with, if any
-        if data_config.input_data.satellite.dropout_fraction>0:
-            max_sat_delay_allowed_mins = max(
-                max_sat_delay_allowed_mins, 
-                np.abs(data_config.input_data.satellite.dropout_timedeltas_minutes).max()
-            )
+            # Take into account the dropout the model was trained with, if any
+            if data_config.input_data.satellite.dropout_fraction>0:
+                max_sat_delay_allowed_mins = max(
+                    max_sat_delay_allowed_mins,
+                    np.abs(data_config.input_data.satellite.dropout_timedeltas_minutes).max()
+                )
 
-        logger.info(f'Checking satellite data availability, '
-                    f'{sat_delay_mins=} {max_sat_delay_allowed_mins=}')
+            logger.info(f'Checking satellite data availability, '
+                        f'{sat_delay_mins=} {max_sat_delay_allowed_mins=}')
 
-        available = available and (sat_delay_mins <= max_sat_delay_allowed_mins)
+            available = available and (sat_delay_mins <= max_sat_delay_allowed_mins)
         
     return available
 
