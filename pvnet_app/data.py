@@ -127,7 +127,7 @@ def check_model_inputs_available(data_config_filename, sat_delay_mins):
     available = True
     
     # check satellite if using
-    if "satellite" in data_config.input_data:
+    if hasattr(data_config.input_data, "satellite"):
 
         # Take into account how recently the model tries to slice satellite data from
         max_sat_delay_allowed_mins = data_config.input_data.satellite.live_delay_minutes
