@@ -16,4 +16,4 @@ pytest
 pytest-cov
 typer
 testcontainers
-xesmf
+xesmf==0.8.7
