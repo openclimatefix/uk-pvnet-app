@@ -55,13 +55,14 @@ def _get_latest_time_and_mins_delay(sat_zarr_path, t0):
     return latest_time, delay_mins, all_datetimes
 
 
-def combine_5_and_15_sat_data(t0) -> [datetime, int, int]:
+def combine_5_and_15_sat_data(t0) -> [datetime, int, int, [datetime]]:
     """Select and/or combine the 5 and 15-minutely satellite data
 
     The return is
     - the most recent timestamp of the data
     - the delay in minutes of the most recent timestamp from t0
     - the data frequency, 5 or 15
+    - all the datetimes
     """
 
     # Check which satellite data exists

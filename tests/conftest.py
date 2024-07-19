@@ -143,6 +143,10 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr"
     )
 
+    # remove tim dim and expand time dim to be len 36 = 3 hours of 5 minute data
+    ds = ds.drop_vars("time")
+    ds = ds.expand_dims(time=range(36))
+
     # Change times so they lead up to present
     t0_datetime_utc = test_t0 - timedelta(minutes=delay_mins)
     ds.time.values[:] = pd.date_range(

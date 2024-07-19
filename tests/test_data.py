@@ -188,9 +188,9 @@ def test_preprocess_old_sat_5_data(sat_5_data_delayed, sat_15_data, test_t0):
 def test_check_model_inputs_available(config_filename):
 
     t0 = datetime(2023,1,1)
-    sat_datetime_1 = pd.date_range(t0 - timedelta(minutes=120), t0- timedelta(minutes=5), freq="5T")
-    sat_datetime_2 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=15), freq="5T")
-    sat_datetime_3 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=35), freq="5T")
+    sat_datetime_1 = pd.date_range(t0 - timedelta(minutes=120), t0- timedelta(minutes=5), freq="5min")
+    sat_datetime_2 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=15), freq="5min")
+    sat_datetime_3 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=35), freq="5min")
 
     assert check_model_inputs_available(config_filename, sat_datetime_1, t0, 5 )
     assert check_model_inputs_available(config_filename, sat_datetime_2, t0, 5 )
