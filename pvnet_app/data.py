@@ -163,10 +163,12 @@ def check_model_inputs_available(data_config_filename, all_satellite_datetimes, 
 
             # we only check every 15 minutes, as ocf_datapipes resample from 15 to 5 if necessary.
             # We need to include the end point also
+            freq = f"{data_freq_minutes}min"
+            logger.info(f"Checking satellite data for {t0} with history {history_minutes} and freq {freq}")
             expected_datetimes = pd.date_range(
                 t0 - timedelta(minutes=history_minutes),
                 t0 - timedelta(minutes=max_sat_delay_allowed_mins) + timedelta(minutes=data_freq_minutes),
-                freq=f"{data_freq_minutes}min"
+                freq=freq
             )
 
             # Check if all expected datetimes are in the available satellite data
