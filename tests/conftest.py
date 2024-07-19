@@ -145,15 +145,16 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
 
     # remove tim dim and expand time dim to be len 36 = 3 hours of 5 minute data
     ds = ds.drop_vars("time")
-    ds = ds.expand_dims(time=range(36))
+    n_hours = 3
 
-    # Change times so they lead up to present
+    # Add times so they lead up to present
     t0_datetime_utc = test_t0 - timedelta(minutes=delay_mins)
-    ds.time.values[:] = pd.date_range(
-        t0_datetime_utc - timedelta(minutes=freq_mins * (len(ds.time) - 1)),
+    times = pd.date_range(
+        t0_datetime_utc - timedelta(hours=n_hours),
         t0_datetime_utc,
         freq=timedelta(minutes=freq_mins),
     )
+    ds = ds.expand_dims(time=times)
 
     # Add data to dataset
     ds["data"] = xr.DataArray(
