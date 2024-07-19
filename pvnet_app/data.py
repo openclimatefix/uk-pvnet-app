@@ -175,13 +175,14 @@ def check_model_inputs_available(
             # We need to include the end point also
             freq = f"{data_freq_minutes}min"
             logger.info(
-                f"Checking satellite data for {t0=} with history {history_minutes=} and freq {freq=}, for {max_sat_delay_allowed_mins=}"
+                f"Checking satellite data for {t0=} with history {history_minutes=} "
+                f"and freq {freq=}, for {max_sat_delay_allowed_mins=}"
             )
             expected_datetimes = pd.date_range(
-                t0 - timedelta(minutes=history_minutes),
+                t0 - timedelta(minutes=int(history_minutes)),
                 t0
-                - timedelta(minutes=max_sat_delay_allowed_mins)
-                + timedelta(minutes=data_freq_minutes),
+                - timedelta(minutes=int(max_sat_delay_allowed_mins))
+                + timedelta(minutes=int(data_freq_minutes)),
                 freq=freq,
             )
 
