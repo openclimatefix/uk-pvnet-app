@@ -212,8 +212,6 @@ def preprocess_sat_data(t0):
     # non-nan timestamp
     extend_satellite_data_with_nans(t0)
 
-    # TODO return actual datetimes
-
     return all_datetimes, data_freq_minutes
 
 
