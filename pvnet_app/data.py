@@ -69,17 +69,17 @@ def combine_5_and_15_sat_data(t0) -> [datetime, int, int]:
     
     # Find the delay in the 5- and 15-minutely data
     if exists_5_minute:
-        latest_time_5, delay_mins_5, all_datetimes = _get_latest_time_and_mins_delay(sat_5_path, t0)
-        logger.info(f"Latest 5-minute timestamp is {latest_time_5} for t0 time {t0}.")
+        latest_time_5, delay_mins_5, all_datetimes_5 = _get_latest_time_and_mins_delay(sat_5_path, t0)
+        logger.info(f"Latest 5-minute timestamp is {latest_time_5} for t0 time {t0}. All the datetimes are {all_datetimes_5}")
     else:
-        latest_time_5, delay_mins_5, all_datetimes = datetime.min, np.inf, []
+        latest_time_5, delay_mins_5, all_datetimes_5 = datetime.min, np.inf, []
         logger.info(f"No 5-minute data was found.")
         
     if exists_15_minute:
-        latest_time_15, delay_mins_15, all_datetimes = _get_latest_time_and_mins_delay(sat_15_path, t0)
-        logger.info(f"Latest 5-minute timestamp is {latest_time_15} for t0 time {t0}.")
+        latest_time_15, delay_mins_15, all_datetimes_15 = _get_latest_time_and_mins_delay(sat_15_path, t0)
+        logger.info(f"Latest 5-minute timestamp is {latest_time_15} for t0 time {t0}. All the datetimes are  {all_datetimes_15}")
     else:
-        latest_time_15, delay_mins_15, all_datetimes = datetime.min, np.inf, []
+        latest_time_15, delay_mins_15, all_datetimes_15 = datetime.min, np.inf, []
         logger.info(f"No 15-minute data was found.")
         
     # Move the data with the most recent timestamp to the expected path
@@ -89,12 +89,14 @@ def combine_5_and_15_sat_data(t0) -> [datetime, int, int]:
         latest_time = latest_time_5
         delay_mins = delay_mins_5
         data_freq_minutes = 5
+        all_datetimes = all_datetimes_5
     else:
         logger.info(f"Using 15-minutely data.")
         os.system(f"mv {sat_15_path} {sat_path}")
         latest_time = latest_time_15
         delay_mins = delay_mins_15
         data_freq_minutes = 15
+        all_datetimes = all_datetimes_15
         
     return latest_time, delay_mins, data_freq_minutes, all_datetimes
 
@@ -171,7 +173,7 @@ def check_model_inputs_available(data_config_filename, all_satellite_datetimes, 
             all_satellite_data_present = all([t in all_satellite_datetimes for t in expected_datetimes])
             if not all_satellite_data_present:
                 # log something. e,g x,y timestamps are missing
-                pass
+                logger.info(f"Missing satellite data for {expected_datetimes} in {all_satellite_datetimes}")
 
             available = all_satellite_data_present
 

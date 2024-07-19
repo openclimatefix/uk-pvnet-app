@@ -15,7 +15,7 @@ from nowcasting_datamodel.models import (
 )
 
 from testcontainers.postgres import PostgresContainer
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 
 xr.set_options(keep_attrs=True)
@@ -165,7 +165,7 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
 
 @pytest.fixture()
 def sat_5_data(test_t0):
-    return make_sat_data(test_t0, delay_mins=10, freq_mins=5)
+    return make_sat_data(test_t0, delay_mins=45, freq_mins=5)
 
 @pytest.fixture()
 def sat_5_data_zero_delay(test_t0):
@@ -202,7 +202,7 @@ def gsp_yields_and_systems(db_session, test_t0):
         # From 3 hours ago to 8.5 hours into future
         for minute in range(-3 * 60, 9 * 60, 30):
             gsp_yield_sql = GSPYield(
-                datetime_utc=t0_datetime_utc + timedelta(minutes=minute),
+                datetime_utc=(t0_datetime_utc + timedelta(minutes=minute)).replace(tzinfo=timezone.utc),
                 solar_generation_kw=np.random.randint(low=0, high=1000),
                 capacity_mwp=100,
             ).to_orm()

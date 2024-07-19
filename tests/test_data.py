@@ -17,7 +17,7 @@ import zarr
 import numpy as np
 import pandas as pd
 import xarray as xr
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_app.data import (
@@ -186,6 +186,12 @@ def test_preprocess_old_sat_5_data(sat_5_data_delayed, sat_15_data, test_t0):
 
 
 def test_check_model_inputs_available(config_filename):
-    assert check_model_inputs_available(config_filename, 5)
-    assert check_model_inputs_available(config_filename, 30)
-    assert not check_model_inputs_available(config_filename, 35)
+
+    t0 = datetime(2023,1,1)
+    sat_datetime_1 = pd.date_range(t0 - timedelta(minutes=120), t0- timedelta(minutes=5), freq="5T")
+    sat_datetime_2 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=15), freq="5T")
+    sat_datetime_3 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=35), freq="5T")
+
+    assert check_model_inputs_available(config_filename, sat_datetime_1, t0, 5 )
+    assert check_model_inputs_available(config_filename, sat_datetime_2, t0, 5 )
+    assert not check_model_inputs_available(config_filename, sat_datetime_3, t0,5 )
