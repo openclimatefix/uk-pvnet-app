@@ -165,7 +165,7 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
 
 @pytest.fixture()
 def sat_5_data(test_t0):
-    return make_sat_data(test_t0, delay_mins=45, freq_mins=5)
+    return make_sat_data(test_t0, delay_mins=15, freq_mins=5)
 
 @pytest.fixture()
 def sat_5_data_zero_delay(test_t0):
