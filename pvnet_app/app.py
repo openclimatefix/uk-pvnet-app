@@ -293,7 +293,7 @@ def app(
     download_all_sat_data()
 
     # Preprocess the satellite data and record the delay of the most recent non-nan timestep
-    sat_delay_mins = preprocess_sat_data(t0)
+    all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(t0)
 
     # Download NWP data
     logger.info("Downloading NWP data")
@@ -324,7 +324,7 @@ def app(
         )
 
         # Check if the data available will allow the model to run
-        model_can_run = check_model_inputs_available(data_config_filename, sat_delay_mins)
+        model_can_run = check_model_inputs_available(data_config_filename, all_satellite_datetimes, t0, data_freq_minutes)
 
         if model_can_run:
             # Set up a forecast compiler for the model

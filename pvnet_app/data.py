@@ -48,11 +48,17 @@ def _get_latest_time_and_mins_delay(sat_zarr_path, t0):
     latest_time = pd.to_datetime(ds_sat.time.max().item())
     delay = t0 - latest_time
     delay_mins = int(delay.total_seconds() / 60)
-    return latest_time, delay_mins
+    all_datetimes = pd.to_datetime(ds_sat.time.values)
+    return latest_time, delay_mins, all_datetimes
 
+def combine_5_and_15_sat_data(t0) -> [datetime, int, int]:
+    """Select and/or combine the 5 and 15-minutely satellite data
 
-def combine_5_and_15_sat_data(t0):
-    """Select and/or combine the 5 and 15-minutely satellite data"""
+    The return is
+    - the most recent timestamp of the data
+    - the delay in minutes of the most recent timestamp from t0
+    - the data frequency, 5 or 15
+    """
     
     # Check which satellite data exists
     exists_5_minute = os.path.exists(sat_5_path)
@@ -63,17 +69,17 @@ def combine_5_and_15_sat_data(t0):
     
     # Find the delay in the 5- and 15-minutely data
     if exists_5_minute:
-        latest_time_5, delay_mins_5 = _get_latest_time_and_mins_delay(sat_5_path, t0)
+        latest_time_5, delay_mins_5, all_datetimes = _get_latest_time_and_mins_delay(sat_5_path, t0)
         logger.info(f"Latest 5-minute timestamp is {latest_time_5} for t0 time {t0}.")
     else:
-        latest_time_5, delay_mins_5 = datetime.min, np.inf
+        latest_time_5, delay_mins_5, all_datetimes = datetime.min, np.inf, []
         logger.info(f"No 5-minute data was found.")
         
     if exists_15_minute:
-        latest_time_15, delay_mins_15 = _get_latest_time_and_mins_delay(sat_15_path, t0)
+        latest_time_15, delay_mins_15, all_datetimes = _get_latest_time_and_mins_delay(sat_15_path, t0)
         logger.info(f"Latest 5-minute timestamp is {latest_time_15} for t0 time {t0}.")
     else:
-        latest_time_15, delay_mins_15 = datetime.min, np.inf
+        latest_time_15, delay_mins_15, all_datetimes = datetime.min, np.inf, []
         logger.info(f"No 15-minute data was found.")
         
     # Move the data with the most recent timestamp to the expected path
@@ -82,20 +88,22 @@ def combine_5_and_15_sat_data(t0):
         os.system(f"mv {sat_5_path} {sat_path}")
         latest_time = latest_time_5
         delay_mins = delay_mins_5
+        data_freq_minutes = 5
     else:
         logger.info(f"Using 15-minutely data.")
         os.system(f"mv {sat_15_path} {sat_path}")
         latest_time = latest_time_15
         delay_mins = delay_mins_15
+        data_freq_minutes = 15
         
-    return latest_time, delay_mins
+    return latest_time, delay_mins, data_freq_minutes, all_datetimes
 
 
 def extend_satellite_data_with_nans(t0):
     """Fill the satellite data with NaNs out to time t0"""
 
     # Find how delayed the satellite data is
-    _, delay_mins = _get_latest_time_and_mins_delay(sat_path, t0)
+    _, delay_mins, _ = _get_latest_time_and_mins_delay(sat_path, t0)
     
     if delay_mins > 0:
         logger.info(f"Filling most recent {delay_mins} mins with NaNs")
@@ -119,8 +127,16 @@ def extend_satellite_data_with_nans(t0):
     return delay_mins
         
     
-def check_model_inputs_available(data_config_filename, sat_delay_mins):
-    """Checks whether the model can be run given the current satellite delay"""
+def check_model_inputs_available(data_config_filename, all_satellite_datetimes, t0, data_freq_minutes ):
+    """Checks whether the model can be run given the current satellite delay
+
+    Args:
+        data_config_filename: Path to the data configuration file
+        all_satellite_datetimes: All the satellite datetimes available
+        t0: The time the model is trying to forecast
+        data_freq_minutes: The frequency of the satellite data. This can be 5 or 15 minutes.
+
+    """
     
     data_config = load_yaml_configuration(data_config_filename)
     
@@ -140,11 +156,25 @@ def check_model_inputs_available(data_config_filename, sat_delay_mins):
                     np.abs(data_config.input_data.satellite.dropout_timedeltas_minutes).max()
                 )
 
-            logger.info(f'Checking satellite data availability, '
-                        f'{sat_delay_mins=} {max_sat_delay_allowed_mins=}')
+            # get start and end satellite times
+            history_minutes = data_config.input_data.satellite.history_minutes
 
-            available = available and (sat_delay_mins <= max_sat_delay_allowed_mins)
-        
+            # we only check every 15 minutes, as ocf_datapipes resample from 15 to 5 if necessary.
+            # We need to include the end point also
+            expected_datetimes = pd.date_range(
+                t0 - timedelta(minutes=history_minutes),
+                t0 - timedelta(minutes=max_sat_delay_allowed_mins) + timedelta(minutes=data_freq_minutes),
+                freq=f"{data_freq_minutes}min"
+            )
+
+            # Check if all expected datetimes are in the available satellite data
+            all_satellite_data_present = all([t in all_satellite_datetimes for t in expected_datetimes])
+            if not all_satellite_data_present:
+                # log something. e,g x,y timestamps are missing
+                pass
+
+            available = all_satellite_data_present
+
     return available
 
 
@@ -152,13 +182,15 @@ def preprocess_sat_data(t0):
     """Combine and 5- and 15-minutely satellite data and extend to t0 if required"""
     
     # Deal with switching between the 5 and 15 minutely satellite data
-    combine_5_and_15_sat_data(t0)
+    _, _, data_freq_minutes, all_datetimes = combine_5_and_15_sat_data(t0)
     
     # Extend the satellite data with NaNs if needed by the model and record the delay of most recent
     # non-nan timestamp
-    delay_mins = extend_satellite_data_with_nans(t0)
+    extend_satellite_data_with_nans(t0)
+
+    # TODO return actual datetimes
     
-    return delay_mins
+    return all_datetimes, data_freq_minutes
 
     
 def _download_nwp_data(source, destination):
