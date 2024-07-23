@@ -132,6 +132,10 @@ def nwp_ecmwf_data(test_t0):
         test_t0=test_t0,
     )
 
+@pytest.fixture
+def config_filename():
+    return f"{os.path.dirname(os.path.abspath(__file__))}/test_data/test.yaml"
+
 
 def make_sat_data(test_t0, delay_mins, freq_mins):
     # Load dataset which only contains coordinates, but no data
