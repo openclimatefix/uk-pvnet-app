@@ -17,4 +17,4 @@ pytest-cov
 typer
 testcontainers
 xesmf==0.8.7
-huggingface_hub-0.24.1
+huggingface-hub==0.24.1
