@@ -80,7 +80,7 @@ class ForecastCompiler:
             self.summation_model = None
         else:
             self.summation_model = SummationBaseModel.from_pretrained(
-                summation_name,
+                model_id=summation_name,
                 revision=summation_version,
             ).to(device)
 
