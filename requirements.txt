@@ -2,8 +2,8 @@ pydantic
 requests<2.32.0
 pytorch-lightning==2.1.3
 torch[cpu]==2.2.0
-PVNet-summation==0.3.0
-pvnet==3.0.47
+PVNet-summation==0.3.2
+pvnet==3.0.50
 ocf_datapipes==3.3.35
 nowcasting_datamodel>=1.5.45
 fsspec[s3]
