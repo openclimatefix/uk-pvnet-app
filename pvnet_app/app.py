@@ -92,7 +92,6 @@ models_dict = {
         "verbose": True,
         "save_gsp_to_forecast_value_last_seven_days": True,
     },
-    
     # Extra models which will be run on dev only
     "pvnet_v2-sat0min-v9-batches": {
         "pvnet": {
@@ -107,9 +106,7 @@ models_dict = {
         "save_gsp_sum": False,
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
-        
     },
-    
     # single source models
     "pvnet_v2-sat_delay0_only-v9-batches": {
         "pvnet": {
@@ -125,7 +122,6 @@ models_dict = {
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
     },
-    
     "pvnet_v2-ukv_only-v9-batches": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
@@ -140,7 +136,6 @@ models_dict = {
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
     },
-    
     "pvnet_v2-ecmwf_only-v9-batches": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
@@ -155,7 +150,6 @@ models_dict = {
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
     },
-    
 }
 
 day_ahead_model_dict = {
@@ -296,7 +290,7 @@ def app(
     download_all_sat_data()
 
     # Preprocess the satellite data and record the delay of the most recent non-nan timestep
-    sat_delay_mins = preprocess_sat_data(t0)
+    all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(t0)
 
     # Download NWP data
     logger.info("Downloading NWP data")
@@ -327,7 +321,9 @@ def app(
         )
 
         # Check if the data available will allow the model to run
-        model_can_run = check_model_inputs_available(data_config_filename, sat_delay_mins)
+        model_can_run = check_model_inputs_available(
+            data_config_filename, all_satellite_datetimes, t0, data_freq_minutes
+        )
 
         if model_can_run:
             # Set up a forecast compiler for the model
@@ -349,9 +345,7 @@ def app(
             warnings.warn(f"The model {model_name} cannot be run with input data available")
 
     if len(forecast_compilers) == 0:
-        raise Exception(
-            f"No models were compatible with the available input data. Sat delay {sat_delay_mins} mins"
-        )
+        raise Exception(f"No models were compatible with the available input data.")
 
     # Find the config with satellite delay suitable for all models running
     common_config = find_min_satellite_delay_config(data_config_filenames)
@@ -470,8 +464,7 @@ def app(
                     update_national=False,
                     update_gsp=True,
                     apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
-                    save_to_last_seven_days=False
-
+                    save_to_last_seven_days=False,
                 )
 
             if model_to_run_dict[model_name]["save_gsp_sum"]:
