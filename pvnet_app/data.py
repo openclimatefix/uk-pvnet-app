@@ -231,6 +231,11 @@ def regrid_nwp_data(nwp_zarr, target_coords_path, method):
         "x": 100,
         "y": 100,
     }
+
+    # change x in64 to int32
+    if "x" in ds_regridded:
+        ds_regridded["x"] = ds_regridded["x"].astype(np.int32)
+        ds_regridded["y"] = ds_regridded["y"].astype(np.int32)
     
     ds_regridded.chunk(
         {k: save_chunk_dict[k] for k in list(ds_raw.xindexes) if k in save_chunk_dict}
