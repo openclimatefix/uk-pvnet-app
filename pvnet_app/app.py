@@ -45,12 +45,14 @@ from pvnet_app.utils import (
     find_min_satellite_delay_config,
     save_yaml_config,
 )
-from pvnet_app.data import (
+from pvnet_app.data.satellite import (
     download_all_sat_data,
-    download_all_nwp_data,
     preprocess_sat_data,
-    preprocess_nwp_data,
     check_model_inputs_available,
+)
+from pvnet_app.data.nwp import (
+    download_all_nwp_data,
+    preprocess_nwp_data,
 )
 from pvnet_app.forecast_compiler import ForecastCompiler
 
