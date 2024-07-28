@@ -20,7 +20,7 @@ import xarray as xr
 from datetime import datetime, timedelta
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
-from pvnet_app.data import (
+from pvnet_app.data.satellite import (
     check_model_inputs_available,
     download_all_sat_data,
     preprocess_sat_data,

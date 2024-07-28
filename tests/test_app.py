@@ -10,7 +10,7 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
-from pvnet_app.data import sat_5_path, sat_15_path
+from pvnet_app.data.satellite import sat_5_path, sat_15_path
 
 
 def test_app(
