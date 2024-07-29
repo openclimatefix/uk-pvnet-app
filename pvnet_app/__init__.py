@@ -1,2 +1,2 @@
 """PVNet App"""
-__version__ = "2.3.20"
+__version__ = "2.3.21"
