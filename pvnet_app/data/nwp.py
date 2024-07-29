@@ -134,14 +134,14 @@ def preprocess_nwp_data():
     # Regrid the UKV data
     regrid_nwp_data(
         nwp_zarr=nwp_ukv_path,
-        target_coords_path=f"{this_dir}/../data/nwp_ukv_target_coords.nc",
+        target_coords_path=f"{this_dir}/../../data/nwp_ukv_target_coords.nc",
         method="bilinear",
     )
 
     # Regrid the ECMWF data
     regrid_nwp_data(
         nwp_zarr=nwp_ecmwf_path,
-        target_coords_path=f"{this_dir}/../data/nwp_ecmwf_target_coords.nc",
+        target_coords_path=f"{this_dir}/../../data/nwp_ecmwf_target_coords.nc",
         method="conservative",  # this is needed to avoid zeros around edges of ECMWF data
     )
 
