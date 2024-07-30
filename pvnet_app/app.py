@@ -276,7 +276,10 @@ def app(
     db_connection = DatabaseConnection(url=os.getenv("DB_URL"), base=Base_Forecast, echo=False)
     with db_connection.get_session() as session:
         #  Pandas series of most recent GSP capacities
-        gsp_capacities = get_latest_gsp_capacities(session, gsp_ids)
+        now_minis_two_days = pd.Timestamp.now(tz="UTC") - timedelta(days=2)
+        gsp_capacities = get_latest_gsp_capacities(
+            session=session, gsp_ids=gsp_ids, datetime_utc=now_minis_two_days
+        )
 
         # National capacity is needed if using summation model
         national_capacity = get_latest_gsp_capacities(session, [0])[0]
