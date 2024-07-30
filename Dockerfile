@@ -18,7 +18,7 @@ COPY data/ app/data/
 
 # Install requirements
 RUN conda install python=3.12
-RUN conda install -c conda-forge xesmf esmpy h5py pytorch-cpu torchvision -y
+RUN conda install -c conda-forge xesmf esmpy h5py pytorch-cpu=2.3.1 torchvision -y
 RUN pip install torch==2.3.1 torchvision --index-url https://download.pytorch.org/whl/cpu
 
 # Change to app folder
