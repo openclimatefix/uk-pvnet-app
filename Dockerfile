@@ -26,6 +26,8 @@ WORKDIR /app
 
 # Install library
 RUN pip install -e .
+
+# This is just a check to make sure it works, we've had problems with this in the past
 RUN python -c "import torchvision"
 
 RUN if [ "$TESTING" = 1 ]; then pip install pytest pytest-cov coverage; fi
