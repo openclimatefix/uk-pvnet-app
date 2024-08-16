@@ -11,33 +11,40 @@ This app expects these evironmental variables to be available:
 """
 
 import logging
-import warnings
 import os
 import tempfile
+import warnings
 from datetime import timedelta
 
-
-import numpy as np
+import dask
 import pandas as pd
+import pvnet
 import torch
 import typer
-import dask
 from nowcasting_datamodel.connection import DatabaseConnection
-from nowcasting_datamodel.save.save import save as save_sql_forecasts
-from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 from nowcasting_datamodel.models.base import Base_Forecast
-from ocf_datapipes.load import OpenGSPFromDatabase
-from ocf_datapipes.batch import stack_np_examples_into_batch, batch_to_tensor, copy_batch_to_device
-
-from ocf_datapipes.batch.merge_numpy_examples_to_batch import stack_np_examples_into_batch
+from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
+from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from ocf_data_sampler.torch_datasets.pvnet_uk_regional import PVNetUKRegionalDataset
-from torch.utils.data import DataLoader
-
-import pvnet
+from ocf_datapipes.batch import batch_to_tensor, copy_batch_to_device
+from ocf_datapipes.batch.merge_numpy_examples_to_batch import stack_np_examples_into_batch
+from ocf_datapipes.load import OpenGSPFromDatabase
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import GSPLocationLookup
+from torch.utils.data import DataLoader
 
 import pvnet_app
+from pvnet_app.data.gsp import make_mock_gsp_data
+from pvnet_app.data.nwp import (
+    download_all_nwp_data,
+    preprocess_nwp_data,
+)
+from pvnet_app.data.satellite import (
+    download_all_sat_data,
+    preprocess_sat_data,
+    check_model_inputs_available,
+)
+from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.utils import (
     worker_init_fn,
     populate_data_config_sources,
@@ -45,16 +52,6 @@ from pvnet_app.utils import (
     find_min_satellite_delay_config,
     save_yaml_config,
 )
-from pvnet_app.data.satellite import (
-    download_all_sat_data,
-    preprocess_sat_data,
-    check_model_inputs_available,
-)
-from pvnet_app.data.nwp import (
-    download_all_nwp_data,
-    preprocess_nwp_data,
-)
-from pvnet_app.forecast_compiler import ForecastCompiler
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
@@ -348,6 +345,9 @@ def app(
 
     if len(forecast_compilers) == 0:
         raise Exception(f"No models were compatible with the available input data.")
+
+    # mock gsp data,
+    make_mock_gsp_data(start_datetime=t0-timedelta(hours=2), end_datime=t0+timedelta(hours=40))
 
     # Find the config with satellite delay suitable for all models running
     common_config = find_min_satellite_delay_config(data_config_filenames)

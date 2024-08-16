@@ -64,7 +64,7 @@ def populate_data_config_sources(input_path, output_path):
     config = load_yaml_config(input_path)
         
     production_paths = {
-        "gsp": os.environ["DB_URL"],
+        "gsp": 'gsp.zarr',
         "nwp": {"ukv": nwp_ukv_path, "ecmwf": nwp_ecmwf_path},
         "satellite": sat_path,
         # TODO: include hrvsatellite
