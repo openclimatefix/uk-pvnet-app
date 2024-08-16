@@ -27,11 +27,11 @@ from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 from nowcasting_datamodel.models.base import Base_Forecast
 from ocf_datapipes.load import OpenGSPFromDatabase
-from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
 from ocf_datapipes.batch import stack_np_examples_into_batch, batch_to_tensor, copy_batch_to_device
 
+from ocf_datapipes.batch.merge_numpy_examples_to_batch import stack_np_examples_into_batch
+from ocf_data_sampler.torch_datasets.pvnet_uk_region import PVNetUKRegionalDataset
 from torch.utils.data import DataLoader
-from torch.utils.data.datapipes.iter import IterableWrapper
 
 import pvnet
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
@@ -364,34 +364,16 @@ def app(
     populated_data_config_filename = f"{temp_dir.name}/data_config.yaml"
 
     populate_data_config_sources(common_config_path, populated_data_config_filename)
-
-    # Location and time datapipes
-    location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
-    t0_datapipe = IterableWrapper([t0]).repeat(len(location_pipe))
-
-    location_pipe = location_pipe.sharding_filter()
-    t0_datapipe = t0_datapipe.sharding_filter()
-
-    # Batch datapipe
-    batch_datapipe = (
-        construct_sliced_data_pipeline(
-            config_filename=populated_data_config_filename,
-            location_pipe=location_pipe,
-            t0_datapipe=t0_datapipe,
-            production=True,
-        )
-        .batch(batch_size)
-        .map(stack_np_examples_into_batch)
-    )
+    dataset = PVNetUKRegionalDataset(config_filename=populated_data_config_filename, start_time=t0, end_time=t0)
 
     # Set up dataloader for parallel loading
     dataloader_kwargs = dict(
         shuffle=False,
-        batch_size=None,  # batched in datapipe step
+        batch_size=10,  # batched in datapipe step
         sampler=None,
         batch_sampler=None,
         num_workers=num_workers,
-        collate_fn=None,
+        collate_fn=stack_np_examples_into_batch,
         pin_memory=False,
         drop_last=False,
         timeout=0,
@@ -400,7 +382,7 @@ def app(
         persistent_workers=False,
     )
 
-    dataloader = DataLoader(batch_datapipe, **dataloader_kwargs)
+    dataloader = DataLoader(dataset, **dataloader_kwargs)
 
     # ---------------------------------------------------------------------------
     # Make predictions
