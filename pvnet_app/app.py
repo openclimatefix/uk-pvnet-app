@@ -30,7 +30,7 @@ from ocf_datapipes.load import OpenGSPFromDatabase
 from ocf_datapipes.batch import stack_np_examples_into_batch, batch_to_tensor, copy_batch_to_device
 
 from ocf_datapipes.batch.merge_numpy_examples_to_batch import stack_np_examples_into_batch
-from ocf_data_sampler.torch_datasets.pvnet_uk_region import PVNetUKRegionalDataset
+from ocf_data_sampler.torch_datasets.pvnet_uk_regional import PVNetUKRegionalDataset
 from torch.utils.data import DataLoader
 
 import pvnet
