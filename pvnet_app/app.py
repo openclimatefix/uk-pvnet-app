@@ -45,12 +45,14 @@ from pvnet_app.utils import (
     find_min_satellite_delay_config,
     save_yaml_config,
 )
-from pvnet_app.data import (
+from pvnet_app.data.satellite import (
     download_all_sat_data,
-    download_all_nwp_data,
     preprocess_sat_data,
-    preprocess_nwp_data,
     check_model_inputs_available,
+)
+from pvnet_app.data.nwp import (
+    download_all_nwp_data,
+    preprocess_nwp_data,
 )
 from pvnet_app.forecast_compiler import ForecastCompiler
 
@@ -92,7 +94,6 @@ models_dict = {
         "verbose": True,
         "save_gsp_to_forecast_value_last_seven_days": True,
     },
-    
     # Extra models which will be run on dev only
     "pvnet_v2-sat0min-v12-batches": {
         "pvnet": {
@@ -107,9 +108,7 @@ models_dict = {
         "save_gsp_sum": False,
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
-        
     },
-    
     # single source models
     "pvnet_v2-sat_delay0_only-v12-batches": {
         "pvnet": {
@@ -155,7 +154,6 @@ models_dict = {
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
     },
-    
 }
 
 day_ahead_model_dict = {
@@ -167,9 +165,9 @@ day_ahead_model_dict = {
         },
         "summation": {
             "name": "openclimatefix/pvnet_summation_uk_national_day_ahead",
-            "version": "06e7df9572738f46f1da2112147bc2b8ea3283ec",
+            "version": "ed60c5d32a020242ca4739dcc6dbc8864f783a08",
         },
-        "use_adjuster": False,
+        "use_adjuster": True,
         "save_gsp_sum": True,
         "verbose": True,
         "save_gsp_to_forecast_value_last_seven_days": True,
@@ -280,7 +278,10 @@ def app(
     db_connection = DatabaseConnection(url=os.getenv("DB_URL"), base=Base_Forecast, echo=False)
     with db_connection.get_session() as session:
         #  Pandas series of most recent GSP capacities
-        gsp_capacities = get_latest_gsp_capacities(session, gsp_ids)
+        now_minis_two_days = pd.Timestamp.now(tz="UTC") - timedelta(days=2)
+        gsp_capacities = get_latest_gsp_capacities(
+            session=session, gsp_ids=gsp_ids, datetime_utc=now_minis_two_days
+        )
 
         # National capacity is needed if using summation model
         national_capacity = get_latest_gsp_capacities(session, [0])[0]
@@ -293,7 +294,7 @@ def app(
     download_all_sat_data()
 
     # Preprocess the satellite data and record the delay of the most recent non-nan timestep
-    sat_delay_mins = preprocess_sat_data(t0)
+    all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(t0)
 
     # Download NWP data
     logger.info("Downloading NWP data")
@@ -324,7 +325,9 @@ def app(
         )
 
         # Check if the data available will allow the model to run
-        model_can_run = check_model_inputs_available(data_config_filename, sat_delay_mins)
+        model_can_run = check_model_inputs_available(
+            data_config_filename, all_satellite_datetimes, t0, data_freq_minutes
+        )
 
         if model_can_run:
             # Set up a forecast compiler for the model
@@ -346,9 +349,7 @@ def app(
             warnings.warn(f"The model {model_name} cannot be run with input data available")
 
     if len(forecast_compilers) == 0:
-        raise Exception(
-            f"No models were compatible with the available input data. Sat delay {sat_delay_mins} mins"
-        )
+        raise Exception(f"No models were compatible with the available input data.")
 
     # Find the config with satellite delay suitable for all models running
     common_config = find_min_satellite_delay_config(data_config_filenames)
@@ -467,8 +468,7 @@ def app(
                     update_national=False,
                     update_gsp=True,
                     apply_adjuster=model_to_run_dict[model_name]["use_adjuster"],
-                    save_to_last_seven_days=False
-
+                    save_to_last_seven_days=False,
                 )
 
             if model_to_run_dict[model_name]["save_gsp_sum"]:

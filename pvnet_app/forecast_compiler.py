@@ -72,7 +72,7 @@ class ForecastCompiler:
         logger.info(f"Loading model: {model_name} - {model_version}")
         
         self.model = PVNetBaseModel.from_pretrained(
-            model_name,
+            model_id=model_name,
             revision=model_version,
         ).to(device)
 
@@ -80,7 +80,7 @@ class ForecastCompiler:
             self.summation_model = None
         else:
             self.summation_model = SummationBaseModel.from_pretrained(
-                summation_name,
+                model_id=summation_name,
                 revision=summation_version,
             ).to(device)
 

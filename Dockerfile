@@ -17,19 +17,18 @@ COPY scripts/ app/scripts/
 COPY data/ app/data/
 
 # Install requirements
-RUN conda install python=3.10
-RUN conda install -c conda-forge xesmf esmpy h5py -y
-RUN pip install torch==2.2.0 --index-url https://download.pytorch.org/whl/cpu
-RUN pip install git+https://github.com/SheffieldSolar/PV_Live-API#pvlive_api
-
-# install cpu torch
-RUN pip install torch==2.2.0 torchvision --index-url https://download.pytorch.org/whl/cpu
+RUN conda install python=3.12
+RUN conda install -c conda-forge xesmf esmpy h5py pytorch-cpu=2.3.1 torchvision -y
+RUN pip install torch==2.3.1 torchvision --index-url https://download.pytorch.org/whl/cpu
 
 # Change to app folder
 WORKDIR /app
 
 # Install library
 RUN pip install -e .
+
+# This is just a check to make sure it works, we've had problems with this in the past
+RUN python -c "import torchvision"
 
 RUN if [ "$TESTING" = 1 ]; then pip install pytest pytest-cov coverage; fi
 

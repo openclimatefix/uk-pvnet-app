@@ -15,7 +15,7 @@ from nowcasting_datamodel.models import (
 )
 
 from testcontainers.postgres import PostgresContainer
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 
 xr.set_options(keep_attrs=True)
@@ -132,6 +132,10 @@ def nwp_ecmwf_data(test_t0):
         test_t0=test_t0,
     )
 
+@pytest.fixture
+def config_filename():
+    return f"{os.path.dirname(os.path.abspath(__file__))}/test_data/test.yaml"
+
 
 def make_sat_data(test_t0, delay_mins, freq_mins):
     # Load dataset which only contains coordinates, but no data
@@ -139,13 +143,18 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr"
     )
 
-    # Change times so they lead up to present
+    # remove tim dim and expand time dim to be len 36 = 3 hours of 5 minute data
+    ds = ds.drop_vars("time")
+    n_hours = 3
+
+    # Add times so they lead up to present
     t0_datetime_utc = test_t0 - timedelta(minutes=delay_mins)
-    ds.time.values[:] = pd.date_range(
-        t0_datetime_utc - timedelta(minutes=freq_mins * (len(ds.time) - 1)),
+    times = pd.date_range(
+        t0_datetime_utc - timedelta(hours=n_hours),
         t0_datetime_utc,
         freq=timedelta(minutes=freq_mins),
     )
+    ds = ds.expand_dims(time=times)
 
     # Add data to dataset
     ds["data"] = xr.DataArray(
@@ -198,7 +207,7 @@ def gsp_yields_and_systems(db_session, test_t0):
         # From 3 hours ago to 8.5 hours into future
         for minute in range(-3 * 60, 9 * 60, 30):
             gsp_yield_sql = GSPYield(
-                datetime_utc=t0_datetime_utc + timedelta(minutes=minute),
+                datetime_utc=(t0_datetime_utc + timedelta(minutes=minute)).replace(tzinfo=timezone.utc),
                 solar_generation_kw=np.random.randint(low=0, high=1000),
                 capacity_mwp=100,
             ).to_orm()
