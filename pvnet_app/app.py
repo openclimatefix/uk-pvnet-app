@@ -76,13 +76,13 @@ models_dict = {
         # Huggingfacehub model repo and commit for PVNet (GSP-level model)
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac",
+            "version": "62e5e20ab793cee7cf94eadac870d2199501a730",
         },
         # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
         # If summation_model_name is set to None, a simple sum is computed instead
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "a7fd71727f4cb2b933992b2108638985e24fa5a3",
+            "version": "ffac655f9650b81865d96023baa15839f3ce26ec",
         },
         # Whether to use the adjuster for this model - for pvnet_v2 is set by environmental variable
         "use_adjuster": os.getenv("USE_ADJUSTER", "true").lower() == "true",
@@ -94,14 +94,14 @@ models_dict = {
     },
     
     # Extra models which will be run on dev only
-    "pvnet_v2-sat0min-v9-batches": {
+    "pvnet_v2-sat0min-v12-batches": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "5bea453ebacba8303afa60dd8dac42508ecca4ab",
+            "version": "dce387462ee08401355f33f53e86461dd59663e2",
         },
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "b905207545ae02a7456830281b9ff62b974fd546",
+            "version": "dcfdc17fda8e48c387122614bec8b284eaa868b9",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
@@ -111,14 +111,14 @@ models_dict = {
     },
     
     # single source models
-    "pvnet_v2-sat_delay0_only-v9-batches": {
+    "pvnet_v2-sat_delay0_only-v12-batches": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "319431c66261b55eaed0be09b067bf96a119d38c",
+            "version": "ea6ad2cf84152969c768788586df227976890f31",
         },
         "summation": {
-            "name": None,
-            "version": None,
+            "name": "openclimatefix/pvnet_v2_summation",
+            "version": "adbf9e7797fee9a5050beb8c13841696e72f99ef",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
@@ -126,14 +126,14 @@ models_dict = {
         "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
-    "pvnet_v2-ukv_only-v9-batches": {
+    "pvnet_v2-ukv_only-v12-batches": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "52da9bc561ea5a6e81a778f976b1ce4633d82418",
+            "version": "35d55181a82440bdd087f380d650bfd0b64bd322",
         },
         "summation": {
-            "name": None,
-            "version": None,
+            "name": "openclimatefix/pvnet_v2_summation",
+            "version": "9002baf1e9dc1ec141f3c4a1fa8447b6316a4558",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
@@ -141,14 +141,14 @@ models_dict = {
         "save_gsp_to_forecast_value_last_seven_days": False,
     },
     
-    "pvnet_v2-ecmwf_only-v9-batches": {
+    "pvnet_v2-ecmwf_only-v12-batches": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "787462f07c12b53dda42aa7dec4fc3a43c6d3df3",
+            "version": "c14f7427d9854d63430aa936ce45f55d3818d033",
         },
         "summation": {
-            "name": None,
-            "version": None,
+            "name": "openclimatefix/pvnet_v2_summation",
+            "version": "4fe6b1441b6dd549292c201ed85eee156ecc220c",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
