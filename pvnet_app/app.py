@@ -219,6 +219,8 @@ def app(
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
         - SATELLITE_ZARR_PATH
+        - PVNET_V2_VERSION, default is a version above
+        - DOWNLOAD_SATELLITE, option to get satelite data. defaults to true
     Args:
         t0 (datetime): Datetime at which forecast is made
         gsp_ids (array_like): List of gsp_ids to make predictions for. This list of GSPs are summed
@@ -292,11 +294,15 @@ def app(
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
 
     # Download satellite data
-    logger.info("Downloading satellite data")
-    download_all_sat_data()
+    if os.getenv("DOWNLOAD_SATELLITE", "true").lower() == "true":
+        logger.info("Downloading satellite data")
+        download_all_sat_data()
 
-    # Preprocess the satellite data and record the delay of the most recent non-nan timestep
-    all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(t0)
+        # Preprocess the satellite data and record the delay of the most recent non-nan timestep
+        all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(t0)
+    else:
+        all_satellite_datetimes = []
+        data_freq_minutes = 5
 
     # Download NWP data
     logger.info("Downloading NWP data")
