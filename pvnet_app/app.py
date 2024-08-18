@@ -240,6 +240,9 @@ def app(
         dask.config.set(scheduler="single-threaded")
 
     day_ahead_model_used = os.getenv("DAY_AHEAD_MODEL", "false").lower() == "true"
+    use_satellite = os.getenv("USE_SATELLITE", "true").lower() == "true"
+    logger.info(f"Using satellite data: {use_satellite}")
+    logger.info(f"Using day ahead model: {day_ahead_model_used}")
 
     if day_ahead_model_used:
         logger.info(f"Using day ahead PVNet model")
@@ -296,7 +299,7 @@ def app(
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
 
     # Download satellite data
-    if os.getenv("DOWNLOAD_SATELLITE", "true").lower() == "true":
+    if use_satellite:
         logger.info("Downloading satellite data")
         download_all_sat_data()
 
@@ -362,7 +365,7 @@ def app(
         raise Exception(f"No models were compatible with the available input data.")
 
     # Find the config with satellite delay suitable for all models running
-    common_config = find_min_satellite_delay_config(data_config_filenames)
+    common_config = find_min_satellite_delay_config(data_config_filenames, use_satellite=use_satellite)
 
     # Save the commmon config
     common_config_path = f"{temp_dir.name}/common_config_path.yaml"

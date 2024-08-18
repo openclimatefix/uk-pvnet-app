@@ -92,10 +92,16 @@ def populate_data_config_sources(input_path, output_path):
     save_yaml_config(config, output_path)
         
     
-def find_min_satellite_delay_config(config_paths):
+def find_min_satellite_delay_config(config_paths, use_satellite: bool = False):
     """Find the config with the minimum satallite delay across from list of config paths"""
+
+    logger.info(f"Finding minimum satellite delay config from {config_paths}")
+
     # Load all the configs
     configs = [load_yaml_config(config_path) for config_path in config_paths]
+    if not use_satellite:
+        logger.info("Not using satellite data, so returning first config")
+        return configs[0]
     
     min_sat_delay = np.inf
     
