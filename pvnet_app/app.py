@@ -86,7 +86,8 @@ models_dict = {
         # If summation_model_name is set to None, a simple sum is computed instead
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "ffac655f9650b81865d96023baa15839f3ce26ec",
+            "version": os.getenv('PVNET_V2_SUMMATION_VERSION',
+                                 "ffac655f9650b81865d96023baa15839f3ce26ec"),
         },
         # Whether to use the adjuster for this model - for pvnet_v2 is set by environmental variable
         "use_adjuster": os.getenv("USE_ADJUSTER", "true").lower() == "true",
@@ -219,7 +220,8 @@ def app(
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
         - SATELLITE_ZARR_PATH
-        - PVNET_V2_VERSION, default is a version above
+        - PVNET_V2_VERSION, pvnet version, default is a version above
+        - PVNET_V2_SUMMATION_VERSION, the pvnet version, default is above
         - DOWNLOAD_SATELLITE, option to get satelite data. defaults to true
     Args:
         t0 (datetime): Datetime at which forecast is made
@@ -238,6 +240,9 @@ def app(
         dask.config.set(scheduler="single-threaded")
 
     day_ahead_model_used = os.getenv("DAY_AHEAD_MODEL", "false").lower() == "true"
+    use_satellite = os.getenv("USE_SATELLITE", "true").lower() == "true"
+    logger.info(f"Using satellite data: {use_satellite}")
+    logger.info(f"Using day ahead model: {day_ahead_model_used}")
 
     if day_ahead_model_used:
         logger.info(f"Using day ahead PVNet model")
@@ -294,7 +299,7 @@ def app(
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
 
     # Download satellite data
-    if os.getenv("DOWNLOAD_SATELLITE", "true").lower() == "true":
+    if use_satellite:
         logger.info("Downloading satellite data")
         download_all_sat_data()
 
@@ -360,7 +365,7 @@ def app(
         raise Exception(f"No models were compatible with the available input data.")
 
     # Find the config with satellite delay suitable for all models running
-    common_config = find_min_satellite_delay_config(data_config_filenames)
+    common_config = find_min_satellite_delay_config(data_config_filenames, use_satellite=use_satellite)
 
     # Save the commmon config
     common_config_path = f"{temp_dir.name}/common_config_path.yaml"
