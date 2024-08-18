@@ -86,7 +86,8 @@ models_dict = {
         # If summation_model_name is set to None, a simple sum is computed instead
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "ffac655f9650b81865d96023baa15839f3ce26ec",
+            "version": os.getenv('PVNET_V2_SUMMATION_VERSION',
+                                 "ffac655f9650b81865d96023baa15839f3ce26ec"),
         },
         # Whether to use the adjuster for this model - for pvnet_v2 is set by environmental variable
         "use_adjuster": os.getenv("USE_ADJUSTER", "true").lower() == "true",
@@ -219,7 +220,8 @@ def app(
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
         - SATELLITE_ZARR_PATH
-        - PVNET_V2_VERSION, default is a version above
+        - PVNET_V2_VERSION, pvnet version, default is a version above
+        - PVNET_V2_SUMMATION_VERSION, the pvnet version, default is above
         - DOWNLOAD_SATELLITE, option to get satelite data. defaults to true
     Args:
         t0 (datetime): Datetime at which forecast is made
