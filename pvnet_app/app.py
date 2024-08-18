@@ -78,7 +78,7 @@ models_dict = {
         # Huggingfacehub model repo and commit for PVNet (GSP-level model)
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "62e5e20ab793cee7cf94eadac870d2199501a730",
+            "version": os.getenv('PVNET_V2_VERSION', "62e5e20ab793cee7cf94eadac870d2199501a730"),
         },
         # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
         # If summation_model_name is set to None, a simple sum is computed instead
