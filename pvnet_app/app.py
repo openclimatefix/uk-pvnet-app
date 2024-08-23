@@ -347,7 +347,7 @@ def app(
         raise Exception(f"No models were compatible with the available input data.")
 
     # mock gsp data,
-    make_mock_gsp_data(start_datetime=t0-timedelta(hours=2), end_datime=t0+timedelta(hours=40))
+    make_mock_gsp_data(start_datetime=t0-timedelta(hours=4), end_datime=t0+timedelta(hours=40))
 
     # Find the config with satellite delay suitable for all models running
     common_config = find_min_satellite_delay_config(data_config_filenames)
