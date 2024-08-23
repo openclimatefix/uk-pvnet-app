@@ -103,7 +103,6 @@ class ForecastCompiler:
         if self.verbose:
             logger.info(message)
     
-    
     def predict_batch(self, batch):
         """Make predictions for a batch and store results internally"""
         
@@ -111,6 +110,13 @@ class ForecastCompiler:
         # Store GSP IDs for this batch for reordering later
         these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
         self.gsp_ids_each_batch += [these_gsp_ids]
+
+        # LEGACY
+        # change new ocf-data-sample batch to ocf-datapipes
+        # if BatchKey gsp_id is in batch, then expand dims
+        if BatchKey.gsp_id in batch:
+            batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
+        # TODO more changes
 
         # Run batch through model
         preds = self.model(batch).detach().cpu().numpy()
