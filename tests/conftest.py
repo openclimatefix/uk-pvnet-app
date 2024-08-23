@@ -85,8 +85,8 @@ def make_nwp_data(shell_path, varname, test_t0):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(shell_path)
 
-    # Last init time was at least 9 hours ago and floor to 3-hour interval
-    t0_datetime_utc = (test_t0 - timedelta(hours=9)).floor(timedelta(hours=3))
+    # Last init time was at least 6 hours ago and floor to 3-hour interval
+    t0_datetime_utc = (test_t0 - timedelta(hours=6)).floor(timedelta(hours=3))
     ds.init_time.values[:] = pd.date_range(
         t0_datetime_utc - timedelta(hours=3 * (len(ds.init_time) - 1)),
         t0_datetime_utc,
