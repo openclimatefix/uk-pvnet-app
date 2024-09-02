@@ -61,7 +61,7 @@ from pvnet_app.sentry import traces_sampler
 # sentry
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN", ""),
-    environment=f'{os.getenv("ENVIRONMENT", "development")}__uk-pvnet-app--{pvnet_app.__version__}',
+    environment=f'{os.getenv("ENVIRONMENT", "development")}__uk-pvnet-app',
     traces_sampler=traces_sampler,
 )
 
