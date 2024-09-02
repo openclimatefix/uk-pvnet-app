@@ -18,4 +18,4 @@ typer
 testcontainers
 xesmf==0.8.7
 huggingface-hub==0.24.1
-sentry-sdk = "^2.1.1"
+sentry-sdk==2.13.0
