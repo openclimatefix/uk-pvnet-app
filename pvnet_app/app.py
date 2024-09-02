@@ -58,13 +58,11 @@ from pvnet_app.data.nwp import (
 from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.sentry import traces_sampler
 
-# SENTRY
-
+# sentry
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN", ""),
-    environment=os.getenv("ENVIRONMENT", "local"),
+    environment=f'{os.getenv("ENVIRONMENT", "development")}__uk-pvnet-app--{pvnet_app.__version__}',
     traces_sampler=traces_sampler,
-    server_name=f'uk-pvnet-app--{pvnet_app.__version__}'
 )
 
 # ---------------------------------------------------------------------------
