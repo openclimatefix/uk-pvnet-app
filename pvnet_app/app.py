@@ -36,6 +36,7 @@ from torch.utils.data.datapipes.iter import IterableWrapper
 import pvnet
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import GSPLocationLookup
+import sentry_sdk
 
 import pvnet_app
 from pvnet_app.utils import (
@@ -55,6 +56,15 @@ from pvnet_app.data.nwp import (
     preprocess_nwp_data,
 )
 from pvnet_app.forecast_compiler import ForecastCompiler
+
+# sentry
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN", ""),
+    environment=f'{os.getenv("ENVIRONMENT", "local")}',
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
+sentry_sdk.set_tag("app_name", "pvnet_app")
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
@@ -215,14 +225,22 @@ def app(
 ):
     """Inference function for production
 
-    This app expects these evironmental variables to be available:
+    This app expects these environmental variables to be available:
         - DB_URL
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
         - SATELLITE_ZARR_PATH
+    The following are options
         - PVNET_V2_VERSION, pvnet version, default is a version above
         - PVNET_V2_SUMMATION_VERSION, the pvnet version, default is above
-        - DOWNLOAD_SATELLITE, option to get satelite data. defaults to true
+        - USE_SATELLITE, option to get satellite data. defaults to true
+        - USE_ADJUSTER, option to use adjuster, defaults to true
+        - SAVE_GSP_SUM, option to save gsp sum, defaults to false
+        - RUN_EXTRA_MODELS, option to run extra models, defaults to false
+        - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
+        - SENTRY_DSN, optional link to sentry
+        - ENVIRONMENT, the environment this is running in, defaults to local
+
     Args:
         t0 (datetime): Datetime at which forecast is made
         gsp_ids (array_like): List of gsp_ids to make predictions for. This list of GSPs are summed
