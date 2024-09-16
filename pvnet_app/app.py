@@ -34,7 +34,6 @@ from pvnet.utils import GSPLocationLookup
 from torch.utils.data import DataLoader
 
 import pvnet_app
-from pvnet_app.data.gsp import make_mock_gsp_data
 from pvnet_app.data.nwp import (
     download_all_nwp_data,
     preprocess_nwp_data,
@@ -46,7 +45,6 @@ from pvnet_app.data.satellite import (
 )
 from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.utils import (
-    worker_init_fn,
     populate_data_config_sources,
     convert_dataarray_to_forecasts,
     find_min_satellite_delay_config,
@@ -71,11 +69,12 @@ batch_size = 10
 # - Batches are prepared only once, so the extra models must be able to run on the batches created
 #   to run the pvnet_v2 model
 models_dict = {
+    
     "pvnet_v2": {
         # Huggingfacehub model repo and commit for PVNet (GSP-level model)
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac",
+            "version": "ae0b8006841ac6227db873a1fc7f7331dc7dadb5",
         },
         # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
         # If summation_model_name is set to None, a simple sum is computed instead
@@ -91,11 +90,12 @@ models_dict = {
         "verbose": True,
         "save_gsp_to_forecast_value_last_seven_days": True,
     },
+    
     # Extra models which will be run on dev only
-    "pvnet_v2-sat0min-v9-batches": {
+    "pvnet_v2-sat0-samples-v1": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "5bea453ebacba8303afa60dd8dac42508ecca4ab",
+            "version": "8a7cc21b64d25ce1add7a8547674be3143b2e650",
         },
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
@@ -106,43 +106,46 @@ models_dict = {
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
     },
+    
     # single source models
-    "pvnet_v2-sat_delay0_only-v9-batches": {
+    "pvnet_v2-sat0-only-samples-v1": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "319431c66261b55eaed0be09b067bf96a119d38c",
+            "version": "d7ab648942c85b6788adcdbed44c91c4e1c5604a",
         },
         "summation": {
-            "name": None,
-            "version": None,
+            "name": "openclimatefix/pvnet_v2_summation",
+            "version": "adbf9e7797fee9a5050beb8c13841696e72f99ef",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
     },
-    "pvnet_v2-ukv_only-v9-batches": {
+    
+    "pvnet_v2-ukv-only-samples-v1": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "52da9bc561ea5a6e81a778f976b1ce4633d82418",
+            "version": "eb73bf9a176a108f2e33b809f1f6993f893a4df9",
         },
         "summation": {
-            "name": None,
-            "version": None,
+            "name": "openclimatefix/pvnet_v2_summation",
+            "version": "9002baf1e9dc1ec141f3c4a1fa8447b6316a4558",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
         "verbose": False,
         "save_gsp_to_forecast_value_last_seven_days": False,
     },
-    "pvnet_v2-ecmwf_only-v9-batches": {
+    
+    "pvnet_v2-ecmwf-only-samples-v1": {
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "787462f07c12b53dda42aa7dec4fc3a43c6d3df3",
+            "version": "0bc344fafb2232fb0b6bb0bf419f0449fe11c643",
         },
         "summation": {
-            "name": None,
-            "version": None,
+            "name": "openclimatefix/pvnet_v2_summation",
+            "version": "4fe6b1441b6dd549292c201ed85eee156ecc220c",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
@@ -151,16 +154,17 @@ models_dict = {
     },
 }
 
+# The day ahead model has not yet been re-trained with data-sampler
 day_ahead_model_dict = {
     "pvnet_day_ahead": {
         # Huggingfacehub model repo and commit for PVNet day ahead models
         "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region_day_ahead",
-            "version": "d87565731692a6003e43caac4feaed0f69e79272",
+            "name": None,
+            "version": None,
         },
         "summation": {
-            "name": "openclimatefix/pvnet_summation_uk_national_day_ahead",
-            "version": "ed60c5d32a020242ca4739dcc6dbc8864f783a08",
+            "name": None,
+            "version": None,
         },
         "use_adjuster": True,
         "save_gsp_sum": True,
@@ -346,9 +350,6 @@ def app(
     if len(forecast_compilers) == 0:
         raise Exception(f"No models were compatible with the available input data.")
 
-    # mock gsp data,
-    make_mock_gsp_data(start_datetime=t0-timedelta(hours=4), end_datime=t0+timedelta(hours=40))
-
     # Find the config with satellite delay suitable for all models running
     common_config = find_min_satellite_delay_config(data_config_filenames)
 
@@ -377,7 +378,6 @@ def app(
         pin_memory=False,
         drop_last=False,
         timeout=0,
-        worker_init_fn=worker_init_fn,
         prefetch_factor=None if num_workers == 0 else 2,
         persistent_workers=False,
     )
