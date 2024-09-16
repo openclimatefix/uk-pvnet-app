@@ -220,6 +220,12 @@ def scale_satellite_data():
 
     for file in [sat_5_path, sat_15_path]:
         if os.path.exists(file):
+
+            # open and scale
             ds_sat = xr.open_zarr(sat_path)
             ds_sat = ds_sat / 1024
+            ds_sat = ds_sat.compute()
+
+            # save
+            os.system(f"rm -rf {sat_path}")
             ds_sat.to_zarr(sat_path)
