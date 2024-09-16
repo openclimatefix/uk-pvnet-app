@@ -28,7 +28,7 @@ def test_t0():
 @pytest.fixture(scope="session")
 def engine_url():
     """Database engine, this includes the table creation."""
-    with PostgresContainer("postgres:14.5") as postgres:
+    with PostgresContainer("postgres:16.1") as postgres:
         url = postgres.get_connection_url()
         os.environ["DB_URL"] = url
 
@@ -85,8 +85,8 @@ def make_nwp_data(shell_path, varname, test_t0):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(shell_path)
 
-    # Last init time was at least 2 hours ago and floor to 3-hour interval
-    t0_datetime_utc = (test_t0 - timedelta(hours=2)).floor(timedelta(hours=3))
+    # Last init time was at least 8 hours ago and floor to 3-hour interval
+    t0_datetime_utc = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
     ds.init_time.values[:] = pd.date_range(
         t0_datetime_utc - timedelta(hours=3 * (len(ds.init_time) - 1)),
         t0_datetime_utc,

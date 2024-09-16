@@ -27,7 +27,7 @@ input_data:
     ecmwf:
       dropout_fraction: 1.0
       dropout_timedeltas_minutes:
-      - -360
+      - -60
       forecast_minutes: 480
       history_minutes: 120
       index_by_id: false
@@ -62,7 +62,7 @@ input_data:
     ukv:
       dropout_fraction: 1.0
       dropout_timedeltas_minutes:
-      - -180
+      - -60
       forecast_minutes: 480
       history_minutes: 120
       index_by_id: false

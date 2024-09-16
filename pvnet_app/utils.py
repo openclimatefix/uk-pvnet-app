@@ -25,21 +25,6 @@ from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 logger = logging.getLogger(__name__)
 
 
-
-def worker_init_fn(worker_id):
-    """
-    Clear reference to the loop and thread.
-    This is a nasty hack that was suggested but NOT recommended by the lead fsspec developer!
-    This appears necessary otherwise gcsfs hangs when used after forking multiple worker processes.
-    Only required for fsspec >= 0.9.0
-    See:
-    - https://github.com/fsspec/gcsfs/issues/379#issuecomment-839929801
-    - https://github.com/fsspec/filesystem_spec/pull/963#issuecomment-1131709948
-    TODO: Try deleting this two lines to make sure this is still relevant.
-    """
-    fsspec.asyn.iothread[0] = None
-    fsspec.asyn.loop[0] = None
-
     
 def load_yaml_config(path):
     """Load config file from path"""
@@ -54,24 +39,24 @@ def save_yaml_config(config, path):
         yaml.dump(config, file, default_flow_style=False)
 
 
-def populate_data_config_sources(input_path, output_path):
+def populate_data_config_sources(input_path, output_path, gsp_path=""):
     """Resave the data config and replace the source filepaths
 
     Args:
         input_path: Path to input datapipes configuration file
         output_path: Location to save the output configuration file
+        gsp_path: For lagacy usage only
     """
     config = load_yaml_config(input_path)
         
     production_paths = {
-        "gsp": os.environ["DB_URL"],
+        "gsp": gsp_path,
         "nwp": {"ukv": nwp_ukv_path, "ecmwf": nwp_ecmwf_path},
         "satellite": sat_path,
-        # TODO: include hrvsatellite
     }        
     
     # Replace data sources
-    for source in ["gsp", "satellite", "hrvsatellite"]:
+    for source in ["gsp", "satellite"]:
         if source in config["input_data"] :
             if config["input_data"][source][f"{source}_zarr_path"]!="":
                 assert source in production_paths, f"Missing production path: {source}"

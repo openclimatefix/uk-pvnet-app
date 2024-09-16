@@ -69,6 +69,7 @@ class ForecastCompiler:
         self.sun_down_masks = []
         
         
+        
         logger.info(f"Loading model: {model_name} - {model_version}")
         
         self.model = PVNetBaseModel.from_pretrained(
@@ -103,7 +104,6 @@ class ForecastCompiler:
         if self.verbose:
             logger.info(message)
     
-    
     def predict_batch(self, batch):
         """Make predictions for a batch and store results internally"""
         
@@ -111,6 +111,9 @@ class ForecastCompiler:
         # Store GSP IDs for this batch for reordering later
         these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
         self.gsp_ids_each_batch += [these_gsp_ids]
+        
+        # TODO: This change should be moved inside PVNet
+        batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
 
         # Run batch through model
         preds = self.model(batch).detach().cpu().numpy()
