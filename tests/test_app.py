@@ -1,3 +1,5 @@
+import pytest
+
 import tempfile
 import zarr
 import os
