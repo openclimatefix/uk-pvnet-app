@@ -15,6 +15,7 @@ import os
 import tempfile
 import warnings
 from datetime import timedelta
+from pathlib import Path
 
 import dask
 import pandas as pd
@@ -26,13 +27,12 @@ from nowcasting_datamodel.models.base import Base_Forecast
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from ocf_data_sampler.torch_datasets.pvnet_uk_regional import PVNetUKRegionalDataset
-from ocf_datapipes.batch import batch_to_tensor, copy_batch_to_device
-from ocf_datapipes.batch.merge_numpy_examples_to_batch import stack_np_examples_into_batch
-from ocf_datapipes.load import OpenGSPFromDatabase
+from ocf_datapipes.batch import stack_np_examples_into_batch, batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import GSPLocationLookup
 from torch.utils.data import DataLoader
 import sentry_sdk
+
 
 
 import pvnet_app
@@ -52,6 +52,12 @@ from pvnet_app.utils import (
     find_min_satellite_delay_config,
     save_yaml_config,
 )
+
+# Legacy imports 
+from ocf_datapipes.load import OpenGSPFromDatabase
+from torch.utils.data.datapipes.iter import IterableWrapper
+from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
+from ocf_datapipes.batch import BatchKey
 
 # sentry
 sentry_sdk.init(
@@ -168,17 +174,18 @@ models_dict = {
     },
 }
 
-# The day ahead model has not yet been re-trained with data-sampler
+# The day ahead model has not yet been re-trained with data-sampler. 
+# It will be run with the legacy dataloader using ocf_datapipes
 day_ahead_model_dict = {
     "pvnet_day_ahead": {
         # Huggingfacehub model repo and commit for PVNet day ahead models
         "pvnet": {
-            "name": None,
-            "version": None,
+            "name": "openclimatefix/pvnet_uk_region_day_ahead",
+            "version": "d87565731692a6003e43caac4feaed0f69e79272",
         },
         "summation": {
-            "name": None,
-            "version": None,
+            "name": "openclimatefix/pvnet_summation_uk_national_day_ahead",
+            "version": "ed60c5d32a020242ca4739dcc6dbc8864f783a08",
         },
         "use_adjuster": True,
         "save_gsp_sum": True,
@@ -215,6 +222,104 @@ sql_logger.addHandler(logging.NullHandler())
 
 # ---------------------------------------------------------------------------
 # APP MAIN
+
+
+def get_dataloader(config_filename: str, t0: pd.Timestamp, gsp_ids: list[int], num_workers: int):
+    
+    # Populate the data config with production data paths    
+    populated_data_config_filename = Path(config_filename).parent / "data_config.yaml"
+    
+    populate_data_config_sources(common_config_path, populated_data_config_filename)
+    
+    dataset = PVNetUKRegionalDataset(
+        config_filename=populated_data_config_filename, 
+        start_time=t0, 
+        end_time=t0
+        gsp_ids=gsp_ids,
+    )
+
+    # Set up dataloader for parallel loading
+    dataloader_kwargs = dict(
+        shuffle=False,
+        batch_size=batch_size,
+        sampler=None,
+        batch_sampler=None,
+        num_workers=num_workers,
+        collate_fn=stack_np_examples_into_batch,
+        pin_memory=False,
+        drop_last=False,
+        timeout=0,
+        prefetch_factor=None if num_workers == 0 else 2,
+        persistent_workers=False,
+    )
+
+    return DataLoader(dataset, **dataloader_kwargs)
+
+
+def legacy_squeeze(batch):
+    batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].squeeze(1)
+    return batch
+
+
+def get_legacy_dataloader(
+    config_filename: str, 
+    t0: pd.Timestamp,
+    gsp_ids: list[int],
+    num_workers: int,
+):
+    
+    # Populate the data config with production data paths
+    populated_data_config_filename = Path(config_filename).parent / "data_config.yaml"
+    
+    populate_data_config_sources(
+        common_config_path, 
+        populated_data_config_filename,
+        gsp_path=os.environ["DB_URL"],
+    
+    )
+    
+    # Set up ID location query object
+    ds_gsp = next(iter(OpenGSPFromDatabase()))
+    gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
+    
+    # Location and time datapipes
+    location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
+    t0_datapipe = IterableWrapper([t0]).repeat(len(location_pipe))
+
+    location_pipe = location_pipe.sharding_filter()
+    t0_datapipe = t0_datapipe.sharding_filter()
+
+    # Batch datapipe
+    batch_datapipe = (
+        construct_sliced_data_pipeline(
+            config_filename=populated_data_config_filename,
+            location_pipe=location_pipe,
+            t0_datapipe=t0_datapipe,
+            production=True,
+        )
+        .batch(batch_size)
+        .map(stack_np_examples_into_batch)
+        .map(legacy_squeeze)
+    )
+
+    # Set up dataloader for parallel loading
+    dataloader_kwargs = dict(
+        shuffle=False,
+        batch_size=None,  # batched in datapipe step
+        sampler=None,
+        batch_sampler=None,
+        num_workers=num_workers,
+        collate_fn=None,
+        pin_memory=False,
+        drop_last=False,
+        timeout=0,
+        worker_init_fn=worker_init_fn,
+        prefetch_factor=None if num_workers == 0 else 2,
+        persistent_workers=False,
+    )
+
+    dataloader = DataLoader(batch_datapipe, **dataloader_kwargs)
+
 
 
 def app(
@@ -257,19 +362,19 @@ def app(
         # Without this line the dataloader will hang if multiple workers are used
         dask.config.set(scheduler="single-threaded")
 
-    day_ahead_model_used = os.getenv("DAY_AHEAD_MODEL", "false").lower() == "true"
+    use_day_ahead_model = os.getenv("DAY_AHEAD_MODEL", "false").lower() == "true"
     use_satellite = os.getenv("USE_SATELLITE", "true").lower() == "true"
     logger.info(f"Using satellite data: {use_satellite}")
-    logger.info(f"Using day ahead model: {day_ahead_model_used}")
+    logger.info(f"Using day ahead model: {use_day_ahead_model}")
 
-    if day_ahead_model_used:
+    if use_day_ahead_model:
         logger.info(f"Using day ahead PVNet model")
 
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
     logger.info(f"Using `pvnet_app` library version: {pvnet_app.__version__}")
     logger.info(f"Using {num_workers} workers")
 
-    if day_ahead_model_used:
+    if use_day_ahead_model:
         logger.info(f"Using adjduster: {day_ahead_model_dict['pvnet_day_ahead']['use_adjuster']}")
         logger.info(f"Saving GSP sum: {day_ahead_model_dict['pvnet_day_ahead']['save_gsp_sum']}")
 
@@ -296,25 +401,18 @@ def app(
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
-    # Make pands Series of most recent GSP effective capacities
     logger.info("Loading GSP metadata")
-
-    ds_gsp = next(iter(OpenGSPFromDatabase()))
 
     # Get capacities from the database
     db_connection = DatabaseConnection(url=os.getenv("DB_URL"), base=Base_Forecast, echo=False)
     with db_connection.get_session() as session:
         #  Pandas series of most recent GSP capacities
-        now_minis_two_days = pd.Timestamp.now(tz="UTC") - timedelta(days=2)
         gsp_capacities = get_latest_gsp_capacities(
-            session=session, gsp_ids=gsp_ids, datetime_utc=now_minis_two_days
+            session=session, gsp_ids=gsp_ids, datetime_utc=t0-timedelta(days=2)
         )
 
         # National capacity is needed if using summation model
         national_capacity = get_latest_gsp_capacities(session, [0])[0]
-
-    # Set up ID location query object
-    gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
 
     # Download satellite data
     if use_satellite:
@@ -325,7 +423,7 @@ def app(
         all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(t0)
     else:
         all_satellite_datetimes = []
-        data_freq_minutes = 5
+        data_freq_minutes = None
 
     # Download NWP data
     logger.info("Downloading NWP data")
@@ -337,7 +435,7 @@ def app(
     # ---------------------------------------------------------------------------
     # 2. Set up models
 
-    if day_ahead_model_used:
+    if use_day_ahead_model:
         model_to_run_dict = {"pvnet_day_ahead": day_ahead_model_dict["pvnet_day_ahead"]}
     # Remove extra models if not configured to run them
     elif os.getenv("RUN_EXTRA_MODELS", "false").lower() == "false":
@@ -393,28 +491,23 @@ def app(
     # Set up data loader
     logger.info("Creating DataLoader")
 
-    # Populate the data config with production data paths
-    populated_data_config_filename = f"{temp_dir.name}/data_config.yaml"
-
-    populate_data_config_sources(common_config_path, populated_data_config_filename)
-    dataset = PVNetUKRegionalDataset(config_filename=populated_data_config_filename, start_time=t0, end_time=t0)
-
-    # Set up dataloader for parallel loading
-    dataloader_kwargs = dict(
-        shuffle=False,
-        batch_size=10,  # batched in datapipe step
-        sampler=None,
-        batch_sampler=None,
-        num_workers=num_workers,
-        collate_fn=stack_np_examples_into_batch,
-        pin_memory=False,
-        drop_last=False,
-        timeout=0,
-        prefetch_factor=None if num_workers == 0 else 2,
-        persistent_workers=False,
-    )
-
-    dataloader = DataLoader(dataset, **dataloader_kwargs)
+    if use_day_ahead_model:
+        # The current day ahead model uses the legacy dataloader
+        dataloader = get_legacy_dataloader(
+            config_filename=common_config_path, 
+            t0=t0, 
+            gsp_ids=gsp_ids,
+            num_workers=num_workers
+        )
+    
+    else:
+        dataloader = get_dataloader(
+            config_filename=common_config_path, 
+            t0=t0, 
+            gsp_ids=gsp_ids,
+            num_workers=num_workers
+        )
+    
 
     # ---------------------------------------------------------------------------
     # Make predictions
@@ -440,7 +533,7 @@ def app(
     # Escape clause for making predictions locally
     if not write_predictions:
         temp_dir.cleanup()
-        if not day_ahead_model_used:
+        if not use_day_ahead_model:
             return forecast_compilers["pvnet_v2"].da_abs_all
         return forecast_compilers["pvnet_day_ahead"].da_abs_all
 

@@ -39,17 +39,18 @@ def save_yaml_config(config, path):
         yaml.dump(config, file, default_flow_style=False)
 
 
-def populate_data_config_sources(input_path, output_path):
+def populate_data_config_sources(input_path, output_path, gsp_path=""):
     """Resave the data config and replace the source filepaths
 
     Args:
         input_path: Path to input datapipes configuration file
         output_path: Location to save the output configuration file
+        gsp_path: For lagacy usage only
     """
     config = load_yaml_config(input_path)
         
     production_paths = {
-        "gsp": "",
+        "gsp": gsp_path,
         "nwp": {"ukv": nwp_ukv_path, "ecmwf": nwp_ecmwf_path},
         "satellite": sat_path,
     }        

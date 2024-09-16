@@ -4,6 +4,7 @@ pytorch-lightning==2.3.3
 torch[cpu]==2.3.1
 PVNet-summation==0.3.2
 pvnet==3.0.50
+ocf_datapipes==3.3.39
 ocf_data_sampler==0.0.18
 nowcasting_datamodel>=1.5.45
 fsspec[s3]
