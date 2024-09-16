@@ -32,6 +32,8 @@ from ocf_datapipes.load import OpenGSPFromDatabase
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import GSPLocationLookup
 from torch.utils.data import DataLoader
+import sentry_sdk
+
 
 import pvnet_app
 from pvnet_app.data.nwp import (
@@ -50,6 +52,15 @@ from pvnet_app.utils import (
     find_min_satellite_delay_config,
     save_yaml_config,
 )
+
+# sentry
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN", ""),
+    environment=f'{os.getenv("ENVIRONMENT", "local")}',
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
+sentry_sdk.set_tag("app_name", "pvnet_app")
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
@@ -74,13 +85,16 @@ models_dict = {
         # Huggingfacehub model repo and commit for PVNet (GSP-level model)
         "pvnet": {
             "name": "openclimatefix/pvnet_uk_region",
-            "version": "ae0b8006841ac6227db873a1fc7f7331dc7dadb5",
+            "version": os.getenv('PVNET_V2_VERSION', "ae0b8006841ac6227db873a1fc7f7331dc7dadb5"),
+            # We should only set PVNET_V2_VERSION in a short term solution,
+            # as its difficult to track which model is being used
         },
         # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
         # If summation_model_name is set to None, a simple sum is computed instead
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "a7fd71727f4cb2b933992b2108638985e24fa5a3",
+            "version": os.getenv('PVNET_V2_SUMMATION_VERSION',
+                                 "ffac655f9650b81865d96023baa15839f3ce26ec"),
         },
         # Whether to use the adjuster for this model - for pvnet_v2 is set by environmental variable
         "use_adjuster": os.getenv("USE_ADJUSTER", "true").lower() == "true",
@@ -99,7 +113,7 @@ models_dict = {
         },
         "summation": {
             "name": "openclimatefix/pvnet_v2_summation",
-            "version": "b905207545ae02a7456830281b9ff62b974fd546",
+            "version": "dcfdc17fda8e48c387122614bec8b284eaa868b9",
         },
         "use_adjuster": False,
         "save_gsp_sum": False,
@@ -211,11 +225,22 @@ def app(
 ):
     """Inference function for production
 
-    This app expects these evironmental variables to be available:
+    This app expects these environmental variables to be available:
         - DB_URL
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
         - SATELLITE_ZARR_PATH
+    The following are options
+        - PVNET_V2_VERSION, pvnet version, default is a version above
+        - PVNET_V2_SUMMATION_VERSION, the pvnet version, default is above
+        - USE_SATELLITE, option to get satellite data. defaults to true
+        - USE_ADJUSTER, option to use adjuster, defaults to true
+        - SAVE_GSP_SUM, option to save gsp sum, defaults to false
+        - RUN_EXTRA_MODELS, option to run extra models, defaults to false
+        - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
+        - SENTRY_DSN, optional link to sentry
+        - ENVIRONMENT, the environment this is running in, defaults to local
+
     Args:
         t0 (datetime): Datetime at which forecast is made
         gsp_ids (array_like): List of gsp_ids to make predictions for. This list of GSPs are summed
@@ -233,6 +258,9 @@ def app(
         dask.config.set(scheduler="single-threaded")
 
     day_ahead_model_used = os.getenv("DAY_AHEAD_MODEL", "false").lower() == "true"
+    use_satellite = os.getenv("USE_SATELLITE", "true").lower() == "true"
+    logger.info(f"Using satellite data: {use_satellite}")
+    logger.info(f"Using day ahead model: {day_ahead_model_used}")
 
     if day_ahead_model_used:
         logger.info(f"Using day ahead PVNet model")
@@ -289,11 +317,15 @@ def app(
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
 
     # Download satellite data
-    logger.info("Downloading satellite data")
-    download_all_sat_data()
+    if use_satellite:
+        logger.info("Downloading satellite data")
+        download_all_sat_data()
 
-    # Preprocess the satellite data and record the delay of the most recent non-nan timestep
-    all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(t0)
+        # Preprocess the satellite data and record the delay of the most recent non-nan timestep
+        all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(t0)
+    else:
+        all_satellite_datetimes = []
+        data_freq_minutes = 5
 
     # Download NWP data
     logger.info("Downloading NWP data")
@@ -351,7 +383,7 @@ def app(
         raise Exception(f"No models were compatible with the available input data.")
 
     # Find the config with satellite delay suitable for all models running
-    common_config = find_min_satellite_delay_config(data_config_filenames)
+    common_config = find_min_satellite_delay_config(data_config_filenames, use_satellite=use_satellite)
 
     # Save the commmon config
     common_config_path = f"{temp_dir.name}/common_config_path.yaml"
