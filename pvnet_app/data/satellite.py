@@ -209,4 +209,17 @@ def preprocess_sat_data(t0):
     # non-nan timestamp
     extend_satellite_data_with_nans(t0)
 
+    # scale the satellite data
+    scale_satellite_data()
+
     return all_datetimes, data_freq_minutes
+
+
+def scale_satellite_data():
+    """Scale the satellite data to be between 0 and 1 """
+
+    for file in [sat_5_path, sat_15_path]:
+        if os.path.exists(file):
+            ds_sat = xr.open_zarr(sat_path)
+            ds_sat = ds_sat / 1024
+            ds_sat.to_zarr(sat_path)
