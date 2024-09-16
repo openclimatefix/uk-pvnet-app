@@ -69,6 +69,7 @@ class ForecastCompiler:
         self.sun_down_masks = []
         
         
+        
         logger.info(f"Loading model: {model_name} - {model_version}")
         
         self.model = PVNetBaseModel.from_pretrained(
@@ -110,13 +111,9 @@ class ForecastCompiler:
         # Store GSP IDs for this batch for reordering later
         these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
         self.gsp_ids_each_batch += [these_gsp_ids]
-
-        # LEGACY
-        # change new ocf-data-sample batch to ocf-datapipes
-        # if BatchKey gsp_id is in batch, then expand dims
-        if BatchKey.gsp_id in batch:
-            batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
-        # TODO more changes
+        
+        # TODO: This change should be moved inside PVNet
+        batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
 
         # Run batch through model
         preds = self.model(batch).detach().cpu().numpy()
