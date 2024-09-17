@@ -1,15 +1,14 @@
 from pathlib import Path
-import os
-
 import pandas as pd
 
 from torch.utils.data import DataLoader
 from ocf_datapipes.batch import stack_np_examples_into_batch
 from ocf_data_sampler.torch_datasets.pvnet_uk_regional import PVNetUKRegionalDataset
 
-from pvnet_app.utils import populate_data_config_sources
+from pvnet_app.utils import modify_data_config_for_production
 
-# Legacy imports 
+# Legacy imports - only used for legacy dataloader
+import os
 from ocf_datapipes.load import OpenGSPFromDatabase
 from torch.utils.data.datapipes.iter import IterableWrapper
 from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
@@ -27,12 +26,12 @@ def get_dataloader(
 ):
     
     # Populate the data config with production data paths    
-    populated_data_config_filename = Path(config_filename).parent / "data_config.yaml"
+    modified_data_config_filename = Path(config_filename).parent / "data_config.yaml"
     
-    populate_data_config_sources(config_filename, populated_data_config_filename)
+    modify_data_config_for_production(config_filename, modified_data_config_filename)
     
     dataset = PVNetUKRegionalDataset(
-        config_filename=populated_data_config_filename, 
+        config_filename=modified_data_config_filename, 
         start_time=t0, 
         end_time=t0,
         gsp_ids=gsp_ids,
@@ -72,7 +71,7 @@ def get_legacy_dataloader(
     # Populate the data config with production data paths
     populated_data_config_filename = Path(config_filename).parent / "data_config.yaml"
     
-    populate_data_config_sources(
+    modify_data_config_for_production(
         config_filename, 
         populated_data_config_filename,
         gsp_path=os.environ["DB_URL"],
