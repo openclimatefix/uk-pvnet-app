@@ -1,0 +1,125 @@
+general:
+  description: Config for training the saved PVNet model
+  name: PVNet current
+git: null
+input_data:
+  data_source_which_defines_geospatial_locations: gsp
+  default_forecast_minutes: 480
+  default_history_minutes: 120
+  gsp:
+    dropout_fraction: 0.0
+    dropout_timedeltas_minutes: null
+    forecast_minutes: 480
+    gsp_image_size_pixels_height: 64
+    gsp_image_size_pixels_width: 64
+    gsp_meters_per_pixel: 2000
+    gsp_zarr_path: PLACEHOLDER.zarr
+    history_minutes: 120
+    is_live: false
+    live_interpolate_minutes: 60
+    live_load_extra_minutes: 60
+    log_level: DEBUG
+    metadata_only: false
+    n_gsp_per_example: 32
+    time_resolution_minutes: 30
+  hrvsatellite: null
+  nwp:
+    ecmwf:
+      dropout_fraction: 1.0
+      dropout_timedeltas_minutes:
+      - -60
+      forecast_minutes: 480
+      history_minutes: 120
+      index_by_id: false
+      log_level: DEBUG
+      max_staleness_minutes: null
+      nwp_accum_channels:
+      - dswrf
+      - dlwrf
+      - sr
+      - duvrs
+      nwp_channels:
+      - t2m
+      - dswrf
+      - dlwrf
+      - hcc
+      - mcc
+      - lcc
+      - tcc
+      - sde
+      - sr
+      - duvrs
+      - u10
+      - v10
+      nwp_image_size_pixels_height: 12
+      nwp_image_size_pixels_width: 12
+      nwp_meters_per_pixel: 2000
+      nwp_provider: ecmwf
+      nwp_zarr_path: PLACEHOLDER.zarr
+      time_resolution_minutes: 60
+      x_dim_name: x_osgb
+      y_dim_name: y_osgb
+    ukv:
+      dropout_fraction: 1.0
+      dropout_timedeltas_minutes:
+      - -60
+      forecast_minutes: 480
+      history_minutes: 120
+      index_by_id: false
+      log_level: DEBUG
+      max_staleness_minutes: null
+      nwp_accum_channels: []
+      nwp_channels:
+      - dlwrf
+      - dswrf
+      - hcc
+      - lcc
+      - mcc
+      - prate
+      - r
+      - sde
+      - si10
+      - t
+      - vis
+      nwp_image_size_pixels_height: 24
+      nwp_image_size_pixels_width: 24
+      nwp_meters_per_pixel: 2000
+      nwp_provider: ukv
+      nwp_zarr_path: PLACEHOLDER.zarr
+      time_resolution_minutes: 60
+      x_dim_name: x_osgb
+      y_dim_name: y_osgb
+  opticalflow: null
+  pv: null
+  satellite:
+    dropout_fraction: 0.2
+    dropout_timedeltas_minutes:
+    - -5
+    - -10
+    - -15
+    forecast_minutes: 0
+    history_minutes: 90
+    is_live: false
+    live_delay_minutes: 30
+    log_level: DEBUG
+    satellite_channels:
+    - IR_016
+    - IR_039
+    - IR_087
+    - IR_097
+    - IR_108
+    - IR_120
+    - IR_134
+    - VIS006
+    - VIS008
+    - WV_062
+    - WV_073
+    satellite_image_size_pixels_height: 24
+    satellite_image_size_pixels_width: 24
+    satellite_meters_per_pixel: 6000
+    satellite_zarr_path: PLACEHOLDER.zarr
+    time_resolution_minutes: 5
+  sensor: null
+  sun: null
+  topographic: null
+  wind: null

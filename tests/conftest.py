@@ -15,7 +15,7 @@ from nowcasting_datamodel.models import (
 )
 
 from testcontainers.postgres import PostgresContainer
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 
 xr.set_options(keep_attrs=True)
@@ -28,7 +28,7 @@ def test_t0():
 @pytest.fixture(scope="session")
 def engine_url():
     """Database engine, this includes the table creation."""
-    with PostgresContainer("postgres:14.5") as postgres:
+    with PostgresContainer("postgres:16.1") as postgres:
         url = postgres.get_connection_url()
         os.environ["DB_URL"] = url
 
@@ -85,8 +85,8 @@ def make_nwp_data(shell_path, varname, test_t0):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(shell_path)
 
-    # Last init time was at least 2 hours ago and floor to 3-hour interval
-    t0_datetime_utc = (test_t0 - timedelta(hours=2)).floor(timedelta(hours=3))
+    # Last init time was at least 8 hours ago and floor to 3-hour interval
+    t0_datetime_utc = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
     ds.init_time.values[:] = pd.date_range(
         t0_datetime_utc - timedelta(hours=3 * (len(ds.init_time) - 1)),
         t0_datetime_utc,
@@ -132,25 +132,34 @@ def nwp_ecmwf_data(test_t0):
         test_t0=test_t0,
     )
 
+@pytest.fixture
+def config_filename():
+    return f"{os.path.dirname(os.path.abspath(__file__))}/test_data/test.yaml"
 
-def _get_sat_data(test_t0, delay_mins, freq_mins):
+
+def make_sat_data(test_t0, delay_mins, freq_mins):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr"
     )
 
-    # Change times so they lead up to present
+    # remove tim dim and expand time dim to be len 36 = 3 hours of 5 minute data
+    ds = ds.drop_vars("time")
+    n_hours = 3
+
+    # Add times so they lead up to present
     t0_datetime_utc = test_t0 - timedelta(minutes=delay_mins)
-    ds.time.values[:] = pd.date_range(
-        t0_datetime_utc - timedelta(minutes=freq_mins * (len(ds.time) - 1)),
+    times = pd.date_range(
+        t0_datetime_utc - timedelta(hours=n_hours),
         t0_datetime_utc,
         freq=timedelta(minutes=freq_mins),
     )
+    ds = ds.expand_dims(time=times)
 
     # Add data to dataset
     ds["data"] = xr.DataArray(
-        np.zeros([len(ds[c]) for c in ds.coords]),
-        coords=ds.coords,
+        np.zeros([len(ds[c]) for c in ds.xindexes]),
+        coords=[ds[c] for c in ds.xindexes],
     )
 
     # Add stored attributes to DataArray
@@ -161,17 +170,20 @@ def _get_sat_data(test_t0, delay_mins, freq_mins):
 
 @pytest.fixture()
 def sat_5_data(test_t0):
-    return _get_sat_data(test_t0, delay_mins=10, freq_mins=5)
+    return make_sat_data(test_t0, delay_mins=10, freq_mins=5)
 
+@pytest.fixture()
+def sat_5_data_zero_delay(test_t0):
+    return make_sat_data(test_t0, delay_mins=0, freq_mins=5)
 
 @pytest.fixture()
 def sat_5_data_delayed(test_t0):
-    return _get_sat_data(test_t0, delay_mins=120, freq_mins=5)
+    return make_sat_data(test_t0, delay_mins=120, freq_mins=5)
 
 
 @pytest.fixture()
 def sat_15_data(test_t0):
-    return _get_sat_data(test_t0, delay_mins=0, freq_mins=15)
+    return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
 
 
 @pytest.fixture()
@@ -195,7 +207,7 @@ def gsp_yields_and_systems(db_session, test_t0):
         # From 3 hours ago to 8.5 hours into future
         for minute in range(-3 * 60, 9 * 60, 30):
             gsp_yield_sql = GSPYield(
-                datetime_utc=t0_datetime_utc + timedelta(minutes=minute),
+                datetime_utc=(t0_datetime_utc + timedelta(minutes=minute)).replace(tzinfo=timezone.utc),
                 solar_generation_kw=np.random.randint(low=0, high=1000),
                 capacity_mwp=100,
             ).to_orm()
