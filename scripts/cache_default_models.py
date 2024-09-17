@@ -18,13 +18,13 @@ def main():
     """Download model from Huggingface and save it to cache."""
     # Model will be downloaded and saved to cache on disk
     PVNetBaseModel.from_pretrained(
-        models_dict["pvnet_v2"]["pvnet"]["name"],
+        model_id=models_dict["pvnet_v2"]["pvnet"]["name"],
         revision=models_dict["pvnet_v2"]["pvnet"]["version"],
     )
 
     # Model will be downloaded and saved to cache on disk
     SummationBaseModel.from_pretrained(
-        models_dict["pvnet_v2"]["summation"]["name"],
+        model_id=models_dict["pvnet_v2"]["summation"]["name"],
         revision=models_dict["pvnet_v2"]["summation"]["version"],
     )
 
