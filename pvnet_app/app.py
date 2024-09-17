@@ -39,7 +39,6 @@ from pvnet_app.data.satellite import (
 )
 from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.utils import (
-    populate_data_config_sources,
     convert_dataarray_to_forecasts,
     find_min_satellite_delay_config,
     save_yaml_config,
@@ -375,7 +374,10 @@ def app(
         raise Exception(f"No models were compatible with the available input data.")
 
     # Find the config with satellite delay suitable for all models running
-    common_config = find_min_satellite_delay_config(data_config_filenames, use_satellite=use_satellite)
+    common_config = find_min_satellite_delay_config(
+        data_config_filenames, 
+        use_satellite=use_satellite
+    )
 
     # Save the commmon config
     common_config_path = f"{temp_dir.name}/common_config_path.yaml"
