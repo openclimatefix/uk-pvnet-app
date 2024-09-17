@@ -311,7 +311,10 @@ def app(
         download_all_sat_data()
 
         # Preprocess the satellite data and record the delay of the most recent non-nan timestep
-        all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(t0)
+        all_satellite_datetimes, data_freq_minutes = preprocess_sat_data(
+            t0, 
+            use_legacy=use_day_ahead_model
+        )
     else:
         all_satellite_datetimes = []
         data_freq_minutes = None

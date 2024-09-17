@@ -199,7 +199,7 @@ def check_model_inputs_available(
     return available
 
 
-def preprocess_sat_data(t0):
+def preprocess_sat_data(t0, use_legacy=False):
     """Combine and 5- and 15-minutely satellite data and extend to t0 if required"""
 
     # Deal with switching between the 5 and 15 minutely satellite data
@@ -208,24 +208,22 @@ def preprocess_sat_data(t0):
     # Extend the satellite data with NaNs if needed by the model and record the delay of most recent
     # non-nan timestamp
     extend_satellite_data_with_nans(t0)
-
-    # scale the satellite data
-    scale_satellite_data()
+    
+    if not use_legacy:
+        # scale the satellite data if not legacy. The legacy dataloader does production data scaling
+        # inside it. The new dataloader does not
+        scale_satellite_data()
 
     return all_datetimes, data_freq_minutes
 
 
 def scale_satellite_data():
-    """Scale the satellite data to be between 0 and 1 """
+    """Scale the satellite data to be between 0 and 1"""
 
-    for file in [sat_5_path, sat_15_path]:
-        if os.path.exists(file):
+    ds_sat = xr.open_zarr(sat_path)
+    ds_sat = ds_sat / 1024
+    ds_sat = ds_sat.compute()
 
-            # open and scale
-            ds_sat = xr.open_zarr(sat_path)
-            ds_sat = ds_sat / 1024
-            ds_sat = ds_sat.compute()
-
-            # save
-            os.system(f"rm -rf {sat_path}")
-            ds_sat.to_zarr(sat_path)
+    # save
+    os.system(f"rm -rf {sat_path}")
+    ds_sat.to_zarr(sat_path)
