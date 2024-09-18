@@ -43,7 +43,6 @@ def test_app(
         store.close()
 
         # Set environmental variables
-        os.environ["SAVE_GSP_SUM"] = "True"
         os.environ["RUN_EXTRA_MODELS"] = "True"
 
         # Run prediction
@@ -58,11 +57,11 @@ def test_app(
     os.system(f"rm -r {nwp_ukv_path}")
     os.system(f"rm -r {nwp_ecmwf_path}")
     # Check correct number of forecasts have been made
-    # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
+    # (317 GSPs + 1 National) = 318 forecasts
     # Forecast made with multiple models
     expected_forecast_results = 0
     for model_config in models_dict.values():
-        expected_forecast_results += 318 + model_config["save_gsp_sum"]
+        expected_forecast_results += 318
 
     forecasts = db_session.query(ForecastSQL).all()
     # Doubled for historic and forecast
@@ -78,9 +77,11 @@ def test_app(
 
     expected_forecast_results = 0
     for model_config in models_dict.values():
-        expected_forecast_results += 1  # national
+        # National
+        expected_forecast_results += 1
+        # GSP
         expected_forecast_results += 317 * model_config["save_gsp_to_forecast_value_last_seven_days"]
-        expected_forecast_results += model_config["save_gsp_sum"]  # gsp sum national
+        expected_forecast_results += model_config["save_gsp_sum"]  # optional Sum of GSPs
 
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
@@ -116,7 +117,6 @@ def test_app_day_ahead_model(
 
         # Set environmental variables
         os.environ["DAY_AHEAD_MODEL"] = "True"
-        os.environ["SAVE_GSP_SUM"] = "True"
         os.environ["RUN_EXTRA_MODELS"] = "False"
 
         # Run prediction
@@ -145,7 +145,7 @@ def test_app_day_ahead_model(
     assert "90" in forecasts[0].forecast_values[0].properties
     assert "10" in forecasts[0].forecast_values[0].properties
 
-    # 318 GSPs * 72 time steps in forecast
+    # 72 time steps in forecast
     expected_forecast_timesteps = 72
 
     assert (

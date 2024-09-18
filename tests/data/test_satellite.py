@@ -10,25 +10,23 @@ Tests for download_sat_data and preprocess_sat_data
 
 Note that I'm not sure these tests will work in parallel, due to files being saved in the same places
 """
+from datetime import datetime, timedelta
+
 import os
 import tempfile
-import pytest
 import zarr
 import numpy as np
 import pandas as pd
 import xarray as xr
-from datetime import datetime, timedelta
 
-from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_app.data.satellite import (
-    check_model_inputs_available,
     download_all_sat_data,
     preprocess_sat_data,
+    check_model_satellite_inputs_available,
     sat_path,
     sat_5_path,
     sat_15_path,
 )
-from pvnet_app.app import models_dict
 
 
 def save_to_zarr_zip(ds, filename):
@@ -37,14 +35,14 @@ def save_to_zarr_zip(ds, filename):
         ds.to_zarr(store, compute=True, mode="w", encoding=encoding, consolidated=True)
 
 
-def check_timesteps(sat_path, expected_mins, skip_nans=False):
+def check_timesteps(sat_path, expected_freq_mins):
     ds_sat = xr.open_zarr(sat_path)
 
-    if not isinstance(expected_mins, list):
-        expected_mins = [expected_mins]
+    if not isinstance(expected_freq_mins, list):
+        expected_freq_mins = [expected_freq_mins]
 
     dts = pd.to_datetime(ds_sat.time).diff()[1:]
-    assert (np.isin(dts, [np.timedelta64(m, "m") for m in expected_mins])).all(), dts
+    assert (np.isin(dts, [np.timedelta64(m, "m") for m in expected_freq_mins])).all(), dts
 
 
 def test_download_sat_5_data(sat_5_data):
@@ -67,7 +65,7 @@ def test_download_sat_5_data(sat_5_data):
         assert not os.path.exists(sat_15_path)
 
         # Check the satellite data is 5-minutely
-        check_timesteps(sat_5_path, expected_mins=5)
+        check_timesteps(sat_5_path, expected_freq_mins=5)
 
 
 def test_download_sat_15_data(sat_15_data):
@@ -91,7 +89,7 @@ def test_download_sat_15_data(sat_15_data):
         assert os.path.exists(sat_15_path)
 
         # Check the satellite data is 15-minutely
-        check_timesteps(sat_15_path, expected_mins=15)
+        check_timesteps(sat_15_path, expected_freq_mins=15)
 
 
 def test_download_sat_both_data(sat_5_data, sat_15_data):
@@ -114,10 +112,10 @@ def test_download_sat_both_data(sat_5_data, sat_15_data):
         assert os.path.exists(sat_15_path)
 
         # Check this satellite data is 5-minutely
-        check_timesteps(sat_5_path, expected_mins=5)
+        check_timesteps(sat_5_path, expected_freq_mins=5)
 
         # Check this satellite data is 15-minutely
-        check_timesteps(sat_15_path, expected_mins=15)
+        check_timesteps(sat_15_path, expected_freq_mins=15)
 
 
 def test_preprocess_sat_data(sat_5_data, test_t0):
@@ -138,7 +136,7 @@ def test_preprocess_sat_data(sat_5_data, test_t0):
         preprocess_sat_data(test_t0)
 
         # Check the satellite data is 5-minutely
-        check_timesteps(sat_path, expected_mins=5)
+        check_timesteps(sat_path, expected_freq_mins=5)
 
 
 def test_preprocess_sat_15_data(sat_15_data, test_t0):
@@ -158,8 +156,8 @@ def test_preprocess_sat_15_data(sat_15_data, test_t0):
 
         preprocess_sat_data(test_t0)
 
-        # Check the satellite data being used is 15-minutely
-        check_timesteps(sat_path, expected_mins=15)
+        # We infill the satellite data to 5 minutes in the process step
+        check_timesteps(sat_path, expected_freq_mins=5)
 
 
 def test_preprocess_old_sat_5_data(sat_5_data_delayed, sat_15_data, test_t0):
@@ -181,17 +179,18 @@ def test_preprocess_old_sat_5_data(sat_5_data_delayed, sat_15_data, test_t0):
 
         preprocess_sat_data(test_t0)
 
-        # Check the satellite data being used is 15-minutely
-        check_timesteps(sat_path, expected_mins=15)
+        # We infill the satellite data to 5 minutes in the process step
+        check_timesteps(sat_path, expected_freq_mins=5)
 
 
-def test_check_model_inputs_available(config_filename):
+
+def test_check_model_satellite_inputs_available(config_filename):
 
     t0 = datetime(2023,1,1)
     sat_datetime_1 = pd.date_range(t0 - timedelta(minutes=120), t0- timedelta(minutes=5), freq="5min")
     sat_datetime_2 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=15), freq="5min")
     sat_datetime_3 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=35), freq="5min")
 
-    assert check_model_inputs_available(config_filename, sat_datetime_1, t0, 5 )
-    assert check_model_inputs_available(config_filename, sat_datetime_2, t0, 5 )
-    assert not check_model_inputs_available(config_filename, sat_datetime_3, t0,5 )
+    assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_1)
+    assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_2)
+    assert not check_model_satellite_inputs_available(config_filename, t0, sat_datetime_3)
