@@ -1,7 +1,6 @@
 import tempfile
 import zarr
 import os
-import logging
 
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
@@ -24,23 +23,26 @@ def test_app(
     # save sat_data to temporary file, and set SATELLITE_ZARR_PATH
     # GSP data
 
+
     with tempfile.TemporaryDirectory() as tmpdirname:
+
+        os.chdir(tmpdirname)
+
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables
-        temp_nwp_path = f"{tmpdirname}/nwp_ukv.zarr"
+        temp_nwp_path = f"temp_nwp_ukv.zarr"
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = f"{tmpdirname}/nwp_ecmwf.zarr"
+        temp_nwp_path = f"temp_nwp_ecmwf.zarr"
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         # In production sat zarr is zipped
-        temp_sat_path = f"{tmpdirname}/sat.zarr.zip"
+        temp_sat_path = f"temp_sat.zarr.zip"
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
-        store = zarr.storage.ZipStore(temp_sat_path, mode="x")
-        sat_5_data.to_zarr(store)
-        store.close()
+        with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
+            sat_5_data.to_zarr(store)
 
         # Set environmental variables
         os.environ["RUN_EXTRA_MODELS"] = "True"
@@ -51,11 +53,6 @@ def test_app(
 
         app(gsp_ids=list(range(1, 318)), num_workers=2)
 
-    os.system(f"rm {sat_5_path}")
-    os.system(f"rm {sat_15_path}")
-    os.system(f"rm -r {sat_path}")
-    os.system(f"rm -r {nwp_ukv_path}")
-    os.system(f"rm -r {nwp_ecmwf_path}")
     # Check correct number of forecasts have been made
     # (317 GSPs + 1 National) = 318 forecasts
     # Forecast made with multiple models
@@ -98,22 +95,24 @@ def test_app_day_ahead_model(
     # GSP data
 
     with tempfile.TemporaryDirectory() as tmpdirname:
+        
+        os.chdir(tmpdirname)
+
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables
-        temp_nwp_path = f"{tmpdirname}/nwp_ukv.zarr"
+        temp_nwp_path = f"temp_nwp_ukv.zarr"
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = f"{tmpdirname}/nwp_ecmwf.zarr"
+        temp_nwp_path = f"temp_nwp_ecmwf.zarr"
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         # In production sat zarr is zipped
-        temp_sat_path = f"{tmpdirname}/sat.zarr.zip"
+        temp_sat_path = f"temp_sat.zarr.zip"
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
-        store = zarr.storage.ZipStore(temp_sat_path, mode="x")
-        sat_5_data.to_zarr(store)
-        store.close()
+        with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
+            sat_5_data.to_zarr(store)
 
         # Set environmental variables
         os.environ["DAY_AHEAD_MODEL"] = "True"
@@ -125,11 +124,6 @@ def test_app_day_ahead_model(
 
         app(gsp_ids=list(range(1, 318)), num_workers=2)
 
-    os.system(f"rm {sat_5_path}")
-    os.system(f"rm {sat_15_path}")
-    os.system(f"rm -r {sat_path}")
-    os.system(f"rm -r {nwp_ukv_path}")
-    os.system(f"rm -r {nwp_ecmwf_path}")
     # Check correct number of forecasts have been made
     # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
     # Forecast made with multiple models
