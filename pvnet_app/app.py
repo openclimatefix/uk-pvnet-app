@@ -28,7 +28,7 @@ from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from ocf_datapipes.batch import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 import sentry_sdk
-
+import structlog
 
 import pvnet_app
 from pvnet_app.data.nwp import download_all_nwp_data, preprocess_nwp_data
@@ -48,13 +48,16 @@ from pvnet_app.dataloader import get_legacy_dataloader, get_dataloader
 
 
 # sentry
-sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN", ""),
-    environment=f'{os.getenv("ENVIRONMENT", "local")}',
-    traces_sample_rate=1.0,
-    profiles_sample_rate=1.0,
-)
 sentry_sdk.set_tag("app_name", "pvnet_app")
+sentry_sdk.set_tag("version", pvnet_app.__version__)
+
+log = structlog.stdlib.get_logger()
+
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    environment=os.getenv("ENVIRONMENT", "local"),
+    traces_sample_rate=1
+)
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
