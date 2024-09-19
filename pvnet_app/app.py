@@ -48,16 +48,14 @@ from pvnet_app.dataloader import get_legacy_dataloader, get_dataloader
 
 
 # sentry
-sentry_sdk.set_tag("app_name", "pvnet_app")
-sentry_sdk.set_tag("version", pvnet_app.__version__)
-
-log = structlog.stdlib.get_logger()
-
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),
     environment=os.getenv("ENVIRONMENT", "local"),
     traces_sample_rate=1
 )
+
+sentry_sdk.set_tag("app_name", "pvnet_app")
+sentry_sdk.set_tag("version", pvnet_app.__version__)
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
