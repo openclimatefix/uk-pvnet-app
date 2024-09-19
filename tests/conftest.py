@@ -203,7 +203,6 @@ def gsp_yields_and_systems(db_session, test_t0):
             installed_capacity_mw=123.0,
         )
 
-        gsp_yield_sqls = []
         # From 3 hours ago to 8.5 hours into future
         for minute in range(-3 * 60, 9 * 60, 30):
             gsp_yield_sql = GSPYield(

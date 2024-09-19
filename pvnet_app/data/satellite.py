@@ -1,11 +1,9 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
-import xesmf as xe
 import logging
 import os
 import fsspec
-from datetime import timedelta, datetime
 import ocf_blosc2
 from ocf_datapipes.config.load import load_yaml_configuration
 
@@ -13,71 +11,64 @@ from pvnet_app.consts import sat_path
 
 logger = logging.getLogger(__name__)
 
-this_dir = os.path.dirname(os.path.abspath(__file__))
-
 sat_5_path = "sat_5_min.zarr"
 sat_15_path = "sat_15_min.zarr"
 
 
-def download_all_sat_data() -> None:
-    """Download the sat data"""
+def download_all_sat_data() -> bool:
+    """Download the sat data and return whether it was successful
+    
+    Returns:
+        bool: Whether the download was successful
+    """
 
     # Clean out old files
     os.system(f"rm -r {sat_path} {sat_5_path} {sat_15_path}")
 
+    # Set variable to track whether the satellite download is successful
+    sat_available = False
+
     # download 5 minute satellite data
-    sat_download_path = os.environ["SATELLITE_ZARR_PATH"]
-    fs = fsspec.open(sat_download_path).fs
-    if fs.exists(sat_download_path):
-        fs.get(sat_download_path, "sat_5_min.zarr.zip")
+    sat_5_dl_path = os.environ["SATELLITE_ZARR_PATH"]
+    fs = fsspec.open(sat_5_dl_path).fs
+    if fs.exists(sat_5_dl_path):
+        sat_available = True
+        logger.info(f"Downloading 5-minute satellite data")
+        fs.get(sat_5_dl_path, "sat_5_min.zarr.zip")
         os.system(f"unzip -qq sat_5_min.zarr.zip -d {sat_5_path}")
         os.system(f"rm sat_5_min.zarr.zip")
+    else:
+        logger.info(f"No 5-minute data available")
 
     # Also download 15-minute satellite if it exists
-    sat_15_dl_path = (
-        os.environ["SATELLITE_ZARR_PATH"]
-        .replace("sat.zarr", "sat_15.zarr")
-        .replace("latest.zarr", "latest_15.zarr")
-    )
+    sat_15_dl_path = os.environ["SATELLITE_ZARR_PATH"].replace(".zarr", "_15.zarr")
     if fs.exists(sat_15_dl_path):
-        logger.info(f"Downloading 15-minute satellite data {sat_15_dl_path}")
+        sat_available = True
+        logger.info(f"Downloading 15-minute satellite data")
         fs.get(sat_15_dl_path, "sat_15_min.zarr.zip")
-        os.system(f"unzip sat_15_min.zarr.zip -d {sat_15_path}")
+        os.system(f"unzip -qq sat_15_min.zarr.zip -d {sat_15_path}")
         os.system(f"rm sat_15_min.zarr.zip")
+    else:
+        logger.info(f"No 15-minute data available")
+    
+    return sat_available
 
 
-def _get_latest_time_and_mins_delay(
-    sat_zarr_path: str, 
-    t0: pd.Timestamp,
-) -> tuple[pd.Timestamp, int, pd.DatetimeIndex]:
-    """Get datetime info about the available satellite data
+def get_satellite_timestamps(sat_zarr_path: str) -> pd.DatetimeIndex:
+    """Get the datetimes of the satellite data
     
     Args:
         sat_zarr_path: The path to the satellite zarr
-        t0: The init-time of the forecast
     
     Returns:
-        pd.Timestamp: The most recent available satellite timestamp
-        int: The delay in minutes of the most recent timestamp
         pd.DatetimeIndex: All available satellite timestamps
     """
     ds_sat = xr.open_zarr(sat_zarr_path)
-    latest_time = pd.to_datetime(ds_sat.time.max().item())
-    delay = t0 - latest_time
-    delay_mins = int(delay.total_seconds() / 60)
-    all_datetimes = pd.to_datetime(ds_sat.time.values)
-    return latest_time, delay_mins, all_datetimes
+    return pd.to_datetime(ds_sat.time.values)
 
 
-def combine_5_and_15_sat_data(t0) -> tuple[int, pd.DatetimeIndex]:
+def combine_5_and_15_sat_data() -> None:
     """Select and/or combine the 5 and 15-minutely satellite data and move it to the expected path
-
-    Args:
-        t0: The init-time of the forecast
-
-    Returns:
-        int: The spacing between data samples in minutes
-        pd.DatetimeIndex: The available satellite timestamps
     """
 
     # Check which satellite data exists
@@ -89,88 +80,179 @@ def combine_5_and_15_sat_data(t0) -> tuple[int, pd.DatetimeIndex]:
 
     # Find the delay in the 5- and 15-minutely data
     if exists_5_minute:
-        latest_time_5, _, all_datetimes_5 = _get_latest_time_and_mins_delay(
-            sat_5_path, t0
-        )
+        datetimes_5min = get_satellite_timestamps(sat_5_path)
         logger.info(
-            f"Latest 5-minute timestamp is {latest_time_5} for t0 time {t0}. "
-            f"All the datetimes are {all_datetimes_5}"
+            f"Latest 5-minute timestamp is {datetimes_5min.max()}. "
+            f"All the datetimes are: \n{datetimes_5min}"
         )
     else:
-        latest_time_5, all_datetimes_5 = datetime.min, []
         logger.info("No 5-minute data was found.")
 
     if exists_15_minute:
-        latest_time_15, _, all_datetimes_15 = _get_latest_time_and_mins_delay(
-            sat_15_path, t0
-        )
+        datetimes_15min = get_satellite_timestamps(sat_15_path)
         logger.info(
-            f"Latest 5-minute timestamp is {latest_time_15} for t0 time {t0}. "
-            f"All the datetimes are  {all_datetimes_15}"
+            f"Latest 5-minute timestamp is {datetimes_15min.max()}. "
+            f"All the datetimes are: \n{datetimes_15min}"
         )
     else:
-        latest_time_15 = datetime.min
         logger.info("No 15-minute data was found.")
+    
+    # If both 5- and 15-minute data exists, use the most recent
+    if exists_5_minute and exists_15_minute:
+        use_5_minute = datetimes_5min.max() > datetimes_15min.max()
+    else:
+        # If only one exists, use that
+        use_5_minute = exists_5_minute
 
-    # Move the data with the most recent timestamp to the expected path
-    if latest_time_5 >= latest_time_15:
+    # Move the selected data to the expected path
+    if use_5_minute:
         logger.info(f"Using 5-minutely data.")
         os.system(f"mv {sat_5_path} {sat_path}")
-        data_freq_minutes = 5
-        all_datetimes = all_datetimes_5
     else:
         logger.info(f"Using 15-minutely data.")
         os.system(f"mv {sat_15_path} {sat_path}")
-        data_freq_minutes = 15
-        all_datetimes = all_datetimes_15
-
-    return data_freq_minutes, all_datetimes
 
 
-def extend_satellite_data_with_nans(t0: pd.Timestamp) -> int:
+def fill_1d_bool_gaps(x, max_gap):
+    """In a boolean array, fill consecutive False elements if their number is less than the gap_size
+
+    Args:
+        x: A 1-dimensional boolean array
+        max_gap: integer of the maximum gap size which will be filled with True
+
+    Returns:
+        A 1-dimensional boolean array
+
+    Examples:
+        >>> x = np.array([0, 1, 0, 0, 1, 0, 1, 0])
+        >>> fill_1d_bool_gaps(x, max_gap=2).astype(int)
+        array([0, 1, 1, 1, 1, 1, 1, 0])
+        
+        >>> x = np.array([1, 0, 0, 0, 1, 0, 1, 0])
+        >>> fill_1d_bool_gaps(x, max_gap=2).astype(int)
+        array([1, 0, 0, 0, 1, 1, 1, 0])
+    """
+
+    should_fill = np.zeros(len(x), dtype=bool)
+
+    i_start = None
+
+    last_b = False
+    for i, b in enumerate(x):
+        if last_b and not b:
+            i_start = i
+        elif b and not last_b and i_start is not None:
+            if i - i_start <= max_gap:
+                should_fill[i_start:i] = True
+            i_start = None
+        last_b = b
+
+    return np.logical_or(should_fill, x)
+
+
+def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
+    """Interpolate missing satellite timestamps"""
+    
+    ds_sat = xr.open_zarr(sat_path)
+
+    # If any of these times are missing, we will try to interpolate them
+    dense_times = pd.date_range(
+        ds_sat.time.values.min(),
+        ds_sat.time.values.max(),
+        freq="5min",
+    )
+
+    # Create mask array of which timestamps are available
+    timestamp_available = np.isin(dense_times, ds_sat.time)
+
+    # If all the requested times are present we avoid running interpolation
+    if timestamp_available.all():
+        logger.warning("No gaps in the available satllite sequence - no interpolation run")
+        return
+
+    # If less than 2 of the buffer requested times are present we cannot infill
+    elif timestamp_available.sum() < 2:
+        logger.warning("Cannot run interpolate infilling with less than 2 time steps available")
+        return
+
+    else:
+        logger.info("Some requested times are missing - running interpolation")
+        
+        # Compute before interpolation for efficiency
+        ds_sat = ds_sat.compute()
+        
+        # Run the interpolation to all 5-minute timestamps between the first and last
+        ds_interp = ds_sat.interp(time=dense_times, method="linear", assume_sorted=True)
+        
+        # Find the timestamps which are within max gap size
+        max_gap_steps = int(max_gap / pd.Timedelta("5min")) - 1
+        valid_fill_times = fill_1d_bool_gaps(timestamp_available, max_gap_steps)
+
+        # Mask the timestamps outside the max gap size
+        valid_fill_times_xr = xr.zeros_like(ds_interp.time, dtype=bool)
+        valid_fill_times_xr.values[:] = valid_fill_times
+        ds_sat = ds_interp.where(valid_fill_times_xr)
+        
+        time_was_filled = np.logical_and(valid_fill_times_xr, ~timestamp_available)
+        
+        if time_was_filled.any():
+            infilled_times = time_was_filled.where(time_was_filled, drop=True)
+            logger.info(
+                "The following times were filled by interpolation:\n"
+                f"{infilled_times.time.values}"
+            )
+
+        if not valid_fill_times_xr.all():
+            not_infilled_times = valid_fill_times_xr.where(~valid_fill_times_xr, drop=True)
+            logger.info(
+                "After interpolation the following times are still missing:\n"
+                f"{not_infilled_times.time.values}"
+            )
+
+        # Save the interpolated data
+        os.system(f"rm -rf {sat_path}")
+        ds_sat.to_zarr(sat_path)
+
+    
+def extend_satellite_data_with_nans(t0: pd.Timestamp) -> None:
     """Fill the satellite data with NaNs out to time t0
     
     Args:
         t0: The init-time of the forecast
-    
-    Returns:
-        int: The delay in minutes of the most recent timestamp
     """
 
     # Find how delayed the satellite data is
-    _, delay_mins, _ = _get_latest_time_and_mins_delay(sat_path, t0)
+    ds_sat = xr.open_zarr(sat_path)
+    delay = t0 - pd.to_datetime(ds_sat.time).max()
 
-    if delay_mins > 0:
-        logger.info(f"Filling most recent {delay_mins} mins with NaNs")
+    if delay > pd.Timedelta(0):
+        logger.info(f"Filling most recent {delay} with NaNs")
 
         # Load into memory so we can delete it on disk
-        ds_sat = xr.open_zarr(sat_path).compute()
+        ds_sat = ds_sat.compute()
 
-        # Pad with zeros
-        fill_times = pd.date_range(t0 + timedelta(minutes=(-delay_mins + 5)), t0, freq="5min")
+        # We will fill the data with NaNs for these timestamps
+        fill_times = pd.date_range(t0 - delay + pd.Timedelta("5min"), t0, freq="5min")
 
+        # Extend the data with NaNs
         ds_sat = ds_sat.reindex(time=np.concatenate([ds_sat.time, fill_times]), fill_value=np.nan)
 
         # Re-save inplace
         os.system(f"rm -rf {sat_path}")
         ds_sat.to_zarr(sat_path)
 
-    return delay_mins
 
-
-def check_model_inputs_available(
+def check_model_satellite_inputs_available(
     data_config_filename: str, 
-    all_satellite_datetimes: pd.DatetimeIndex, 
-    t0: pd.Timestamp, 
-    data_freq_minutes: int,
+    t0: pd.Timestamp,
+    sat_datetimes: pd.DatetimeIndex,
 ) -> bool:
     """Checks whether the model can be run given the current satellite delay
 
     Args:
         data_config_filename: Path to the data configuration file
-        all_satellite_datetimes: All the satellite datetimes available
         t0: The init-time of the forecast
-        data_freq_minutes: The frequency of the satellite data. This can be 5 or 15 minutes.
+        available_sat_datetimes: The available satellite timestamps
         
     Returns:
         bool: Whether the satellite data satisfies that specified in the config
@@ -182,7 +264,7 @@ def check_model_inputs_available(
 
     # check satellite if using
     if hasattr(data_config.input_data, "satellite"):
-        if data_config.input_data.satellite is not None:
+        if data_config.input_data.satellite:
 
             # Take into account how recently the model tries to slice satellite data from
             max_sat_delay_allowed_mins = data_config.input_data.satellite.live_delay_minutes
@@ -194,37 +276,27 @@ def check_model_inputs_available(
                     np.abs(data_config.input_data.satellite.dropout_timedeltas_minutes).max(),
                 )
 
-            # get start and end satellite times
+            # Get all expected datetimes
             history_minutes = data_config.input_data.satellite.history_minutes
 
-            # we only check every 15 minutes, as ocf_datapipes resample from 15 to 5 if necessary.
-            freq = f"{data_freq_minutes}min"
-            logger.info(
-                f"Checking satellite data for {t0=} with history {history_minutes=} "
-                f"and freq {freq=}, for {max_sat_delay_allowed_mins=}"
-            )
             expected_datetimes = pd.date_range(
-                t0 - timedelta(minutes=int(history_minutes)),
-                t0 - timedelta(minutes=int(max_sat_delay_allowed_mins)),
-                freq=freq,
+                t0 - pd.Timedelta(f"{int(history_minutes)}min"),
+                t0 - pd.Timedelta(f"{int(max_sat_delay_allowed_mins)}min"),
+                freq="5min",
             )
 
-            # Check if all expected datetimes are in the available satellite data
-            all_satellite_data_present = all(
-                [t in all_satellite_datetimes for t in expected_datetimes]
-            )
-            if not all_satellite_data_present:
-                # log something. e,g x,y timestamps are missing
-                logger.info(
-                    f"Missing satellite data for {expected_datetimes} in {all_satellite_datetimes}"
-                )
+            # Check if any of the expected datetimes are missing
+            missing_time_steps = np.setdiff1d(expected_datetimes, sat_datetimes, assume_unique=True)
 
-            available = all_satellite_data_present
+            available = len(missing_time_steps) == 0
+
+            if len(missing_time_steps)>0:
+                logger.info(f"Some satellite timesteps for {t0=} missing: \n{missing_time_steps}")
 
     return available
 
 
-def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> tuple[pd.DatetimeIndex, int]:
+def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> pd.DatetimeIndex:
     """Combine and 5- and 15-minutely satellite data and extend to t0 if required
     
     Args:
@@ -237,18 +309,24 @@ def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> tuple[pd.
     """
 
     # Deal with switching between the 5 and 15 minutely satellite data
-    data_freq_minutes, all_datetimes = combine_5_and_15_sat_data(t0)
+    combine_5_and_15_sat_data()
 
-    # Extend the satellite data with NaNs if needed by the model and record the delay of most recent
-    # non-nan timestamp
-    extend_satellite_data_with_nans(t0)
-    
+    # Interpolate missing satellite timestamps
+    interpolate_missing_satellite_timestamps(pd.Timedelta("15min"))
+
     if not use_legacy:
         # scale the satellite data if not legacy. The legacy dataloader does production data scaling
         # inside it. The new dataloader does not
         scale_satellite_data()
 
-    return all_datetimes, data_freq_minutes
+    # Get the available satellite timestamps before we extend with NaNs
+    sat_timestamps = get_satellite_timestamps(sat_path)
+
+    # Extend the satellite data with NaNs if needed by the model and record the delay of most recent
+    # non-nan timestamp
+    extend_satellite_data_with_nans(t0)
+
+    return sat_timestamps
 
 
 def scale_satellite_data() -> None:
