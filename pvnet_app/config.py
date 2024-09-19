@@ -92,24 +92,48 @@ def modify_data_config_for_production(
     save_yaml_config(config, output_path)
         
     
-def find_min_satellite_delay_config(config_paths: list[str]) -> dict:
-    """Find the config with the minimum satallite delay across from list of config paths"""
+def get_union_of_configs(config_paths: list[str]) -> dict:
+    """Find the config which is able to run all models from a list of config paths
+    
+    Note that this implementation is very limited and will not work in general unless all models
+    have been trained on the same batches. We do not chck example if the satellite and NWP channels
+    are the same in the different configs, or whether the NWP time slices are the same. Many more
+    limitations not mentioned apply
+    """
 
     # Load all the configs
     configs = [load_yaml_config(config_path) for config_path in config_paths]
     
-    min_sat_delay = None
-    
-    for config in configs:
+    # We will ammend this config according to the entries in the other configs
+    common_config = configs[0] 
+        
+    for config in configs[1:]:
         
         if "satellite" in config["input_data"]:
             
-            sat_delay = config["input_data"]["satellite"]["live_delay_minutes"]
-            if min_sat_delay is None:
-                min_sat_delay = sat_delay
+            if "satellite" in common_config["input_data"]:
+            
+                # Find the minimum satellite delay across configs                
+                common_config["input_data"]["satellite"]["live_delay_minutes"] = min(
+                    common_config["input_data"]["satellite"]["live_delay_minutes"],
+                    config["input_data"]["satellite"]["live_delay_minutes"]
+                )
+
+                
             else:
-                min_sat_delay = min(min_sat_delay, sat_delay)
-        
-    config = configs[0] 
-    config["input_data"]["satellite"]["live_delay_minutes"] = min_sat_delay
-    return config
+                # Add satellite to common config if not there already 
+                common_config["input_data"]["satellite"] = config["input_data"]["satellite"]
+                
+        if "nwp" in config["input_data"]:
+            
+            # Add NWP to common config if not there already 
+            if "nwp" not in common_config["input_data"]:
+                common_config["input_data"]["nwp"] = config["input_data"]["nwp"]
+                
+            else:
+                for nwp_key, nwp_conf in config["input_data"]["nwp"].items():
+                    # Add different NWP sources to common config if not there already 
+                    if nwp_key not in common_config["input_data"]["nwp"]:
+                        common_config["input_data"]["nwp"][nwp_key] = nwp_conf
+    
+    return common_config

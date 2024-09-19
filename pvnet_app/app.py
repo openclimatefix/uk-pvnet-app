@@ -21,7 +21,7 @@ import sentry_sdk
 
 
 import pvnet_app
-from pvnet_app.config import find_min_satellite_delay_config, load_yaml_config, save_yaml_config
+from pvnet_app.config import get_union_of_configs, load_yaml_config, save_yaml_config
 from pvnet_app.data.nwp import download_all_nwp_data, preprocess_nwp_data
 from pvnet_app.data.satellite import (
     download_all_sat_data,
@@ -351,11 +351,8 @@ def app(
     if len(forecast_compilers) == 0:
         raise Exception(f"No models were compatible with the available input data.")
 
-    # Find the config with satellite delay suitable for all models running
-    if sat_available:
-        common_config = find_min_satellite_delay_config(data_config_paths)
-    else:
-        common_config = load_yaml_config(data_config_paths[0])
+    # Find the config with values suitable for running all models
+    common_config = get_union_of_configs(data_config_paths)
 
     # Save the commmon config
     common_config_path = f"{temp_dir.name}/common_config_path.yaml"

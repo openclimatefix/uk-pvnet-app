@@ -11,54 +11,65 @@ from nowcasting_datamodel.models.forecast import (
 
 from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 from pvnet_app.data.satellite import sat_5_path, sat_15_path
+from pvnet.models.base_model import BaseModel as PVNetBaseModel
+from ocf_datapipes.config.load import load_yaml_configuration
+
+
+def model_uses_satellite(model_config):
+    """Function to check model if model entry in model dictionary uses satellite data"""
+    
+    data_config_path = PVNetBaseModel.get_data_config(
+        model_config["pvnet"]["name"],
+        revision=model_config["pvnet"]["version"],
+    )
+    data_config = load_yaml_configuration(data_config_path)
+
+    return hasattr(data_config.input_data, "satellite") and data_config.input_data.satellite
+
 
 
 def test_app(
     db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
 ):
-    # Environment variable DB_URL is set in engine_url, which is called by db_session
-    # set NWP_ZARR_PATH
-    # save nwp_data to temporary file, and set NWP_ZARR_PATH
-    # SATELLITE_ZARR_PATH
-    # save sat_data to temporary file, and set SATELLITE_ZARR_PATH
-    # GSP data
 
-
+    """Test the app running the intraday models"""
+    
     with tempfile.TemporaryDirectory() as tmpdirname:
 
         os.chdir(tmpdirname)
 
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables
-        temp_nwp_path = f"temp_nwp_ukv.zarr"
+        temp_nwp_path = "temp_nwp_ukv.zarr"
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = f"temp_nwp_ecmwf.zarr"
+        temp_nwp_path = "temp_nwp_ecmwf.zarr"
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         # In production sat zarr is zipped
-        temp_sat_path = f"temp_sat.zarr.zip"
+        temp_sat_path = "temp_sat.zarr.zip"
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
         with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
             sat_5_data.to_zarr(store)
 
         # Set environmental variables
         os.environ["RUN_EXTRA_MODELS"] = "True"
+        os.environ["SAVE_GSP_SUM"] = "True"
 
         # Run prediction
-        # Thes import needs to come after the environ vars have been set
+        # These imports need to come after the environ vars have been set
         from pvnet_app.app import app, models_dict
 
         app(gsp_ids=list(range(1, 318)), num_workers=2)
 
     # Check correct number of forecasts have been made
-    # (317 GSPs + 1 National) = 318 forecasts
+    # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
     # Forecast made with multiple models
     expected_forecast_results = 0
     for model_config in models_dict.values():
-        expected_forecast_results += 318
+        expected_forecast_results += 318 + model_config["save_gsp_sum"]
 
     forecasts = db_session.query(ForecastSQL).all()
     # Doubled for historic and forecast
@@ -86,35 +97,25 @@ def test_app(
 def test_app_day_ahead_model(
     db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
 ):
-    # Test app with day ahead model config
-    # Environment variable DB_URL is set in engine_url, which is called by db_session
-    # set NWP_ZARR_PATH
-    # save nwp_data to temporary file, and set NWP_ZARR_PATH
-    # SATELLITE_ZARR_PATH
-    # save sat_data to temporary file, and set SATELLITE_ZARR_PATH
-    # GSP data
+    """Test the app running the day ahead model"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         
         os.chdir(tmpdirname)
 
-        # The app loads sat and NWP data from environment variable
-        # Save out data, and set paths as environmental variables
-        temp_nwp_path = f"temp_nwp_ukv.zarr"
+        temp_nwp_path = "temp_nwp_ukv.zarr"
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = f"temp_nwp_ecmwf.zarr"
+        temp_nwp_path = "temp_nwp_ecmwf.zarr"
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
-        # In production sat zarr is zipped
         temp_sat_path = f"temp_sat.zarr.zip"
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
         with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
             sat_5_data.to_zarr(store)
 
-        # Set environmental variables
         os.environ["DAY_AHEAD_MODEL"] = "True"
         os.environ["RUN_EXTRA_MODELS"] = "False"
 
@@ -154,3 +155,65 @@ def test_app_day_ahead_model(
         len(db_session.query(ForecastValueSevenDaysSQL).all())
         == expected_forecast_results * expected_forecast_timesteps
     )
+
+def test_app_no_sat(
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+):
+    """Test the app for the case when no satellite data is available"""
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        
+        os.chdir(tmpdirname)
+
+        temp_nwp_path = "temp_nwp_ukv.zarr"
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        nwp_ukv_data.to_zarr(temp_nwp_path)
+
+        temp_nwp_path = "temp_nwp_ecmwf.zarr"
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        nwp_ecmwf_data.to_zarr(temp_nwp_path)
+        
+        # There is no satellite data available at the environ path
+        os.environ["SATELLITE_ZARR_PATH"] = "nonexistent_sat.zarr.zip"
+
+        os.environ["RUN_EXTRA_MODELS"] = "True"
+        os.environ["SAVE_GSP_SUM"] = "True"
+
+        # Run prediction
+        # Thes import needs to come after the environ vars have been set
+        from pvnet_app.app import app, models_dict
+
+        app(gsp_ids=list(range(1, 318)), num_workers=2)
+        
+    # Only the models which don't use satellite will be run in this case
+    # The models below are the only ones which should have been run
+    no_sat_models_dict = {k: v for k, v in models_dict.items() if not model_uses_satellite(v)}
+
+    # Check correct number of forecasts have been made
+    # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
+    # Forecast made with multiple models
+    expected_forecast_results = 0
+    for model_config in no_sat_models_dict.values():
+        expected_forecast_results += 318 + model_config["save_gsp_sum"]
+
+    forecasts = db_session.query(ForecastSQL).all()
+    # Doubled for historic and forecast
+    assert len(forecasts) == expected_forecast_results * 2
+
+    # Check probabilistic added
+    assert "90" in forecasts[0].forecast_values[0].properties
+    assert "10" in forecasts[0].forecast_values[0].properties
+
+    # 318 GSPs * 16 time steps in forecast
+    assert len(db_session.query(ForecastValueSQL).all()) == expected_forecast_results * 16
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_forecast_results * 16
+
+    expected_forecast_results = 0
+    for model_config in no_sat_models_dict.values():
+        # National
+        expected_forecast_results += 1
+        # GSP
+        expected_forecast_results += 317 * model_config["save_gsp_to_forecast_value_last_seven_days"]
+        expected_forecast_results += model_config["save_gsp_sum"]  # optional Sum of GSPs
+
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
