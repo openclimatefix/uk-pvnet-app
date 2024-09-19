@@ -57,6 +57,7 @@ def test_app(
         # Set environmental variables
         os.environ["RUN_EXTRA_MODELS"] = "True"
         os.environ["SAVE_GSP_SUM"] = "True"
+        os.environ["DAY_AHEAD_MODEL"] = "False"
 
         # Run prediction
         # These imports need to come after the environ vars have been set
@@ -111,7 +112,7 @@ def test_app_day_ahead_model(
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
-        temp_sat_path = f"temp_sat.zarr.zip"
+        temp_sat_path = "temp_sat.zarr.zip"
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
         with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
             sat_5_data.to_zarr(store)
@@ -178,6 +179,7 @@ def test_app_no_sat(
 
         os.environ["RUN_EXTRA_MODELS"] = "True"
         os.environ["SAVE_GSP_SUM"] = "True"
+        os.environ["DAY_AHEAD_MODEL"] = "False"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
