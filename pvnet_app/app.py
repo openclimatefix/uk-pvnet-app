@@ -19,7 +19,6 @@ from ocf_datapipes.batch import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 import sentry_sdk
 
-
 import pvnet_app
 from pvnet_app.config import get_union_of_configs, load_yaml_config, save_yaml_config
 from pvnet_app.data.nwp import download_all_nwp_data, preprocess_nwp_data
@@ -34,12 +33,13 @@ from pvnet_app.forecast_compiler import ForecastCompiler
 
 # sentry
 sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN", ""),
-    environment=f'{os.getenv("ENVIRONMENT", "local")}',
-    traces_sample_rate=1.0,
-    profiles_sample_rate=1.0,
+    dsn=os.getenv("SENTRY_DSN"),
+    environment=os.getenv("ENVIRONMENT", "local"),
+    traces_sample_rate=1
 )
+
 sentry_sdk.set_tag("app_name", "pvnet_app")
+sentry_sdk.set_tag("version", pvnet_app.__version__)
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
