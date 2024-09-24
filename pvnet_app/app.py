@@ -29,6 +29,7 @@ from pvnet_app.data.satellite import (
 )
 from pvnet_app.dataloader import get_legacy_dataloader, get_dataloader
 from pvnet_app.forecast_compiler import ForecastCompiler
+from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
 # sentry
@@ -52,122 +53,6 @@ all_gsp_ids = list(range(1, 318))
 
 # Batch size used to make forecasts for all GSPs
 batch_size = 10
-
-# Dictionary of all models to run
-# - The dictionary key will be used as the model name when saving to the database
-# - The key "pvnet_v2" must be included
-# - Batches are prepared only once, so the extra models must be able to run on the batches created
-#   to run the pvnet_v2 model
-models_dict = {
-    
-    "pvnet_v2": {
-        # Huggingfacehub model repo and commit for PVNet (GSP-level model)
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": os.getenv('PVNET_V2_VERSION', "ae0b8006841ac6227db873a1fc7f7331dc7dadb5"),
-            # We should only set PVNET_V2_VERSION in a short term solution,
-            # as its difficult to track which model is being used
-        },
-        # Huggingfacehub model repo and commit for PVNet summation (GSP sum to national model)
-        # If summation_model_name is set to None, a simple sum is computed instead
-        "summation": {
-            "name": "openclimatefix/pvnet_v2_summation",
-            "version": os.getenv(
-                'PVNET_V2_SUMMATION_VERSION',
-                "ffac655f9650b81865d96023baa15839f3ce26ec"
-            ),
-        },
-        # Whether to use the adjuster for this model - for pvnet_v2 is set by environmental variable
-        "use_adjuster": os.getenv("USE_ADJUSTER", "true").lower() == "true",
-        # Whether to save the GSP sum for this model - for pvnet_v2 is set by environmental variable
-        "save_gsp_sum": os.getenv("SAVE_GSP_SUM", "false").lower() == "true",
-        # Whether to log information through prediction steps for this model
-        "verbose": True,
-        "save_gsp_to_forecast_value_last_seven_days": True,
-    },
-    
-    # Extra models which will be run on dev only
-    "pvnet_v2-sat0-samples-v1": {
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": "8a7cc21b64d25ce1add7a8547674be3143b2e650",
-        },
-        "summation": {
-            "name": "openclimatefix/pvnet_v2_summation",
-            "version": "dcfdc17fda8e48c387122614bec8b284eaa868b9",
-        },
-        "use_adjuster": False,
-        "save_gsp_sum": False,
-        "verbose": False,
-        "save_gsp_to_forecast_value_last_seven_days": False,
-    },
-    
-    # single source models
-    "pvnet_v2-sat0-only-samples-v1": {
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": "d7ab648942c85b6788adcdbed44c91c4e1c5604a",
-        },
-        "summation": {
-            "name": "openclimatefix/pvnet_v2_summation",
-            "version": "adbf9e7797fee9a5050beb8c13841696e72f99ef",
-        },
-        "use_adjuster": False,
-        "save_gsp_sum": False,
-        "verbose": False,
-        "save_gsp_to_forecast_value_last_seven_days": False,
-    },
-    
-    "pvnet_v2-ukv-only-samples-v1": {
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": "eb73bf9a176a108f2e33b809f1f6993f893a4df9",
-        },
-        "summation": {
-            "name": "openclimatefix/pvnet_v2_summation",
-            "version": "9002baf1e9dc1ec141f3c4a1fa8447b6316a4558",
-        },
-        "use_adjuster": False,
-        "save_gsp_sum": False,
-        "verbose": False,
-        "save_gsp_to_forecast_value_last_seven_days": False,
-    },
-    
-    "pvnet_v2-ecmwf-only-samples-v1": {
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region",
-            "version": "0bc344fafb2232fb0b6bb0bf419f0449fe11c643",
-        },
-        "summation": {
-            "name": "openclimatefix/pvnet_v2_summation",
-            "version": "4fe6b1441b6dd549292c201ed85eee156ecc220c",
-        },
-        "use_adjuster": False,
-        "save_gsp_sum": False,
-        "verbose": False,
-        "save_gsp_to_forecast_value_last_seven_days": False,
-    },
-}
-
-# The day ahead model has not yet been re-trained with data-sampler. 
-# It will be run with the legacy dataloader using ocf_datapipes
-day_ahead_model_dict = {
-    "pvnet_day_ahead": {
-        # Huggingfacehub model repo and commit for PVNet day ahead models
-        "pvnet": {
-            "name": "openclimatefix/pvnet_uk_region_day_ahead",
-            "version": "d87565731692a6003e43caac4feaed0f69e79272",
-        },
-        "summation": {
-            "name": "openclimatefix/pvnet_summation_uk_national_day_ahead",
-            "version": "ed60c5d32a020242ca4739dcc6dbc8864f783a08",
-        },
-        "use_adjuster": True,
-        "save_gsp_sum": True,
-        "verbose": True,
-        "save_gsp_to_forecast_value_last_seven_days": True,
-    },
-}
 
 # ---------------------------------------------------------------------------
 # LOGGER
@@ -245,20 +130,21 @@ def app(
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using day ahead model: {use_day_ahead_model}")
 
+    # load models
+    model_configs = get_all_models()
+
     # Filter the models to be run
     if use_day_ahead_model:
-        model_to_run_dict = day_ahead_model_dict
-        main_model_key = "pvnet_day_ahead"
+        model_configs = [model for model in model_configs.models if model.day_ahead]
     else:
 
-        if os.getenv("RUN_EXTRA_MODELS", "false").lower() == "false":
-            model_to_run_dict = {"pvnet_v2": models_dict["pvnet_v2"]}
-        else:
-            model_to_run_dict = models_dict
-        main_model_key = "pvnet_v2"
+        model_configs = [model for model in model_configs.models if not model.day_ahead]
 
-    logger.info(f"Using adjduster: {model_to_run_dict[main_model_key]['use_adjuster']}")
-    logger.info(f"Saving GSP sum: {model_to_run_dict[main_model_key]['save_gsp_sum']}")
+        if os.getenv("RUN_EXTRA_MODELS", "false").lower() == "false":
+            model_configs = [model for model in model_configs if model.name == "pvnet_v2"]
+
+    logger.info(f"Using adjuster: {model_configs[0].use_adjuster}")
+    logger.info(f"Saving GSP sum: {model_configs[0].save_gsp_sum}")
 
     temp_dir = tempfile.TemporaryDirectory()
 
@@ -314,11 +200,11 @@ def app(
     # Prepare all the models which can be run
     forecast_compilers = {}
     data_config_paths = []
-    for model_key, model_config in model_to_run_dict.items():
+    for model_config in model_configs:
         # First load the data config
         data_config_path = PVNetBaseModel.get_data_config(
-            model_config["pvnet"]["name"],
-            revision=model_config["pvnet"]["version"],
+            model_config.pvnet.repo,
+            revision=model_config.pvnet.version,
         )
 
         # Check if the data available will allow the model to run
@@ -326,27 +212,27 @@ def app(
 
         if model_can_run:
             # Set up a forecast compiler for the model
-            forecast_compilers[model_key] = ForecastCompiler(
-                model_tag=model_key,
-                model_name=model_config["pvnet"]["name"],
-                model_version=model_config["pvnet"]["version"],
-                summation_name=model_config["summation"]["name"],
-                summation_version=model_config["summation"]["version"],
+            forecast_compilers[model_config.name] = ForecastCompiler(
+                model_tag=model_config.name,
+                model_name=model_config.pvnet.repo,
+                model_version=model_config.pvnet.version,
+                summation_name=model_config.summation.repo,
+                summation_version=model_config.summation.version,
                 device=device,
                 t0=t0,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
-                apply_adjuster=model_config["use_adjuster"],
-                save_gsp_sum=model_config["save_gsp_sum"],
-                save_gsp_to_recent=model_config["save_gsp_to_forecast_value_last_seven_days"],
-                verbose=model_config["verbose"],
+                apply_adjuster=model_config.use_adjuster,
+                save_gsp_sum=model_config.save_gsp_sum,
+                save_gsp_to_recent=model_config.save_gsp_to_forecast_value_last_seven_days,
+                verbose=model_config.verbose,
                 use_legacy=use_day_ahead_model,
             )
 
             # Store the config filename so we can create batches suitable for all models
             data_config_paths.append(data_config_path)
         else:
-            warnings.warn(f"The model {model_key} cannot be run with input data available")
+            warnings.warn(f"The model {model_config.name} cannot be run with input data available")
 
     if len(forecast_compilers) == 0:
         raise Exception(f"No models were compatible with the available input data.")
