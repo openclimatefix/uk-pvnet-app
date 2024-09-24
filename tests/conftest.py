@@ -229,4 +229,7 @@ def gsp_yields_and_systems(db_session, test_t0):
 def me_latest(db_session):
     metric_values = make_fake_me_latest(session=db_session, model_name="pvnet_v2")
     db_session.add_all(metric_values)
+
+    metric_values = make_fake_me_latest(session=db_session, model_name="pvnet_day_ahead")
+    db_session.add_all(metric_values)
     db_session.commit()
