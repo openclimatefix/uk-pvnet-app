@@ -124,24 +124,20 @@ def app(
         dask.config.set(scheduler="single-threaded")
 
     use_day_ahead_model = os.getenv("DAY_AHEAD_MODEL", "false").lower() == "true"
+    use_ecmwf_only = os.getenv("USE_ECMWF_ONLY", "false").lower() == "true"
+    run_extra_models = os.getenv("RUN_EXTRA_MODELS", "false").lower() == "true"
     
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
     logger.info(f"Using `pvnet_app` library version: {pvnet_app.__version__}")
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using day ahead model: {use_day_ahead_model}")
+    logger.info(f"Using ecwmwf only: {use_ecmwf_only}")
+    logger.info(f"Running extra models: {run_extra_models}")
 
     # load models
-    model_configs = get_all_models()
-
-    # Filter the models to be run
-    if use_day_ahead_model:
-        model_configs = [model for model in model_configs.models if model.day_ahead]
-    else:
-
-        model_configs = [model for model in model_configs.models if not model.day_ahead]
-
-        if os.getenv("RUN_EXTRA_MODELS", "false").lower() == "false":
-            model_configs = [model for model in model_configs if model.name == "pvnet_v2"]
+    model_configs = get_all_models(get_ecmwf_only=use_ecmwf_only,
+                                   get_day_ahead_only=use_day_ahead_model,
+                                   run_extra_models=run_extra_models)
 
     logger.info(f"Using adjuster: {model_configs[0].use_adjuster}")
     logger.info(f"Saving GSP sum: {model_configs[0].save_gsp_sum}")

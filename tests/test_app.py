@@ -14,17 +14,7 @@ from pvnet_app.data.satellite import sat_5_path, sat_15_path
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from ocf_datapipes.config.load import load_yaml_configuration
 
-
-def model_uses_satellite(model_config):
-    """Function to check model if model entry in model dictionary uses satellite data"""
-    
-    data_config_path = PVNetBaseModel.get_data_config(
-        model_config["pvnet"]["name"],
-        revision=model_config["pvnet"]["version"],
-    )
-    data_config = load_yaml_configuration(data_config_path)
-
-    return hasattr(data_config.input_data, "satellite") and data_config.input_data.satellite
+from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
 
@@ -61,15 +51,17 @@ def test_app(
 
         # Run prediction
         # These imports need to come after the environ vars have been set
-        from pvnet_app.app import app, models_dict
+        from pvnet_app.app import app
 
         app(gsp_ids=list(range(1, 318)), num_workers=2)
+
+    all_models = get_all_models(run_extra_models=True)
 
     # Check correct number of forecasts have been made
     # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
     # Forecast made with multiple models
     expected_forecast_results = 0
-    for model_config in models_dict.values():
+    for model_config in all_models:
         expected_forecast_results += 318 + model_config["save_gsp_sum"]
 
     forecasts = db_session.query(ForecastSQL).all()
@@ -85,12 +77,12 @@ def test_app(
     assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_forecast_results * 16
 
     expected_forecast_results = 0
-    for model_config in models_dict.values():
+    for model_config in all_models:
         # National
         expected_forecast_results += 1
         # GSP
-        expected_forecast_results += 317 * model_config["save_gsp_to_forecast_value_last_seven_days"]
-        expected_forecast_results += model_config["save_gsp_sum"]  # optional Sum of GSPs
+        expected_forecast_results += 317 * model_config.save_gsp_to_recent
+        expected_forecast_results += model_config.save_gsp_sum  # optional Sum of GSPs
 
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
@@ -122,16 +114,18 @@ def test_app_day_ahead_model(
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
-        from pvnet_app.app import app, day_ahead_model_dict
+        from pvnet_app.app import app
 
         app(gsp_ids=list(range(1, 318)), num_workers=2)
+
+    all_models = get_all_models(get_day_ahead_only=True)
 
     # Check correct number of forecasts have been made
     # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
     # Forecast made with multiple models
     expected_forecast_results = 0
-    for model_config in day_ahead_model_dict.values():
-        expected_forecast_results += 318 + model_config["save_gsp_sum"]
+    for model_config in all_models:
+        expected_forecast_results += 318 + model_config.save_gsp_sum
 
     forecasts = db_session.query(ForecastSQL).all()
     # Doubled for historic and forecast
@@ -183,20 +177,21 @@ def test_app_no_sat(
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
-        from pvnet_app.app import app, models_dict
+        from pvnet_app.app import app
 
         app(gsp_ids=list(range(1, 318)), num_workers=2)
         
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run
-    no_sat_models_dict = {k: v for k, v in models_dict.items() if not model_uses_satellite(v)}
+    all_models = get_all_models(get_day_ahead_only=True)
+    all_models = [model for model in all_models if not model.uses_satellite_data]
 
     # Check correct number of forecasts have been made
     # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
     # Forecast made with multiple models
     expected_forecast_results = 0
-    for model_config in no_sat_models_dict.values():
-        expected_forecast_results += 318 + model_config["save_gsp_sum"]
+    for model_config in all_models:
+        expected_forecast_results += 318 + model_config.save_gsp_sum
 
     forecasts = db_session.query(ForecastSQL).all()
     # Doubled for historic and forecast
@@ -211,11 +206,11 @@ def test_app_no_sat(
     assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_forecast_results * 16
 
     expected_forecast_results = 0
-    for model_config in no_sat_models_dict.values():
+    for model_config in all_models:
         # National
         expected_forecast_results += 1
         # GSP
-        expected_forecast_results += 317 * model_config["save_gsp_to_forecast_value_last_seven_days"]
-        expected_forecast_results += model_config["save_gsp_sum"]  # optional Sum of GSPs
+        expected_forecast_results += 317 * model_config.save_gsp_to_recent
+        expected_forecast_results += model_config.save_gsp_sum  # optional Sum of GSPs
 
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16

@@ -45,6 +45,10 @@ class Model(BaseModel):
         False, title="ECMWF ONly", description="If this model is only using ecmwf data"
     )
 
+    uses_satellite_data:    Optional[bool] = Field(
+        True, title="Uses Satellite Data", description="If this model uses satellite data"
+    )
+
 
 class Models(BaseModel):
     """A group of ml models"""
@@ -60,19 +64,26 @@ class Models(BaseModel):
         names = [model.name for model in v]
         unique_names = set(names)
 
-        if len(names) == len(unique_names):
+        if len(names) != len(unique_names):
             raise Exception(f"Model names must be unique, names are {names}")
         return v
 
 
-def get_all_models() -> List[Model]:
+def get_all_models(
+    get_ecmwf_only: Optional[bool] = False,
+    get_day_ahead_only: Optional[bool] = False,
+    run_extra_models: Optional[bool] = False,
+) -> List[Model]:
     """
     Returns all the models for a given client
+
+    Args:
+        get_ecmwf_only: If only the ECMWF model should be returned
+        get_day_ahead_only: If only the day ahead model should be returned
+        run_extra_models: If extra models should be run
     """
 
     # load models from yaml file
-    import os
-
     filename = os.path.dirname(os.path.abspath(__file__)) + "/all_models.yaml"
 
     with fsspec.open(filename, mode="r") as stream:
@@ -81,12 +92,19 @@ def get_all_models() -> List[Model]:
 
     models = config_pvnet_v2_model(models)
 
-    # only use ECMWF model
-    if os.getenv("USE_ECMWF_ONLY", "true").lower() == "true":
+    if get_ecmwf_only:
         log.info("Using ECMWF model only")
         models.models = [model for model in models.models if model.ecmwf_only]
 
-    return models
+    elif get_day_ahead_only:
+        log.info("Using Day Ahead model only")
+        models.models = [model for model in models.models if model.day_ahead]
+
+    elif not run_extra_models:
+        log.info("Not running extra models")
+        models.models = [model for model in models.models if model.name == "pvnet_v2"]
+
+    return models.models
 
 
 def config_pvnet_v2_model(models):

@@ -11,8 +11,8 @@ models:
     summation:
         repo: openclimatefix/pvnet_v2_summation
         version: ffac655f9650b81865d96023baa15839f3ce26ec
-    use_adjuster: USE_ADJUSTER # default True
-    save_gsp_sum: SAVE_GSP_SUM # default False
+    use_adjuster: True
+    save_gsp_sum: False
     verbose: True
     save_gsp_to_forecast_value_last_seven_days: true
   - name: pvnet_v2-sat0-samples-v1
@@ -30,6 +30,7 @@ models:
     summation:
         repo: openclimatefix/pvnet_v2_summation
         version: 9002baf1e9dc1ec141f3c4a1fa8447b6316a4558
+    uses_satellite_data: False
   - name: pvnet_v2-ecmwf-only-samples-v1
     pvnet:
         repo: openclimatefix/pvnet_uk_region
@@ -38,6 +39,7 @@ models:
         repo: openclimatefix/pvnet_v2_summation
         version: 4fe6b1441b6dd549292c201ed85eee156ecc220c
     ecmwf_only: True
+    uses_satellite_data: False
 # The day ahead model has not yet been re-trained with data-sampler.
 # It will be run with the legacy dataloader using ocf_datapipes
   - name: pvnet_day_ahead
