@@ -183,7 +183,7 @@ def test_app_no_sat(
         
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run
-    all_models = get_all_models()
+    all_models = get_all_models(run_extra_models=True)
     all_models = [model for model in all_models if not model.uses_satellite_data]
 
     # Check correct number of forecasts have been made
