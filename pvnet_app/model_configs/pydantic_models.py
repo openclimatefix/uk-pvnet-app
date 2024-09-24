@@ -4,7 +4,7 @@ from typing import List, Optional
 
 import fsspec
 from pyaml_env import parse_config
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ModelHF(BaseModel):
@@ -32,7 +32,7 @@ class Model(BaseModel):
     verbose: bool = Field(
         False, title="Verbose", description="Whether to print verbose output"
     )
-    save_gsp_to_forecast_value_last_seven_days: bool = Field(
+    save_gsp_to_recent: bool = Field(
         False, title="Save GSP to Forecast Value Last Seven Days",
         description="Whether to save the GSP to Forecast Value Last Seven Days"
     )
@@ -47,8 +47,19 @@ class Models(BaseModel):
         ..., title="Models", description="A list of models to use for the forecast"
     )
 
+    @field_validator('models')
+    @classmethod
+    def name_must_be_unique(cls, v: List[Model]) -> List[Model]:
+        """ Ensure that all model names are unique """
+        names = [model.name for model in v]
+        unique_names = set(names)
 
-def get_all_models(client_abbreviation: Optional[str] = None):
+        if len(names) == len(unique_names):
+            raise Exception(f"Model names must be unique, names are {names}")
+        return v
+
+
+def get_all_models():
     """
     Returns all the models for a given client
     """
@@ -61,8 +72,5 @@ def get_all_models(client_abbreviation: Optional[str] = None):
     with fsspec.open(filename, mode="r") as stream:
         models = parse_config(data=stream)
         models = Models(**models)
-
-    if client_abbreviation:
-        models.models = [model for model in models.models if model.client == client_abbreviation]
 
     return models

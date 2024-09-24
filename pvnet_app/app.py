@@ -224,7 +224,7 @@ def app(
                 national_capacity=national_capacity,
                 apply_adjuster=model_config.use_adjuster,
                 save_gsp_sum=model_config.save_gsp_sum,
-                save_gsp_to_recent=model_config.save_gsp_to_forecast_value_last_seven_days,
+                save_gsp_to_recent=model_config.save_gsp_to_recent,
                 verbose=model_config.verbose,
                 use_legacy=use_day_ahead_model,
             )
