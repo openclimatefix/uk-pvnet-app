@@ -96,11 +96,14 @@ def get_all_models(
         log.info("Using ECMWF model only")
         models.models = [model for model in models.models if model.ecmwf_only]
 
-    elif get_day_ahead_only:
+    if get_day_ahead_only:
         log.info("Using Day Ahead model only")
         models.models = [model for model in models.models if model.day_ahead]
+    else:
+        log.info("Not using Day Ahead model")
+        models.models = [model for model in models.models if not model.day_ahead]
 
-    elif not run_extra_models:
+    if not run_extra_models and not get_day_ahead_only and not get_ecmwf_only:
         log.info("Not running extra models")
         models.models = [model for model in models.models if model.name == "pvnet_v2"]
 

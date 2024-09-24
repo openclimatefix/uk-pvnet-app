@@ -26,5 +26,5 @@ def test_get_all_models_get_day_ahead_only():
 def test_get_all_models_run_extra_models():
     """Test for getting all models with ecmwf_only"""
     models = get_all_models(run_extra_models=True)
-    assert len(models) == 6
+    assert len(models) == 5
 
