@@ -37,6 +37,7 @@ models:
     summation:
         repo: openclimatefix/pvnet_v2_summation
         version: 4fe6b1441b6dd549292c201ed85eee156ecc220c
+    ecmwf_only: True
 # The day ahead model has not yet been re-trained with data-sampler.
 # It will be run with the legacy dataloader using ocf_datapipes
   - name: pvnet_day_ahead

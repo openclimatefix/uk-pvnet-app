@@ -1,10 +1,14 @@
 """ A pydantic model for the ML models"""
+import os
+import logging
 
 from typing import List, Optional
 
 import fsspec
 from pyaml_env import parse_config
 from pydantic import BaseModel, Field, field_validator
+
+log = logging.getLogger(__name__)
 
 
 class ModelHF(BaseModel):
@@ -16,41 +20,43 @@ class Model(BaseModel):
     """One ML Model"""
 
     name: str = Field(..., title="Model Name", description="The name of the model")
-    pvnet: ModelHF = Field(
-        ..., title="PVNet", description="The PVNet model"
-    )
-    summation: ModelHF = Field(
-        ..., title="Summation", description="The Summation model"
-    )
+    pvnet: ModelHF = Field(..., title="PVNet", description="The PVNet model")
+    summation: ModelHF = Field(..., title="Summation", description="The Summation model")
 
-    use_adjuster: bool = Field(
+    use_adjuster: Optional[bool] = Field(
         False, title="Use Adjuster", description="Whether to use the adjuster model"
     )
-    save_gsp_sum: bool = Field(
+    save_gsp_sum: Optional[bool] = Field(
         False, title="Save GSP Sum", description="Whether to save the GSP sum"
     )
-    verbose: bool = Field(
+    verbose: Optional[bool] = Field(
         False, title="Verbose", description="Whether to print verbose output"
     )
-    save_gsp_to_recent: bool = Field(
-        False, title="Save GSP to Forecast Value Last Seven Days",
-        description="Whether to save the GSP to Forecast Value Last Seven Days"
+    save_gsp_to_recent: Optional[bool] = Field(
+        False,
+        title="Save GSP to Forecast Value Last Seven Days",
+        description="Whether to save the GSP to Forecast Value Last Seven Days",
     )
-    day_ahead: bool = Field(
+    day_ahead: Optional[bool] = Field(
         False, title="Day Ahead", description="If this model is day ahead or not"
+    )
+
+    ecmwf_only: Optional[bool] = Field(
+        False, title="ECMWF ONly", description="If this model is only using ecmwf data"
     )
 
 
 class Models(BaseModel):
-    """ A group of ml models """
+    """A group of ml models"""
+
     models: List[Model] = Field(
         ..., title="Models", description="A list of models to use for the forecast"
     )
 
-    @field_validator('models')
+    @field_validator("models")
     @classmethod
     def name_must_be_unique(cls, v: List[Model]) -> List[Model]:
-        """ Ensure that all model names are unique """
+        """Ensure that all model names are unique"""
         names = [model.name for model in v]
         unique_names = set(names)
 
@@ -59,7 +65,7 @@ class Models(BaseModel):
         return v
 
 
-def get_all_models():
+def get_all_models() -> List[Model]:
     """
     Returns all the models for a given client
     """
@@ -72,5 +78,25 @@ def get_all_models():
     with fsspec.open(filename, mode="r") as stream:
         models = parse_config(data=stream)
         models = Models(**models)
+
+    models = config_pvnet_v2_model(models)
+
+    # only use ECMWF model
+    if os.getenv("USE_ECMWF_ONLY", "true").lower() == "true":
+        log.info("Using ECMWF model only")
+        models.models = [model for model in models.models if model.ecmwf_only]
+
+    return models
+
+
+def config_pvnet_v2_model(models):
+    """Function to adjust pvnet model"""
+    # special case for environment variables
+    use_adjuster = os.getenv("USE_ADJUSTER", "true").lower() == "true"
+    save_gsp_sum = os.getenv("SAVE_GSP_SUM", "false").lower() == "true"
+    # find index where name=pvnet_v2
+    pvnet_v2_index = 0
+    models.models[pvnet_v2_index].use_adjuster = use_adjuster
+    models.models[pvnet_v2_index].save_gsp_sum = save_gsp_sum
 
     return models
