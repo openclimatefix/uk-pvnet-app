@@ -14,7 +14,7 @@ models:
     use_adjuster: True
     save_gsp_sum: False
     verbose: True
-    save_gsp_to_forecast_value_last_seven_days: true
+    save_gsp_to_recent: true
   - name: pvnet_v2-sat0-samples-v1
     pvnet:
         repo: openclimatefix/pvnet_uk_region
@@ -61,6 +61,6 @@ models:
     use_adjuster: True
     save_gsp_sum: True
     verbose: True
-    save_gsp_to_forecast_value_last_seven_days: True
+    save_gsp_to_recent: True
     day_ahead: True
 
