@@ -106,6 +106,7 @@ def app(
         - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
         - SENTRY_DSN, optional link to sentry
         - ENVIRONMENT, the environment this is running in, defaults to local
+        - USE_ECMWF_ONLY, option to use ecmwf only model, defaults to false
 
     Args:
         t0 (datetime): Datetime at which forecast is made

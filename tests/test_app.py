@@ -62,7 +62,7 @@ def test_app(
     # Forecast made with multiple models
     expected_forecast_results = 0
     for model_config in all_models:
-        expected_forecast_results += 318 + model_config["save_gsp_sum"]
+        expected_forecast_results += 318 + model_config.save_gsp_sum
 
     forecasts = db_session.query(ForecastSQL).all()
     # Doubled for historic and forecast
@@ -183,7 +183,7 @@ def test_app_no_sat(
         
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run
-    all_models = get_all_models(get_day_ahead_only=True)
+    all_models = get_all_models()
     all_models = [model for model in all_models if not model.uses_satellite_data]
 
     # Check correct number of forecasts have been made
