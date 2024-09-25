@@ -1,8 +1,6 @@
 # Here we define all the models that are available in the app
-# - The dictionary key will be used as the model name when saving to the database
-# - The key "pvnet_v2" must be included
-# - Batches are prepared only once, so the extra models must be able to run on the batches created
-#   to run the pvnet_v2 model
+# Batches are prepared only once, so the extra models must be able to run on the batches created
+# to run the pvnet_v2 model
 models:
   - name: pvnet_v2
     pvnet:
