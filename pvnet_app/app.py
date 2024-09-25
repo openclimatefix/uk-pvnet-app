@@ -210,19 +210,11 @@ def app(
         if model_can_run:
             # Set up a forecast compiler for the model
             forecast_compilers[model_config.name] = ForecastCompiler(
-                model_tag=model_config.name,
-                model_name=model_config.pvnet.repo,
-                model_version=model_config.pvnet.version,
-                summation_name=model_config.summation.repo,
-                summation_version=model_config.summation.version,
+                model_config=model_config,
                 device=device,
                 t0=t0,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
-                apply_adjuster=model_config.use_adjuster,
-                save_gsp_sum=model_config.save_gsp_sum,
-                save_gsp_to_recent=model_config.save_gsp_to_recent,
-                verbose=model_config.verbose,
                 use_legacy=use_day_ahead_model,
             )
 
