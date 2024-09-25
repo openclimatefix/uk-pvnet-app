@@ -1,0 +1,64 @@
+# Here we define all the models that are available in the app
+# Batches are prepared only once, so the extra models must be able to run on the batches created
+# to run the pvnet_v2 model
+models:
+  - name: pvnet_v2
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        version: ae0b8006841ac6227db873a1fc7f7331dc7dadb5
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        version: ffac655f9650b81865d96023baa15839f3ce26ec
+    use_adjuster: True
+    save_gsp_sum: False
+    verbose: True
+    save_gsp_to_recent: true
+  - name: pvnet_v2-sat0-samples-v1
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        version: 8a7cc21b64d25ce1add7a8547674be3143b2e650
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        version: dcfdc17fda8e48c387122614bec8b284eaa868b9
+    # single source models
+  - name: pvnet_v2-sat0-only-samples-v1"
+    pvnet:
+      repo: openclimatefix/pvnet_uk_region
+      version: d7ab648942c85b6788adcdbed44c91c4e1c5604a
+    summation:
+      repo: openclimatefix/pvnet_v2_summation
+      version: adbf9e7797fee9a5050beb8c13841696e72f99ef
+
+  - name: pvnet_v2-ukv-only-samples-v1
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        version: eb73bf9a176a108f2e33b809f1f6993f893a4df9
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        version: 9002baf1e9dc1ec141f3c4a1fa8447b6316a4558
+    uses_satellite_data: False
+
+  - name: pvnet_v2-ecmwf-only-samples-v1
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        version: 0bc344fafb2232fb0b6bb0bf419f0449fe11c643
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        version: 4fe6b1441b6dd549292c201ed85eee156ecc220c
+    ecmwf_only: True
+    uses_satellite_data: False
+# The day ahead model has not yet been re-trained with data-sampler.
+# It will be run with the legacy dataloader using ocf_datapipes
+  - name: pvnet_day_ahead
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region_day_ahead
+        version: d87565731692a6003e43caac4feaed0f69e79272
+    summation:
+        repo: openclimatefix/pvnet_summation_uk_national_day_ahead
+        version: ed60c5d32a020242ca4739dcc6dbc8864f783a08
+    use_adjuster: True
+    save_gsp_sum: True
+    verbose: True
+    save_gsp_to_recent: True
+    day_ahead: True
+
