@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 import xesmf as xe
 import logging
+from typing import Optional
 import os
 import fsspec
 
@@ -20,10 +21,16 @@ def _download_nwp_data(source, destination):
     fs.get(source, destination, recursive=True)
 
 
-def download_all_nwp_data():
+def download_all_nwp_data(download_ukv: Optional[bool] = True, download_ecmwf: Optional[bool] = True):
     """Download the NWP data"""
-    _download_nwp_data(os.environ["NWP_UKV_ZARR_PATH"], nwp_ukv_path)
-    _download_nwp_data(os.environ["NWP_ECMWF_ZARR_PATH"], nwp_ecmwf_path)
+    if download_ukv:
+        _download_nwp_data(os.environ["NWP_UKV_ZARR_PATH"], nwp_ukv_path)
+    else:
+        logger.info(f"Skipping download of UKV data")
+    if download_ecmwf:
+        _download_nwp_data(os.environ["NWP_ECMWF_ZARR_PATH"], nwp_ecmwf_path)
+    else:
+        logger.info(f"Skipping download of ECMWF data")
 
 
 def regrid_nwp_data(nwp_zarr, target_coords_path, method):
@@ -129,24 +136,31 @@ def fix_ukv_data():
     ds.to_zarr(nwp_ukv_path)
 
 
-def preprocess_nwp_data():
+def preprocess_nwp_data(use_ukv: Optional[bool] = True, use_ecmwf: Optional[bool] = True):
 
-    # Regrid the UKV data
-    regrid_nwp_data(
-        nwp_zarr=nwp_ukv_path,
-        target_coords_path=f"{this_dir}/../../data/nwp_ukv_target_coords.nc",
-        method="bilinear",
-    )
+    if use_ukv:
+        # Regrid the UKV data
+        regrid_nwp_data(
+            nwp_zarr=nwp_ukv_path,
+            target_coords_path=f"{this_dir}/../../data/nwp_ukv_target_coords.nc",
+            method="bilinear",
+        )
 
-    # Regrid the ECMWF data
-    regrid_nwp_data(
-        nwp_zarr=nwp_ecmwf_path,
-        target_coords_path=f"{this_dir}/../../data/nwp_ecmwf_target_coords.nc",
-        method="conservative",  # this is needed to avoid zeros around edges of ECMWF data
-    )
+        # UKV data must be float16 to allow overflow to inf like in training
+        fix_ukv_data()
+    else:
+        logger.info(f"Skipping UKV data preprocessing")
 
-    # UKV data must be float16 to allow overflow to inf like in training
-    fix_ukv_data()
+    if use_ecmwf:
+        # Regrid the ECMWF data
+        regrid_nwp_data(
+            nwp_zarr=nwp_ecmwf_path,
+            target_coords_path=f"{this_dir}/../../data/nwp_ecmwf_target_coords.nc",
+            method="conservative",  # this is needed to avoid zeros around edges of ECMWF data
+        )
 
-    # Names need to be aligned between training and prod, and we need to infill the shetlands
-    fix_ecmwf_data()
+        # Names need to be aligned between training and prod, and we need to infill the shetlands
+        fix_ecmwf_data()
+    else:
+        logger.info(f"Skipping ECMWF data preprocessing")
+
