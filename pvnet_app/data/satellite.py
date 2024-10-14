@@ -28,6 +28,10 @@ def download_all_sat_data() -> bool:
 
     # Set variable to track whether the satellite download is successful
     sat_available = False
+    if "SATELLITE_ZARR_PATH" not in os.environ:
+        logger.info("SATELLITE_ZARR_PATH has not be set. "
+                    "No satellite data will be downloaded.")
+        return False
 
     # download 5 minute satellite data
     sat_5_dl_path = os.environ["SATELLITE_ZARR_PATH"]
