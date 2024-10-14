@@ -223,10 +223,16 @@ def extend_satellite_data_with_nans(t0: pd.Timestamp) -> None:
 
     # Find how delayed the satellite data is
     ds_sat = xr.open_zarr(sat_path)
-    delay = t0 - pd.to_datetime(ds_sat.time).max()
+    sat_max_time = pd.to_datetime(ds_sat.time).max()
+    delay = t0 - sat_max_time
 
     if delay > pd.Timedelta(0):
         logger.info(f"Filling most recent {delay} with NaNs")
+
+        if delay > pd.Timedelta("3h"):
+            logger.warning("The satellite data is delayed by more than 3 hours. "
+                           "Will only infill last 3 hours.")
+            delay = pd.Timedelta("3h")
 
         # Load into memory so we can delete it on disk
         ds_sat = ds_sat.compute()
