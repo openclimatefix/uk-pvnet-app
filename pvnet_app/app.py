@@ -186,10 +186,10 @@ def app(
 
     # Download NWP data
     logger.info("Downloading NWP data")
-    download_all_nwp_data(download_ukv=~use_ecmwf_only)
+    download_all_nwp_data(download_ukv=not use_ecmwf_only)
 
     # Preprocess the NWP data
-    preprocess_nwp_data(use_ukv=~use_ecmwf_only)
+    preprocess_nwp_data(use_ukv=not use_ecmwf_only)
 
     # ---------------------------------------------------------------------------
     # 2. Set up models
