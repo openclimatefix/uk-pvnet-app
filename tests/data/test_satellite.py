@@ -26,6 +26,7 @@ from pvnet_app.data.satellite import (
     sat_path,
     sat_5_path,
     sat_15_path,
+    extend_satellite_data_with_nans
 )
 
 
@@ -183,7 +184,6 @@ def test_preprocess_old_sat_5_data(sat_5_data_delayed, sat_15_data, test_t0):
         check_timesteps(sat_path, expected_freq_mins=5)
 
 
-
 def test_check_model_satellite_inputs_available(config_filename):
 
     t0 = datetime(2023,1,1)
@@ -194,3 +194,46 @@ def test_check_model_satellite_inputs_available(config_filename):
     assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_1)
     assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_2)
     assert not check_model_satellite_inputs_available(config_filename, t0, sat_datetime_3)
+
+
+def test_extend_satellite_data_with_nans(sat_5_data, test_t0):
+
+    # make temporary directory
+    with tempfile.TemporaryDirectory() as tmpdirname:
+
+        # Change to temporary working directory
+        os.chdir(tmpdirname)
+
+        # save sat to zarr
+        filename = "sat_5_data.zarr"
+        sat_5_data.to_zarr(filename)
+
+        time = sat_5_data.time.values
+        t0 = pd.to_datetime(sat_5_data.time).max()
+        extend_satellite_data_with_nans(t0=t0, satellite_data_path=filename)
+
+        # load new file
+        ds = xr.open_zarr(filename)
+        assert (ds.time.values == time).all()
+
+
+def test_extend_satellite_data_with_nans_over_3_hours(sat_5_data, test_t0):
+
+    # make temporary directory
+    with tempfile.TemporaryDirectory() as tmpdirname:
+
+        # Change to temporary working directory
+        os.chdir(tmpdirname)
+
+        # save sat to zarr
+        filename = "sat_5_data.zarr"
+        sat_5_data.to_zarr(filename)
+
+        time = sat_5_data.time.values
+        t0 = pd.to_datetime(sat_5_data.time).max() + pd.Timedelta(hours=4)
+        extend_satellite_data_with_nans(t0=t0, satellite_data_path=filename)
+
+        # load new file
+        ds = xr.open_zarr(filename)
+        assert len(time) + 3*12 == len(ds.time)
+        assert ds.time.values[-1] == t0

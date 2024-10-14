@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import logging
+from typing import Optional
 import os
 import fsspec
 import ocf_blosc2
@@ -214,7 +215,7 @@ def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
         ds_sat.to_zarr(sat_path)
 
     
-def extend_satellite_data_with_nans(t0: pd.Timestamp) -> None:
+def extend_satellite_data_with_nans(t0: pd.Timestamp, satellite_data_path: Optional[str] = sat_path) -> None:
     """Fill the satellite data with NaNs out to time t0
     
     Args:
@@ -222,7 +223,7 @@ def extend_satellite_data_with_nans(t0: pd.Timestamp) -> None:
     """
 
     # Find how delayed the satellite data is
-    ds_sat = xr.open_zarr(sat_path)
+    ds_sat = xr.open_zarr(satellite_data_path)
     sat_max_time = pd.to_datetime(ds_sat.time).max()
     delay = t0 - sat_max_time
 
@@ -244,8 +245,8 @@ def extend_satellite_data_with_nans(t0: pd.Timestamp) -> None:
         ds_sat = ds_sat.reindex(time=np.concatenate([ds_sat.time, fill_times]), fill_value=np.nan)
 
         # Re-save inplace
-        os.system(f"rm -rf {sat_path}")
-        ds_sat.to_zarr(sat_path)
+        os.system(f"rm -rf {satellite_data_path}")
+        ds_sat.to_zarr(satellite_data_path)
 
 
 def check_model_satellite_inputs_available(
