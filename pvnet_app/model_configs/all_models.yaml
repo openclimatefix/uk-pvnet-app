@@ -47,7 +47,19 @@ models:
         version: 4fe6b1441b6dd549292c201ed85eee156ecc220c
     ecmwf_only: True
     uses_satellite_data: False
-# This is the old model for pvnet_ecmwf
+# This is the old model for pvnet and pvnet_ecmwf
+  - name: pvnet_v2
+    pvnet:
+      repo: openclimatefix/pvnet_uk_region
+      version: 62e5e20ab793cee7cf94eadac870d2199501a730
+    summation:
+      repo: openclimatefix/pvnet_v2_summation
+      version: ffac655f9650b81865d96023baa15839f3ce26ec
+    use_adjuster: True
+    save_gsp_sum: False
+    verbose: True
+    save_gsp_to_recent: True
+    uses_ocf_data_sampler: False
   - name: pvnet_ecmwf # this name is important as it used for blending
     pvnet:
         repo: openclimatefix/pvnet_uk_region
