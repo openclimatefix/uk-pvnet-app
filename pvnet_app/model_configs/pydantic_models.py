@@ -49,6 +49,12 @@ class Model(BaseModel):
         True, title="Uses Satellite Data", description="If this model uses satellite data"
     )
 
+    uses_ocf_data_sampler: Optional[bool] = Field(
+        True, title="Uses OCF Data Sampler", description="If this model uses data sampler, old one uses ocf_datapipes"
+    )
+
+
+
 
 class Models(BaseModel):
     """A group of ml models"""
@@ -60,8 +66,8 @@ class Models(BaseModel):
     @field_validator("models")
     @classmethod
     def name_must_be_unique(cls, v: List[Model]) -> List[Model]:
-        """Ensure that all model names are unique"""
-        names = [model.name for model in v]
+        """Ensure that all model names are unique, respect to using ocf_data_sampler or not"""
+        names = [(model.name,model.uses_ocf_data_sampler) for model in v]
         unique_names = set(names)
 
         if len(names) != len(unique_names):
@@ -73,6 +79,7 @@ def get_all_models(
     get_ecmwf_only: Optional[bool] = False,
     get_day_ahead_only: Optional[bool] = False,
     run_extra_models: Optional[bool] = False,
+    use_ocf_data_sampler: Optional[bool] = True,
 ) -> List[Model]:
     """
     Returns all the models for a given client
@@ -81,6 +88,7 @@ def get_all_models(
         get_ecmwf_only: If only the ECMWF model should be returned
         get_day_ahead_only: If only the day ahead model should be returned
         run_extra_models: If extra models should be run
+        use_ocf_data_sampler: If the OCF Data Sampler should be used
     """
 
     # load models from yaml file
@@ -92,10 +100,12 @@ def get_all_models(
 
     models = config_pvnet_v2_model(models)
 
+    print(len(models.models))
     if get_ecmwf_only:
         log.info("Using ECMWF model only")
         models.models = [model for model in models.models if model.ecmwf_only]
 
+    print(len(models.models))
     if get_day_ahead_only:
         log.info("Using Day Ahead model only")
         models.models = [model for model in models.models if model.day_ahead]
@@ -103,9 +113,18 @@ def get_all_models(
         log.info("Not using Day Ahead model")
         models.models = [model for model in models.models if not model.day_ahead]
 
+    print(len(models.models))
     if not run_extra_models and not get_day_ahead_only and not get_ecmwf_only:
         log.info("Not running extra models")
         models.models = [model for model in models.models if model.name == "pvnet_v2"]
+
+    print(len(models.models))
+    if use_ocf_data_sampler:
+        log.info("Using OCF Data Sampler")
+        models.models = [model for model in models.models if model.uses_ocf_data_sampler]
+    else:
+        log.info("Not using OCF Data Sampler, using ocf_datapipes")
+        models.models = [model for model in models.models if not model.uses_ocf_data_sampler]
 
     return models.models
 
