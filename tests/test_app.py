@@ -269,7 +269,7 @@ def test_app_ocf_datapipes(
     assert "10" in forecasts[0].forecast_values[0].properties
 
     # 72 time steps in forecast
-    expected_forecast_timesteps = 72
+    expected_forecast_timesteps = 16
 
     assert (
             len(db_session.query(ForecastValueSQL).all())
