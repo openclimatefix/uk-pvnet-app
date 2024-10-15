@@ -185,7 +185,7 @@ def app(
     if not sat_available:
         sat_datetimes = pd.DatetimeIndex([])
     else:
-        sat_datetimes = preprocess_sat_data(t0, use_legacy=use_day_ahead_model)
+        sat_datetimes = preprocess_sat_data(t0, use_legacy=not use_ocf_data_sampler)
 
     # Download NWP data
     logger.info("Downloading NWP data")
