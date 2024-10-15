@@ -122,6 +122,8 @@ def get_all_models(
         log.info("Not using OCF Data Sampler, using ocf_datapipes")
         models.models = [model for model in models.models if not model.uses_ocf_data_sampler]
 
+    log.info(f"Got the following models: {[(model.name, model.uses_ocf_data_sampler) for model in models.models]}")
+
     return models.models
 
 
