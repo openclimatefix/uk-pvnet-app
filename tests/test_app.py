@@ -175,6 +175,7 @@ def test_app_no_sat(
         os.environ["RUN_EXTRA_MODELS"] = "True"
         os.environ["SAVE_GSP_SUM"] = "True"
         os.environ["DAY_AHEAD_MODEL"] = "False"
+        os.environ["USE_OCF_DATA_SAMPLER"] = "True"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set

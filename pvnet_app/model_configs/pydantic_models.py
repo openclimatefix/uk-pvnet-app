@@ -100,12 +100,10 @@ def get_all_models(
 
     models = config_pvnet_v2_model(models)
 
-    print(len(models.models))
     if get_ecmwf_only:
         log.info("Using ECMWF model only")
         models.models = [model for model in models.models if model.ecmwf_only]
 
-    print(len(models.models))
     if get_day_ahead_only:
         log.info("Using Day Ahead model only")
         models.models = [model for model in models.models if model.day_ahead]
@@ -113,12 +111,10 @@ def get_all_models(
         log.info("Not using Day Ahead model")
         models.models = [model for model in models.models if not model.day_ahead]
 
-    print(len(models.models))
     if not run_extra_models and not get_day_ahead_only and not get_ecmwf_only:
         log.info("Not running extra models")
         models.models = [model for model in models.models if model.name == "pvnet_v2"]
 
-    print(len(models.models))
     if use_ocf_data_sampler:
         log.info("Using OCF Data Sampler")
         models.models = [model for model in models.models if model.uses_ocf_data_sampler]
