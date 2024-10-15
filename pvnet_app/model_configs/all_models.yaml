@@ -38,7 +38,7 @@ models:
         version: 9002baf1e9dc1ec141f3c4a1fa8447b6316a4558
     uses_satellite_data: False
 
-  - name: pvnet_v2-ecmwf-only-samples-v1
+  - name: pvnet_ecmwf # this name is important as it used for blending
     pvnet:
         repo: openclimatefix/pvnet_uk_region
         version: 0bc344fafb2232fb0b6bb0bf419f0449fe11c643
