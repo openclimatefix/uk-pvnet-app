@@ -149,6 +149,7 @@ class ForecastCompiler:
         # Calculate unnormalised elevation and sun-dowm mask
         self.log_info("Computing sundown mask")
         if self.use_legacy:
+            self.log_info("Computing sundown mask, with legacy dataloader")
             # The old dataloader standardises the data
             elevation = (
                 batch[BatchKey.gsp_solar_elevation].cpu().numpy() * ELEVATION_STD + ELEVATION_MEAN
