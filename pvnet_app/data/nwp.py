@@ -21,7 +21,9 @@ def _download_nwp_data(source, destination):
     fs.get(source, destination, recursive=True)
 
 
-def download_all_nwp_data(download_ukv: Optional[bool] = True, download_ecmwf: Optional[bool] = True):
+def download_all_nwp_data(
+    download_ukv: Optional[bool] = True, download_ecmwf: Optional[bool] = True
+):
     """Download the NWP data"""
     if download_ukv:
         _download_nwp_data(os.environ["NWP_UKV_ZARR_PATH"], nwp_ukv_path)
@@ -163,4 +165,3 @@ def preprocess_nwp_data(use_ukv: Optional[bool] = True, use_ecmwf: Optional[bool
         fix_ecmwf_data()
     else:
         logger.info(f"Skipping ECMWF data preprocessing")
-

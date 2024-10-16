@@ -16,23 +16,22 @@ from ocf_datapipes.batch import BatchKey
 from pvnet.utils import GSPLocationLookup
 
 
-
 def get_dataloader(
-    config_filename: str, 
-    t0: pd.Timestamp, 
-    gsp_ids: list[int], 
+    config_filename: str,
+    t0: pd.Timestamp,
+    gsp_ids: list[int],
     batch_size: int,
     num_workers: int,
 ):
-    
-    # Populate the data config with production data paths    
+
+    # Populate the data config with production data paths
     modified_data_config_filename = Path(config_filename).parent / "data_config.yaml"
-    
+
     modify_data_config_for_production(config_filename, modified_data_config_filename)
-    
+
     dataset = PVNetUKRegionalDataset(
-        config_filename=modified_data_config_filename, 
-        start_time=t0, 
+        config_filename=modified_data_config_filename,
+        start_time=t0,
         end_time=t0,
         gsp_ids=gsp_ids,
     )
@@ -61,27 +60,26 @@ def legacy_squeeze(batch):
 
 
 def get_legacy_dataloader(
-    config_filename: str, 
-    t0: pd.Timestamp, 
-    gsp_ids: list[int], 
+    config_filename: str,
+    t0: pd.Timestamp,
+    gsp_ids: list[int],
     batch_size: int,
     num_workers: int,
 ):
-    
+
     # Populate the data config with production data paths
     populated_data_config_filename = Path(config_filename).parent / "data_config.yaml"
-    
+
     modify_data_config_for_production(
-        config_filename, 
+        config_filename,
         populated_data_config_filename,
         gsp_path=os.environ["DB_URL"],
-    
     )
-    
+
     # Set up ID location query object
     ds_gsp = next(iter(OpenGSPFromDatabase()))
     gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
-    
+
     # Location and time datapipes
     location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
     t0_datapipe = IterableWrapper([t0]).repeat(len(location_pipe))
@@ -119,4 +117,3 @@ def get_legacy_dataloader(
     )
 
     return DataLoader(batch_datapipe, **dataloader_kwargs)
-
