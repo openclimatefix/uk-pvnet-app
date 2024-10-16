@@ -218,7 +218,7 @@ def app(
                 t0=t0,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
-                use_legacy=use_day_ahead_model,
+                use_legacy=not use_ocf_data_sampler,
             )
 
             # Store the config filename so we can create batches suitable for all models
