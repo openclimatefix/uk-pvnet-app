@@ -240,7 +240,8 @@ def app(
     # Set up data loader
     logger.info("Creating DataLoader")
 
-    if use_day_ahead_model:
+    if not use_ocf_data_sampler:
+        logger.info('Making OCF datapipes dataloader')
         # The current day ahead model uses the legacy dataloader
         dataloader = get_legacy_dataloader(
             config_filename=common_config_path, 
@@ -251,6 +252,7 @@ def app(
         )
     
     else:
+        logger.info('Making OCF Data Sampler dataloader')
         dataloader = get_dataloader(
             config_filename=common_config_path, 
             t0=t0, 
