@@ -45,15 +45,15 @@ class Model(BaseModel):
         False, title="ECMWF ONly", description="If this model is only using ecmwf data"
     )
 
-    uses_satellite_data:    Optional[bool] = Field(
+    uses_satellite_data: Optional[bool] = Field(
         True, title="Uses Satellite Data", description="If this model uses satellite data"
     )
 
     uses_ocf_data_sampler: Optional[bool] = Field(
-        True, title="Uses OCF Data Sampler", description="If this model uses data sampler, old one uses ocf_datapipes"
+        True,
+        title="Uses OCF Data Sampler",
+        description="If this model uses data sampler, old one uses ocf_datapipes",
     )
-
-
 
 
 class Models(BaseModel):
@@ -67,7 +67,7 @@ class Models(BaseModel):
     @classmethod
     def name_must_be_unique(cls, v: List[Model]) -> List[Model]:
         """Ensure that all model names are unique, respect to using ocf_data_sampler or not"""
-        names = [(model.name,model.uses_ocf_data_sampler) for model in v]
+        names = [(model.name, model.uses_ocf_data_sampler) for model in v]
         unique_names = set(names)
 
         if len(names) != len(unique_names):
@@ -122,7 +122,9 @@ def get_all_models(
         log.info("Not using OCF Data Sampler, using ocf_datapipes")
         models.models = [model for model in models.models if not model.uses_ocf_data_sampler]
 
-    log.info(f"Got the following models: {[(model.name, model.uses_ocf_data_sampler) for model in models.models]}")
+    log.info(
+        f"Got the following models: {[(model.name, f'uses_ocf_data_sampler={model.uses_ocf_data_sampler}') for model in models.models]}"
+    )
 
     return models.models
 

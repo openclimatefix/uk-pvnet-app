@@ -18,7 +18,7 @@ sat_15_path = "sat_15_min.zarr"
 
 def download_all_sat_data() -> bool:
     """Download the sat data and return whether it was successful
-    
+
     Returns:
         bool: Whether the download was successful
     """
@@ -29,8 +29,7 @@ def download_all_sat_data() -> bool:
     # Set variable to track whether the satellite download is successful
     sat_available = False
     if "SATELLITE_ZARR_PATH" not in os.environ:
-        logger.info("SATELLITE_ZARR_PATH has not be set. "
-                    "No satellite data will be downloaded.")
+        logger.info("SATELLITE_ZARR_PATH has not be set. " "No satellite data will be downloaded.")
         return False
 
     # download 5 minute satellite data
@@ -55,16 +54,16 @@ def download_all_sat_data() -> bool:
         os.system(f"rm sat_15_min.zarr.zip")
     else:
         logger.info(f"No 15-minute data available")
-    
+
     return sat_available
 
 
 def get_satellite_timestamps(sat_zarr_path: str) -> pd.DatetimeIndex:
     """Get the datetimes of the satellite data
-    
+
     Args:
         sat_zarr_path: The path to the satellite zarr
-    
+
     Returns:
         pd.DatetimeIndex: All available satellite timestamps
     """
@@ -73,8 +72,7 @@ def get_satellite_timestamps(sat_zarr_path: str) -> pd.DatetimeIndex:
 
 
 def combine_5_and_15_sat_data() -> None:
-    """Select and/or combine the 5 and 15-minutely satellite data and move it to the expected path
-    """
+    """Select and/or combine the 5 and 15-minutely satellite data and move it to the expected path"""
 
     # Check which satellite data exists
     exists_5_minute = os.path.exists(sat_5_path)
@@ -101,7 +99,7 @@ def combine_5_and_15_sat_data() -> None:
         )
     else:
         logger.info("No 15-minute data was found.")
-    
+
     # If both 5- and 15-minute data exists, use the most recent
     if exists_5_minute and exists_15_minute:
         use_5_minute = datetimes_5min.max() > datetimes_15min.max()
@@ -132,7 +130,7 @@ def fill_1d_bool_gaps(x, max_gap):
         >>> x = np.array([0, 1, 0, 0, 1, 0, 1, 0])
         >>> fill_1d_bool_gaps(x, max_gap=2).astype(int)
         array([0, 1, 1, 1, 1, 1, 1, 0])
-        
+
         >>> x = np.array([1, 0, 0, 0, 1, 0, 1, 0])
         >>> fill_1d_bool_gaps(x, max_gap=2).astype(int)
         array([1, 0, 0, 0, 1, 1, 1, 0])
@@ -157,7 +155,7 @@ def fill_1d_bool_gaps(x, max_gap):
 
 def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
     """Interpolate missing satellite timestamps"""
-    
+
     ds_sat = xr.open_zarr(sat_path)
 
     # If any of these times are missing, we will try to interpolate them
@@ -182,13 +180,13 @@ def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
 
     else:
         logger.info("Some requested times are missing - running interpolation")
-        
+
         # Compute before interpolation for efficiency
         ds_sat = ds_sat.compute()
-        
+
         # Run the interpolation to all 5-minute timestamps between the first and last
         ds_interp = ds_sat.interp(time=dense_times, method="linear", assume_sorted=True)
-        
+
         # Find the timestamps which are within max gap size
         max_gap_steps = int(max_gap / pd.Timedelta("5min")) - 1
         valid_fill_times = fill_1d_bool_gaps(timestamp_available, max_gap_steps)
@@ -197,9 +195,9 @@ def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
         valid_fill_times_xr = xr.zeros_like(ds_interp.time, dtype=bool)
         valid_fill_times_xr.values[:] = valid_fill_times
         ds_sat = ds_interp.where(valid_fill_times_xr)
-        
+
         time_was_filled = np.logical_and(valid_fill_times_xr, ~timestamp_available)
-        
+
         if time_was_filled.any():
             infilled_times = time_was_filled.where(time_was_filled, drop=True)
             logger.info(
@@ -218,10 +216,12 @@ def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
         os.system(f"rm -rf {sat_path}")
         ds_sat.to_zarr(sat_path)
 
-    
-def extend_satellite_data_with_nans(t0: pd.Timestamp, satellite_data_path: Optional[str] = sat_path) -> None:
+
+def extend_satellite_data_with_nans(
+    t0: pd.Timestamp, satellite_data_path: Optional[str] = sat_path
+) -> None:
     """Fill the satellite data with NaNs out to time t0
-    
+
     Args:
         t0: The init-time of the forecast
     """
@@ -235,8 +235,10 @@ def extend_satellite_data_with_nans(t0: pd.Timestamp, satellite_data_path: Optio
         logger.info(f"Filling most recent {delay} with NaNs")
 
         if delay > pd.Timedelta("3h"):
-            logger.warning("The satellite data is delayed by more than 3 hours. "
-                           "Will only infill last 3 hours.")
+            logger.warning(
+                "The satellite data is delayed by more than 3 hours. "
+                "Will only infill last 3 hours."
+            )
             delay = pd.Timedelta("3h")
 
         # Load into memory so we can delete it on disk
@@ -254,7 +256,7 @@ def extend_satellite_data_with_nans(t0: pd.Timestamp, satellite_data_path: Optio
 
 
 def check_model_satellite_inputs_available(
-    data_config_filename: str, 
+    data_config_filename: str,
     t0: pd.Timestamp,
     sat_datetimes: pd.DatetimeIndex,
 ) -> bool:
@@ -264,7 +266,7 @@ def check_model_satellite_inputs_available(
         data_config_filename: Path to the data configuration file
         t0: The init-time of the forecast
         available_sat_datetimes: The available satellite timestamps
-        
+
     Returns:
         bool: Whether the satellite data satisfies that specified in the config
     """
@@ -301,7 +303,7 @@ def check_model_satellite_inputs_available(
 
             available = len(missing_time_steps) == 0
 
-            if len(missing_time_steps)>0:
+            if len(missing_time_steps) > 0:
                 logger.info(f"Some satellite timesteps for {t0=} missing: \n{missing_time_steps}")
 
     return available
@@ -309,11 +311,11 @@ def check_model_satellite_inputs_available(
 
 def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> pd.DatetimeIndex:
     """Combine and 5- and 15-minutely satellite data and extend to t0 if required
-    
+
     Args:
         t0: The init-time of the forecast
         use_legacy: Whether to prepare the data as required for the legacy dataloader
-    
+
     Returns:
         pd.DatetimeIndex: The available satellite timestamps
         int: The spacing between data samples in minutes

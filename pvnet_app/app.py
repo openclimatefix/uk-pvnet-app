@@ -34,9 +34,7 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 
 # sentry
 sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"),
-    environment=os.getenv("ENVIRONMENT", "local"),
-    traces_sample_rate=1
+    dsn=os.getenv("SENTRY_DSN"), environment=os.getenv("ENVIRONMENT", "local"), traces_sample_rate=1
 )
 
 sentry_sdk.set_tag("app_name", "pvnet_app")
@@ -129,7 +127,7 @@ def app(
     use_ecmwf_only = os.getenv("USE_ECMWF_ONLY", "false").lower() == "true"
     run_extra_models = os.getenv("RUN_EXTRA_MODELS", "false").lower() == "true"
     use_ocf_data_sampler = os.getenv("USE_OCF_DATA_SAMPLER", "true").lower() == "true"
-    
+
     logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
     logger.info(f"Using `pvnet_app` library version: {pvnet_app.__version__}")
     logger.info(f"Using {num_workers} workers")
@@ -138,10 +136,12 @@ def app(
     logger.info(f"Running extra models: {run_extra_models}")
 
     # load models
-    model_configs = get_all_models(get_ecmwf_only=use_ecmwf_only,
-                                   get_day_ahead_only=use_day_ahead_model,
-                                   run_extra_models=run_extra_models,
-                                   use_ocf_data_sampler=use_ocf_data_sampler)
+    model_configs = get_all_models(
+        get_ecmwf_only=use_ecmwf_only,
+        get_day_ahead_only=use_day_ahead_model,
+        run_extra_models=run_extra_models,
+        use_ocf_data_sampler=use_ocf_data_sampler,
+    )
 
     logger.info(f"Using adjuster: {model_configs[0].use_adjuster}")
     logger.info(f"Saving GSP sum: {model_configs[0].save_gsp_sum}")
@@ -166,12 +166,12 @@ def app(
 
     # Get capacities from the database
     logger.info("Loading capacities from the database")
-    
+
     db_connection = DatabaseConnection(url=os.getenv("DB_URL"), base=Base_Forecast, echo=False)
     with db_connection.get_session() as session:
         #  Pandas series of most recent GSP capacities
         gsp_capacities = get_latest_gsp_capacities(
-            session=session, gsp_ids=gsp_ids, datetime_utc=t0-timedelta(days=2)
+            session=session, gsp_ids=gsp_ids, datetime_utc=t0 - timedelta(days=2)
         )
 
         # National capacity is needed if using summation model
@@ -218,7 +218,7 @@ def app(
                 t0=t0,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
-                use_legacy=use_day_ahead_model,
+                use_legacy=not use_ocf_data_sampler,
             )
 
             # Store the config filename so we can create batches suitable for all models
@@ -241,21 +241,21 @@ def app(
     logger.info("Creating DataLoader")
 
     if not use_ocf_data_sampler:
-        logger.info('Making OCF datapipes dataloader')
+        logger.info("Making OCF datapipes dataloader")
         # The current day ahead model uses the legacy dataloader
         dataloader = get_legacy_dataloader(
-            config_filename=common_config_path, 
-            t0=t0, 
+            config_filename=common_config_path,
+            t0=t0,
             gsp_ids=gsp_ids,
             batch_size=batch_size,
             num_workers=num_workers,
         )
-    
+
     else:
-        logger.info('Making OCF Data Sampler dataloader')
+        logger.info("Making OCF Data Sampler dataloader")
         dataloader = get_dataloader(
-            config_filename=common_config_path, 
-            t0=t0, 
+            config_filename=common_config_path,
+            t0=t0,
             gsp_ids=gsp_ids,
             batch_size=batch_size,
             num_workers=num_workers,
