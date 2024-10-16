@@ -161,6 +161,7 @@ class ForecastCompiler:
         # We only need elevation mask for forecasted values, not history
         elevation = elevation[:, -preds.shape[1] :]
         sun_down_mask = elevation < MIN_DAY_ELEVATION
+        self.log_info.info(f'{sun_down_mask=}')
 
         # Store predictions internally
         self.normed_preds += [preds]
