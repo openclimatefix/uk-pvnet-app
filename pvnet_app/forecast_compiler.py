@@ -140,6 +140,7 @@ class ForecastCompiler:
         these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
         self.gsp_ids_each_batch += [these_gsp_ids]
 
+        self.log_info(f"{batch[BatchKey.gsp_id]=}")
         # TODO: This change should be moved inside PVNet
         batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
 
