@@ -51,10 +51,10 @@ models:
   - name: pvnet_v2
     pvnet:
       repo: openclimatefix/pvnet_uk_region
-      version: 62e5e20ab793cee7cf94eadac870d2199501a730
+      version: aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac
     summation:
       repo: openclimatefix/pvnet_v2_summation
-      version: ffac655f9650b81865d96023baa15839f3ce26ec
+      version: a7fd71727f4cb2b933992b2108638985e24fa5a3
     use_adjuster: True
     save_gsp_sum: False
     verbose: True
