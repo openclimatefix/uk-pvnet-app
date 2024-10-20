@@ -62,20 +62,14 @@ class SQLAlchemyFilter(logging.Filter):
 
 
 # Create a logger
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-formatter = logging.Formatter(
-    fmt="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s"
+logging.basicConfig(
+    level=getattr(logging, os.getenv("LOGLEVEL", "DEBUG")),
+    format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
 )
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(formatter)
-logger.addHandler(stream_handler)
+logger = logging.getLogger()
 
 # Get rid of the verbose sqlalchemy logs
-stream_handler.addFilter(SQLAlchemyFilter())
-sql_logger = logging.getLogger("sqlalchemy.engine.Engine")
-sql_logger.addHandler(logging.NullHandler())
+logging.getLogger('sqlalchemy').setLevel(logging.ERROR)
 
 
 # ---------------------------------------------------------------------------
