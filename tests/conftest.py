@@ -158,7 +158,7 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
 
     # Add data to dataset
     ds["data"] = xr.DataArray(
-        np.zeros([len(ds[c]) for c in ds.xindexes]),
+        np.ones([len(ds[c]) for c in ds.xindexes]),
         coords=[ds[c] for c in ds.xindexes],
     )
 
