@@ -366,7 +366,7 @@ def check_for_zeros():
         if (data == 0).sum() / n_data_points_per_timestep > ERROR_ZERO_PERCENTAGE:
             time = ds_sat.time[i].values
             message = (
-                f"Satellite data contains zeros, (greater than {ERROR_ZERO_PERCENTAGE})"
+                f"Satellite data contains zeros (greater than {ERROR_ZERO_PERCENTAGE}), "
                 f"This is for time step {time}"
             )
             raise Exception(message)
