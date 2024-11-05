@@ -115,7 +115,7 @@ def make_nwp_data(shell_path, varname, test_t0):
     return ds
         
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def nwp_ukv_data(test_t0):
     return make_nwp_data(
         shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ukv_shell.zarr",
@@ -124,7 +124,7 @@ def nwp_ukv_data(test_t0):
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def nwp_ecmwf_data(test_t0):
     return make_nwp_data(
         shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ecmwf_shell.zarr",
@@ -168,25 +168,25 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
 
     return ds
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sat_5_data(test_t0):
     return make_sat_data(test_t0, delay_mins=10, freq_mins=5)
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sat_5_data_zero_delay(test_t0):
     return make_sat_data(test_t0, delay_mins=0, freq_mins=5)
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sat_5_data_delayed(test_t0):
     return make_sat_data(test_t0, delay_mins=120, freq_mins=5)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sat_15_data(test_t0):
     return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def gsp_yields_and_systems(db_session, test_t0):
     """Create gsp yields and systems"""
 
@@ -225,7 +225,7 @@ def gsp_yields_and_systems(db_session, test_t0):
     }
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def me_latest(db_session):
     metric_values = make_fake_me_latest(session=db_session, model_name="pvnet_v2")
     db_session.add_all(metric_values)
