@@ -17,13 +17,12 @@ from ocf_datapipes.config.load import load_yaml_configuration
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
-
 def test_app(
     db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
 ):
 
     """Test the app running the intraday models"""
-    
+
     with tempfile.TemporaryDirectory() as tmpdirname:
 
         os.chdir(tmpdirname)
@@ -93,7 +92,7 @@ def test_app_day_ahead_model(
     """Test the app running the day ahead model"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-        
+
         os.chdir(tmpdirname)
 
         temp_nwp_path = "temp_nwp_ukv.zarr"
@@ -152,13 +151,14 @@ def test_app_day_ahead_model(
         == expected_forecast_results * expected_forecast_timesteps
     )
 
+
 def test_app_no_sat(
     db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
 ):
     """Test the app for the case when no satellite data is available"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-        
+
         os.chdir(tmpdirname)
 
         temp_nwp_path = "temp_nwp_ukv.zarr"
@@ -168,8 +168,8 @@ def test_app_no_sat(
         temp_nwp_path = "temp_nwp_ecmwf.zarr"
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
-        
-        # There is no satellite data available at the environ path
+
+        # There is no satellite data available at the environ path
         os.environ["SATELLITE_ZARR_PATH"] = "nonexistent_sat.zarr.zip"
 
         os.environ["RUN_EXTRA_MODELS"] = "True"
@@ -182,7 +182,7 @@ def test_app_no_sat(
         from pvnet_app.app import app
 
         app(gsp_ids=list(range(1, 318)), num_workers=2)
-        
+
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run
     all_models = get_all_models(run_extra_models=True)
@@ -218,10 +218,11 @@ def test_app_no_sat(
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
 
-def test_app_ecwmf_only(
-        db_session, nwp_ecmwf_data, gsp_yields_and_systems, me_latest
-):
-    """Test the app for the case when no satellite data is available"""
+# test legacy models
+# Its nice to have this here, so we can run the latest version in production, but still use the old models
+# Once we have re trained PVnet summation models we can remove this
+def test_app_ecwmf_only(db_session, nwp_ecmwf_data, gsp_yields_and_systems, me_latest):
+    """Test the app for the case running model just on ecmwf"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
 
@@ -285,7 +286,7 @@ def test_app_ecwmf_only(
 # Its nice to have this here, so we can run the latest version in production, but still use the old models
 # Once we have re trained PVnet summation models we can remove this
 def test_app_ocf_datapipes(
-        db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
 ):
     """Test the app running the day ahead model"""
 
@@ -336,14 +337,14 @@ def test_app_ocf_datapipes(
     expected_forecast_timesteps = 16
 
     assert (
-            len(db_session.query(ForecastValueSQL).all())
-            == expected_forecast_results * expected_forecast_timesteps
+        len(db_session.query(ForecastValueSQL).all())
+        == expected_forecast_results * expected_forecast_timesteps
     )
     assert (
-            len(db_session.query(ForecastValueLatestSQL).all())
-            == expected_forecast_results * expected_forecast_timesteps
+        len(db_session.query(ForecastValueLatestSQL).all())
+        == expected_forecast_results * expected_forecast_timesteps
     )
     assert (
-            len(db_session.query(ForecastValueSevenDaysSQL).all())
-            == expected_forecast_results * expected_forecast_timesteps
+        len(db_session.query(ForecastValueSevenDaysSQL).all())
+        == expected_forecast_results * expected_forecast_timesteps
     )
