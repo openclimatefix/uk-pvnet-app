@@ -20,7 +20,7 @@ from datetime import timedelta, timezone
 
 xr.set_options(keep_attrs=True)
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def test_t0():
     return pd.Timestamp.now(tz=None).floor(timedelta(minutes=30))
 
@@ -115,7 +115,7 @@ def make_nwp_data(shell_path, varname, test_t0):
     return ds
         
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def nwp_ukv_data(test_t0):
     return make_nwp_data(
         shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ukv_shell.zarr",
@@ -124,7 +124,7 @@ def nwp_ukv_data(test_t0):
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def nwp_ecmwf_data(test_t0):
     return make_nwp_data(
         shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ecmwf_shell.zarr",
@@ -168,20 +168,20 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
 
     return ds
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def sat_5_data(test_t0):
     return make_sat_data(test_t0, delay_mins=10, freq_mins=5)
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def sat_5_data_zero_delay(test_t0):
     return make_sat_data(test_t0, delay_mins=0, freq_mins=5)
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def sat_5_data_delayed(test_t0):
     return make_sat_data(test_t0, delay_mins=120, freq_mins=5)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def sat_15_data(test_t0):
     return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
 
