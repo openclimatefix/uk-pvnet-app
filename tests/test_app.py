@@ -218,6 +218,69 @@ def test_app_no_sat(
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
 
+def test_app_ecwmf_only(
+        db_session, nwp_ecmwf_data, gsp_yields_and_systems, me_latest
+):
+    """Test the app for the case when no satellite data is available"""
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+
+        os.chdir(tmpdirname)
+
+        temp_nwp_path = "temp_nwp_ecmwf.zarr"
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        nwp_ecmwf_data.to_zarr(temp_nwp_path)
+
+        # There is no satellite or ukv data available at the environ path
+        os.environ["SATELLITE_ZARR_PATH"] = "nonexistent_sat.zarr.zip"
+        os.environ["NWP_UKV_ZARR_PATH"] = "nonexistent_nwp.zarr.zip"
+
+        os.environ["RUN_EXTRA_MODELS"] = "False"
+        os.environ["SAVE_GSP_SUM"] = "True"
+        os.environ["DAY_AHEAD_MODEL"] = "False"
+        os.environ["USE_OCF_DATA_SAMPLER"] = "False"
+        os.environ["USE_ECMWF_ONLY"] = "True"
+
+        # Run prediction
+        # Thes import needs to come after the environ vars have been set
+        from pvnet_app.app import app
+
+        app(gsp_ids=list(range(1, 318)), num_workers=2)
+
+    # Only the models which don't use satellite will be run in this case
+    # The models below are the only ones which should have been run
+    all_models = get_all_models(get_ecmwf_only=True)
+
+    # Check correct number of forecasts have been made
+    # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
+    # Forecast made with multiple models
+    expected_forecast_results = 0
+    for model_config in all_models:
+        expected_forecast_results += 318 + model_config.save_gsp_sum
+
+    forecasts = db_session.query(ForecastSQL).all()
+    # Doubled for historic and forecast
+    assert len(forecasts) == expected_forecast_results * 2
+
+    # Check probabilistic added
+    assert "90" in forecasts[0].forecast_values[0].properties
+    assert "10" in forecasts[0].forecast_values[0].properties
+
+    # 318 GSPs * 16 time steps in forecast
+    assert len(db_session.query(ForecastValueSQL).all()) == expected_forecast_results * 16
+    assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_forecast_results * 16
+
+    expected_forecast_results = 0
+    for model_config in all_models:
+        # National
+        expected_forecast_results += 1
+        # GSP
+        expected_forecast_results += 317 * model_config.save_gsp_to_recent
+        expected_forecast_results += model_config.save_gsp_sum  # optional Sum of GSPs
+
+    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
+
+
 # test legacy models
 # Its nice to have this here, so we can run the latest version in production, but still use the old models
 # Once we have re trained PVnet summation models we can remove this
