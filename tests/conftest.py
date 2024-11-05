@@ -20,7 +20,7 @@ from datetime import timedelta, timezone
 
 xr.set_options(keep_attrs=True)
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def test_t0():
     return pd.Timestamp.now(tz=None).floor(timedelta(minutes=30))
 
@@ -186,7 +186,7 @@ def sat_15_data(test_t0):
     return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def gsp_yields_and_systems(db_session, test_t0):
     """Create gsp yields and systems"""
 
@@ -225,7 +225,7 @@ def gsp_yields_and_systems(db_session, test_t0):
     }
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def me_latest(db_session):
     metric_values = make_fake_me_latest(session=db_session, model_name="pvnet_v2")
     db_session.add_all(metric_values)
