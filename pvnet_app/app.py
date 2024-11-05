@@ -218,7 +218,8 @@ def app(
             # Store the config filename so we can create batches suitable for all models
             data_config_paths.append(data_config_path)
         else:
-            warnings.warn(f"The model {model_config.name} cannot be run with input data available")
+            message = f"The model {model_config.name} cannot be run with input data available"
+            warnings.warn(message)
 
     if len(forecast_compilers) == 0:
         raise Exception(f"No models were compatible with the available input data.")
