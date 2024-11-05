@@ -309,6 +309,7 @@ def test_app_ocf_datapipes(
         os.environ["DAY_AHEAD_MODEL"] = "False"
         os.environ["RUN_EXTRA_MODELS"] = "False"
         os.environ["USE_OCF_DATA_SAMPLER"] = "False"
+        os.environ["USE_ECMWF_ONLY"] = "False"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
