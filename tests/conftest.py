@@ -137,11 +137,15 @@ def config_filename():
     return f"{os.path.dirname(os.path.abspath(__file__))}/test_data/test.yaml"
 
 
-def make_sat_data(test_t0, delay_mins, freq_mins):
+def make_sat_data(test_t0, delay_mins, freq_mins, small=False):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr"
     )
+
+    if small:
+        # only select 10 by 10
+        ds = ds.isel(x_geostationary=slice(0, 10), y_geostationary=slice(0, 10))
 
     # remove tim dim and expand time dim to be len 36 = 3 hours of 5 minute data
     ds = ds.drop_vars("time")
@@ -158,7 +162,7 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
 
     # Add data to dataset
     ds["data"] = xr.DataArray(
-        np.zeros([len(ds[c]) for c in ds.xindexes]),
+        np.ones([len(ds[c]) for c in ds.xindexes]),
         coords=[ds[c] for c in ds.xindexes],
     )
 
@@ -184,6 +188,10 @@ def sat_5_data_delayed(test_t0):
 @pytest.fixture()
 def sat_15_data(test_t0):
     return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
+
+@pytest.fixture()
+def sat_15_data_small(test_t0):
+    return make_sat_data(test_t0, delay_mins=0, freq_mins=15,small=True)
 
 
 @pytest.fixture()

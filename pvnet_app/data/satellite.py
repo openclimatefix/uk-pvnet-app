@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 sat_5_path = "sat_5_min.zarr"
 sat_15_path = "sat_15_min.zarr"
 
+# The percentage of zeros in the satellite data that is acceptable
+ERROR_ZERO_PERCENTAGE = 0.1
+
 
 def download_all_sat_data() -> bool:
     """Download the sat data and return whether it was successful
@@ -339,7 +342,34 @@ def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> pd.Dateti
     # non-nan timestamp
     extend_satellite_data_with_nans(t0)
 
+    # Check for zeros in the satellite data
+    check_for_zeros()
+
     return sat_timestamps
+
+
+def check_for_zeros():
+    """Check the satellite data for zeros and raise an exception
+
+    This sometimes happen when the satellite data is corrupt
+
+    Note that in the UK, even at night, the values are not zero.
+    """
+    # check satellite for zeros
+    logger.info("Checking satellite data for zeros")
+    ds_sat = xr.open_zarr(sat_path)
+    shape = ds_sat.data.shape
+    n_data_points_per_timestep = shape[1] * shape[2] * shape[3]
+    n_time_steps = shape[0]
+    for i in range(n_time_steps):
+        data = ds_sat.data[i].values
+        if (data == 0).sum() / n_data_points_per_timestep > ERROR_ZERO_PERCENTAGE:
+            time = ds_sat.time[i].values
+            message = (
+                f"Satellite data contains zeros (greater than {ERROR_ZERO_PERCENTAGE}), "
+                f"This is for time step {time}"
+            )
+            raise Exception(message)
 
 
 def scale_satellite_data() -> None:
