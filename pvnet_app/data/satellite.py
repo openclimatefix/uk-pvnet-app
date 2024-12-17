@@ -8,7 +8,7 @@ import fsspec
 import ocf_blosc2
 from ocf_datapipes.config.load import load_yaml_configuration
 
-from pvnet_app.consts import sat_path
+from pvnet_app.consts import sat_path, uk_box
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +312,37 @@ def check_model_satellite_inputs_available(
     return available
 
 
+def remove_any_nans_in_satellite():
+    """ Remove any NaNs in the satellite data"""
+
+    ds_sat = xr.open_zarr(sat_path)
+
+    # slice to uk box
+    ds_sat_uk = ds_sat.sel(
+        x=slice(uk_box["x_geostationary"][0], uk_box["x_geostationary"][1]),
+        y=slice(uk_box["y_geostationary"][0], uk_box["y_geostationary"][1]),
+    )
+
+    # remove any nans
+    ds_sat_uk = ds_sat_uk.dropna(dim="time", how="any")
+
+    # see which timestamps have been dropped
+    dropped_timestamps = np.setdiff1d(ds_sat.time, ds_sat_uk.time)
+    if len(dropped_timestamps) > 0:
+        logger.info(f"Removing NaNs from satellite data."
+                    f" The following timestamps have been dropped: {dropped_timestamps}")
+
+        # remove dropped timstamps from original dataset
+        ds_sat = ds_sat.sel(time=~ds_sat.time.isin(dropped_timestamps))
+
+        # save
+        os.system(f"rm -rf {sat_path}")
+        ds_sat.to_zarr(sat_path)
+
+    else:
+        logger.info("No NaNs found in satellite data.")
+
+
 def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> pd.DatetimeIndex:
     """Combine and 5- and 15-minutely satellite data and extend to t0 if required
 
@@ -326,6 +357,9 @@ def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> pd.Dateti
 
     # Deal with switching between the 5 and 15 minutely satellite data
     combine_5_and_15_sat_data()
+
+    # check for any nans in the satellite data
+    remove_any_nans_in_satellite()
 
     # Interpolate missing satellite timestamps
     interpolate_missing_satellite_timestamps(pd.Timedelta("15min"))
