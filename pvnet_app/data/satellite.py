@@ -8,7 +8,7 @@ import fsspec
 import ocf_blosc2
 from ocf_datapipes.config.load import load_yaml_configuration
 
-from pvnet_app.consts import sat_path, uk_box
+from pvnet_app.consts import sat_path
 
 logger = logging.getLogger(__name__)
 
