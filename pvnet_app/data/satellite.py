@@ -313,7 +313,7 @@ def check_model_satellite_inputs_available(
 
 
 def remove_any_nans_in_satellite():
-    """ Remove any NaNs in the satellite data"""
+    """Remove any NaNs in the satellite data"""
 
     ds_sat = xr.open_zarr(sat_path)
 
@@ -329,15 +329,21 @@ def remove_any_nans_in_satellite():
     # see which timestamps have been dropped
     dropped_timestamps = np.setdiff1d(ds_sat.time, ds_sat_uk.time)
     if len(dropped_timestamps) > 0:
-        logger.info(f"Removing NaNs from satellite data."
-                    f" The following timestamps have been dropped: {dropped_timestamps}")
+        logger.info(
+            f"Removing NaNs from satellite data."
+            f" The following timestamps have been dropped: {dropped_timestamps}"
+        )
 
-        # remove dropped timstamps from original dataset
-        ds_sat = ds_sat.sel(time=~ds_sat.time.isin(dropped_timestamps))
+        raise Exception("There are some nans in the satellite data, so lets not run the forecast")
 
-        # save
-        os.system(f"rm -rf {sat_path}")
-        ds_sat.to_zarr(sat_path)
+        # other options
+        # remove dropped timestamps from original dataset
+        # we just remove them, as later on we might be able to interpolate them
+        # ds_sat = ds_sat.sel(time=~ds_sat.time.isin(dropped_timestamps))
+        #
+        # # save
+        # os.system(f"rm -rf {sat_path}")
+        # ds_sat.to_zarr(sat_path)
 
     else:
         logger.info("No NaNs found in satellite data.")
