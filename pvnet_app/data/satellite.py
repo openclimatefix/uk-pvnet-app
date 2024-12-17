@@ -359,7 +359,7 @@ def check_for_constant_values(value: Optional[float] = 0, threshold: Optional[fl
     Note that in the UK, even at night, the values are not zero.
     """
     # check satellite for zeros
-    logger.info("Checking satellite data for constant value ({value})")
+    logger.info(f"Checking satellite data for constant value ({value})")
     ds_sat = xr.open_zarr(sat_path)
     shape = ds_sat.data.shape
     n_data_points_per_timestep = shape[1] * shape[2] * shape[3]

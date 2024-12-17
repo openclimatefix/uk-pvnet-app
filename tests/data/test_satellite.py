@@ -265,7 +265,7 @@ def test_zeros_in_sat_data(sat_15_data_small, test_t0):
 
 
 def test_remove_satellite_data(sat_15_data_small, test_t0):
-    """Check error is made if data has zeros"""
+    """Check error is made if data has nans"""
     # make temporary directory
     with tempfile.TemporaryDirectory() as tmpdirname:
         # Change to temporary working directory
