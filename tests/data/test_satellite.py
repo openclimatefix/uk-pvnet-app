@@ -28,7 +28,7 @@ from pvnet_app.data.satellite import (
     sat_path,
     sat_5_path,
     sat_15_path,
-    extend_satellite_data_with_nans
+    extend_satellite_data_with_nans,
 )
 
 
@@ -242,7 +242,7 @@ def test_extend_satellite_data_with_nans_over_3_hours(sat_5_data, test_t0):
 
 
 def test_zeros_in_sat_data(sat_15_data_small, test_t0):
-    """Download and process only the 15 minute satellite data"""
+    """Check error is made if data has zeros"""
 
     # make temporary directory
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -252,6 +252,27 @@ def test_zeros_in_sat_data(sat_15_data_small, test_t0):
 
         # make half the values zeros
         sat_15_data_small.data[::2] = 0
+
+        # Make 15-minutely satellite data available
+        save_to_zarr_zip(sat_15_data_small, filename="latest.zarr.zip")
+
+        os.environ["SATELLITE_ZARR_PATH"] = "latest.zarr.zip"
+        download_all_sat_data()
+
+        # check an error is made
+        with pytest.raises(Exception):
+            preprocess_sat_data(test_t0)
+
+
+def test_remove_satellite_data(sat_15_data_small, test_t0):
+    """Check error is made if data has zeros"""
+    # make temporary directory
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        # Change to temporary working directory
+        os.chdir(tmpdirname)
+
+        # make half the values zeros
+        sat_15_data_small.data[::2] = np.nan
 
         # Make 15-minutely satellite data available
         save_to_zarr_zip(sat_15_data_small, filename="latest.zarr.zip")

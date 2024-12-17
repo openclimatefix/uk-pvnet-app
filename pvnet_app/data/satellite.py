@@ -312,43 +312,6 @@ def check_model_satellite_inputs_available(
     return available
 
 
-def remove_any_nans_in_satellite():
-    """Remove any NaNs in the satellite data"""
-
-    ds_sat = xr.open_zarr(sat_path)
-
-    # slice to uk box
-    ds_sat_uk = ds_sat.sel(
-        x=slice(uk_box["x_geostationary"][0], uk_box["x_geostationary"][1]),
-        y=slice(uk_box["y_geostationary"][0], uk_box["y_geostationary"][1]),
-    )
-
-    # remove any nans
-    ds_sat_uk = ds_sat_uk.dropna(dim="time", how="any")
-
-    # see which timestamps have been dropped
-    dropped_timestamps = np.setdiff1d(ds_sat.time, ds_sat_uk.time)
-    if len(dropped_timestamps) > 0:
-        logger.info(
-            f"Removing NaNs from satellite data."
-            f" The following timestamps have been dropped: {dropped_timestamps}"
-        )
-
-        raise Exception("There are some nans in the satellite data, so lets not run the forecast")
-
-        # other options
-        # remove dropped timestamps from original dataset
-        # we just remove them, as later on we might be able to interpolate them
-        # ds_sat = ds_sat.sel(time=~ds_sat.time.isin(dropped_timestamps))
-        #
-        # # save
-        # os.system(f"rm -rf {sat_path}")
-        # ds_sat.to_zarr(sat_path)
-
-    else:
-        logger.info("No NaNs found in satellite data.")
-
-
 def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> pd.DatetimeIndex:
     """Combine and 5- and 15-minutely satellite data and extend to t0 if required
 
@@ -364,8 +327,8 @@ def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> pd.Dateti
     # Deal with switching between the 5 and 15 minutely satellite data
     combine_5_and_15_sat_data()
 
-    # check for any nans in the satellite data
-    remove_any_nans_in_satellite()
+    # Check for nans in the satellite data
+    check_for_constant_values(value=np.nan, threshold=0)
 
     # Interpolate missing satellite timestamps
     interpolate_missing_satellite_timestamps(pd.Timedelta("15min"))
@@ -383,30 +346,30 @@ def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> pd.Dateti
     extend_satellite_data_with_nans(t0)
 
     # Check for zeros in the satellite data
-    check_for_zeros()
+    check_for_constant_values()
 
     return sat_timestamps
 
 
-def check_for_zeros():
-    """Check the satellite data for zeros and raise an exception
+def check_for_constant_values(value: Optional[float] = 0, threshold: Optional[float] = ERROR_ZERO_PERCENTAGE) -> None:
+    """Check the satellite data for constant values and raise an exception
 
     This sometimes happen when the satellite data is corrupt
 
     Note that in the UK, even at night, the values are not zero.
     """
     # check satellite for zeros
-    logger.info("Checking satellite data for zeros")
+    logger.info("Checking satellite data for constant value ({value})")
     ds_sat = xr.open_zarr(sat_path)
     shape = ds_sat.data.shape
     n_data_points_per_timestep = shape[1] * shape[2] * shape[3]
     n_time_steps = shape[0]
     for i in range(n_time_steps):
         data = ds_sat.data[i].values
-        if (data == 0).sum() / n_data_points_per_timestep > ERROR_ZERO_PERCENTAGE:
+        if (data == value).sum() / n_data_points_per_timestep > threshold:
             time = ds_sat.time[i].values
             message = (
-                f"Satellite data contains zeros (greater than {ERROR_ZERO_PERCENTAGE}), "
+                f"Satellite data contains zeros (greater than {threshold}), "
                 f"This is for time step {time}"
             )
             raise Exception(message)
