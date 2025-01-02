@@ -154,6 +154,14 @@ def preprocess_nwp_data(use_ukv: Optional[bool] = True, use_ecmwf: Optional[bool
         logger.info(f"Skipping UKV data preprocessing")
 
     if use_ecmwf:
+
+        # rename dataset variable from  HRES-IFS_uk to ECMWF_UK
+        d = xr.open_zarr(nwp_ecmwf_path)
+        # if the variable HRES-IFS_uk is there
+        if "HRES-IFS_uk" in d.variable.values:
+            d = d.rename({"HRES-IFS_uk": "ECMWF_UK"})
+            d.to_zarr(nwp_ecmwf_path)
+
         # Regrid the ECMWF data
         regrid_nwp_data(
             nwp_zarr=nwp_ecmwf_path,
