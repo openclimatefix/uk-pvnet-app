@@ -193,7 +193,7 @@ def rename_ecmwf_variables():
                   'direct_shortwave_radiation_flux_gl': 'sr',
                   'downward_longwave_radiation_flux_gl': 'dlwrf',
                   'downward_shortwave_radiation_flux_gl': 'dswrf',
-                  'downward_ultraviolet_radiation_flux_gl': 'durvs',
+                  'downward_ultraviolet_radiation_flux_gl': 'duvrs',
                   'temperature_sl': 't',
                   'total_precipitation_rate_gl': 'prate',
                   'visibility_sl': 'vis',
