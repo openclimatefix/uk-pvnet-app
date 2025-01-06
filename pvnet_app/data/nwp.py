@@ -177,8 +177,15 @@ def rename_ecmwf_variables():
     # if the variable HRES-IFS_uk is there
     if "HRES-IFS_uk" in d.data_vars:
         logger.info(f"Renaming the ECMWF variables")
-
         d = d.rename({"HRES-IFS_uk": "ECMWF_UK"})
+
+        # remove anything >60 in latitude
+        logger.info(f"Removing data above 60 latitude")
+        d = d.where(d.latitude <= 60, drop=True)
+
+        # remove anything step > 83
+        logger.info(f"Removing data after step 83, step 84 is nan")
+        d = d.where(d.step <= d.step[83], drop=True)
 
         # rename variable names in the variable coordinate
         # This is a renaming from ECMWF variables to what we use in the ML Model
@@ -197,7 +204,7 @@ def rename_ecmwf_variables():
                   'temperature_sl': 't',
                   'total_precipitation_rate_gl': 'prate',
                   'visibility_sl': 'vis',
-                  'wind_u_component_100m': '100',
+                  'wind_u_component_100m': 'u100',
                   'wind_u_component_10m': 'u10',
                   'wind_u_component_200m': 'u200',
                   'wind_v_component_100m': 'v100',
@@ -209,6 +216,7 @@ def rename_ecmwf_variables():
 
         # assign the new variable names
         d = d.assign_coords(variable=variable_coords)
+        d = d.compute()
 
         # save back to path
         os.system(f"rm -rf {nwp_ecmwf_path}")
