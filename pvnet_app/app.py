@@ -12,6 +12,7 @@ import pandas as pd
 import pvnet
 import torch
 import typer
+import boto3
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
@@ -259,10 +260,19 @@ def app(
     # Make predictions
     logger.info("Processing batches")
 
+    s3_directory = os.getenv("SAVE_BATCHES_DIR", None)
+
     with torch.no_grad():
         for i, batch in enumerate(dataloader):
             logger.info(f"Predicting for batch: {i}")
 
+            if s3_directory:
+                timestamp = pd.Timestamp.now(tz="UTC").strftime("%Y%m%dT%H%M%SZ")
+                for model_name in forecast_compilers.keys():
+                    filename = f"{s3_directory}/{model_name}_batch_{i}_{timestamp}.pt"
+                    torch.save(batch, filename)
+                    logger.info(f"Saved batch {i} for model {model_name} to {filename}")
+                    
             for forecast_compiler in forecast_compilers.values():
                 # need to do copy the batch for each model, as a model might change the batch
                 device_batch = copy_batch_to_device(batch_to_tensor(batch), device)
