@@ -6,7 +6,6 @@ import os
 import tempfile
 import warnings
 from datetime import timedelta
-
 import dask
 import pandas as pd
 import pvnet
