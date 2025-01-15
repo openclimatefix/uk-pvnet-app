@@ -264,7 +264,7 @@ def app(
         for i, batch in enumerate(dataloader):
             logger.info(f"Predicting for batch: {i}")
 
-            if s3_directory and i == len(dataloader) - 1:
+            if s3_directory and i == 0:
                 model_name = list(forecast_compilers.keys())[0]
                 filename = f"{s3_directory}/{model_name}_latest_batch.pt"
                 torch.save(batch, filename)
