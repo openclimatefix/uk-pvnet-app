@@ -6,10 +6,10 @@ import os
 import tempfile
 import warnings
 from datetime import timedelta
-
 import dask
 import pandas as pd
 import pvnet
+import fsspec
 import torch
 import typer
 from nowcasting_datamodel.connection import DatabaseConnection
@@ -259,9 +259,18 @@ def app(
     # Make predictions
     logger.info("Processing batches")
 
+    s3_directory = os.getenv("SAVE_BATCHES_DIR", None)
+
     with torch.no_grad():
         for i, batch in enumerate(dataloader):
             logger.info(f"Predicting for batch: {i}")
+
+            if s3_directory and i == 0:
+                model_name = list(forecast_compilers.keys())[0]
+                save_batch = f"{model_name}_latest_batch.pt"
+                fs = fsspec.open(s3_directory).fs
+                fs.put(save_batch, f"{s3_directory}/{save_batch}")
+                logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}")
 
             for forecast_compiler in forecast_compilers.values():
                 # need to do copy the batch for each model, as a model might change the batch
