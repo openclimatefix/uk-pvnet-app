@@ -267,11 +267,10 @@ def app(
 
             if s3_directory and i == 0:
                 model_name = list(forecast_compilers.keys())[0]
-                local_filename = f"{model_name}_latest_batch.pt"
-                torch.save(batch, local_filename)
+                save_batch = f"{model_name}_latest_batch.pt"
                 fs = fsspec.open(s3_directory).fs
-                fs.put(local_filename, f"{s3_directory}/{local_filename}")
-                logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{local_filename}")
+                fs.put(save_batch, f"{s3_directory}/{save_batch}")
+                logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}")
 
             for forecast_compiler in forecast_compilers.values():
                 # need to do copy the batch for each model, as a model might change the batch
