@@ -16,35 +16,105 @@ def save_yaml_config(config: dict, path: str) -> None:
         yaml.dump(config, file, default_flow_style=False)
 
 
+# def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -> dict:
+#     """Populate the data source filepaths in the config
+
+#     Args:
+#         config: The data config
+#         gsp_path: For lagacy usage only
+#     """
+#     production_paths = {
+#         "gsp": gsp_path,
+#         "nwp": {"ukv": nwp_ukv_path, "ecmwf": nwp_ecmwf_path},
+#         "satellite": sat_path,
+#     }
+
+#     # Replace data sources - GSP and satellite
+#     for source in ["gsp", "satellite"]:
+#         # v0 and v1 schema
+#         if source in config["input_data"]:
+#             zarr_path_key = (
+#                 f"{source}_zarr_path"
+#                 if f"{source}_zarr_path" in config["input_data"][source]
+#                 else "zarr_path"
+#             )
+            
+#             if config["input_data"][source][zarr_path_key] != "":
+#                 assert source in production_paths, f"Missing production path: {source}"
+#                 config["input_data"][source][zarr_path_key] = production_paths[source]
+
+#     # Handle NWP separately - nested
+#     if "nwp" in config["input_data"]:
+#         nwp_config = config["input_data"]["nwp"]
+#         for nwp_source in nwp_config.keys():
+#         # v0 and v1 schema
+#             zarr_path_key = (
+#                 "nwp_zarr_path"
+#                 if "nwp_zarr_path" in nwp_config[nwp_source]
+#                 else "zarr_path"
+#             )
+#             provider_key = (
+#                 "nwp_provider"
+#                 if "nwp_provider" in nwp_config[nwp_source]
+#                 else "provider"
+#             )
+
+#             if zarr_path_key in nwp_config[nwp_source] and nwp_config[nwp_source][zarr_path_key] != "":
+#                 provider = nwp_config[nwp_source][provider_key].lower()
+#                 assert provider in production_paths["nwp"], f"Missing NWP path: {provider}"
+#                 nwp_config[nwp_source][zarr_path_key] = production_paths["nwp"][provider]
+
+#     return config
+
+
 def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -> dict:
-    """Populate the data source filepaths in the config
+    """Populate the data source filepaths in the config with backwards compatibility
 
     Args:
         config: The data config
-        gsp_path: For lagacy usage only
+        gsp_path: For legacy usage only
     """
-
     production_paths = {
         "gsp": gsp_path,
         "nwp": {"ukv": nwp_ukv_path, "ecmwf": nwp_ecmwf_path},
         "satellite": sat_path,
     }
 
-    # Replace data sources
+    # Backward compatibility for attribute handling
     for source in ["gsp", "satellite"]:
         if source in config["input_data"]:
-            if config["input_data"][source][f"{source}_zarr_path"] != "":
+            source_config = config["input_data"][source]
+            path_key = f"{source}_zarr_path"
+            
+            if source_config.get(path_key, ""):
                 assert source in production_paths, f"Missing production path: {source}"
-                config["input_data"][source][f"{source}_zarr_path"] = production_paths[source]
+                source_config[path_key] = production_paths[source]
+                
+                if source == "gsp":
+                    source_config["handle_legacy_attrs"] = True
 
-    # NWP is nested so much be treated separately
+    # NWP is nested - treated separately 
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
-            if nwp_config[nwp_source]["nwp_zarr_path"] != "":
+            zarr_path = nwp_config[nwp_source].get("nwp_zarr_path", "")
+            if zarr_path:
                 assert "nwp" in production_paths, "Missing production path: nwp"
                 assert nwp_source in production_paths["nwp"], f"Missing NWP path: {nwp_source}"
                 nwp_config[nwp_source]["nwp_zarr_path"] = production_paths["nwp"][nwp_source]
+
+                # v0 and v1 schema
+                old_keys = [
+                    ("zarr_path", "nwp_zarr_path"),
+                    ("channels", "nwp_channels"),
+                    ("image_size_pixels_height", "nwp_image_size_pixels_height"),
+                    ("image_size_pixels_width", "nwp_image_size_pixels_width"),
+                    ("provider", "nwp_provider")
+                ]
+                
+                for old_key, new_key in old_keys:
+                    if old_key in nwp_config[nwp_source]:
+                        nwp_config[nwp_source][new_key] = nwp_config[nwp_source].pop(old_key)
 
     return config
 
@@ -56,18 +126,32 @@ def overwrite_config_dropouts(config: dict) -> dict:
         config: The data config
     """
 
-    # Replace data sources
+    # Replace data source - satellite
     for source in ["satellite"]:
+        
+        # v0 and v1 schema
         if source in config["input_data"]:
-            if config["input_data"][source][f"{source}_zarr_path"] != "":
-                config["input_data"][source][f"dropout_timedeltas_minutes"] = None
+            zarr_path_key = (
+                f"{source}_zarr_path"
+                if f"{source}_zarr_path" in config["input_data"][source]
+                else "zarr_path"
+            )
+            if config["input_data"][source][zarr_path_key] != "":
+                config["input_data"][source]["dropout_timedeltas_minutes"] = None
 
-    # NWP is nested so much be treated separately
+    # Handle NWP separately - nested
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
-            if nwp_config[nwp_source]["nwp_zarr_path"] != "":
-                nwp_config[nwp_source]["dropout_timedeltas_minutes"] = None
+
+        # v0 and v1 schema
+            zarr_path_key = (
+                "nwp_zarr_path"
+                if "nwp_zarr_path" in nwp_config[nwp_source]
+                else "zarr_path"
+            )
+            if zarr_path_key in nwp_config[nwp_source] and nwp_config[nwp_source][zarr_path_key] != "":
+                config["input_data"]["nwp"][nwp_source]["dropout_timedeltas_minutes"] = None
 
     return config
 
