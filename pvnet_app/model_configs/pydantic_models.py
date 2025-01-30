@@ -55,6 +55,12 @@ class Model(BaseModel):
         description="If this model uses data sampler, old one uses ocf_datapipes",
     )
 
+    config_schema_version: Optional[str] = Field(
+        "v1",
+        title="Config Schema Version", 
+        description="Schema version - 'v0' for legacy ocf_datapipes format or 'v1' for data-sampler"
+    )
+
 
 class Models(BaseModel):
     """A group of ml models"""
