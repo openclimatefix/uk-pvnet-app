@@ -55,6 +55,7 @@ class Model(BaseModel):
         description="If this model uses data sampler, old one uses ocf_datapipes",
     )
 
+    # CURRENTLY PUSHED - TO MOVE / REDUCE
     config_schema_version: Optional[str] = Field(
         "v1",
         title="Config Schema Version", 
@@ -81,6 +82,15 @@ class Models(BaseModel):
         return v
 
 
+# NEWLY INTRODUCED FUNCTION - TO MOVE / REDUCE
+def validate_and_transform_model(model: Model) -> Model:
+    if model.config_schema_version == "v0":
+        if not hasattr(model, 'uses_ocf_data_sampler'):
+            model.uses_ocf_data_sampler = False
+        log.warning(f"Migrating model {model.name} from v0 to v1 schema")
+    return model
+
+
 def get_all_models(
     get_ecmwf_only: Optional[bool] = False,
     get_day_ahead_only: Optional[bool] = False,
@@ -102,6 +112,9 @@ def get_all_models(
 
     with fsspec.open(filename, mode="r") as stream:
         models = parse_config(data=stream)
+
+        # UPDATE LINE - MOVE
+        models['models'] = [validate_and_transform_model(Model(**model)) for model in models['models']]
         models = Models(**models)
 
     models = config_pvnet_v2_model(models)

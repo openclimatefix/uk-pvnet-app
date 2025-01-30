@@ -1,10 +1,11 @@
 import os
-
+import tempfile
 import pytest
 import pandas as pd
 import numpy as np
 import xarray as xr
 import torch
+
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast, Base_PV
 from nowcasting_datamodel.read.read import get_location
@@ -194,43 +195,119 @@ def sat_15_data_small(test_t0):
     return make_sat_data(test_t0, delay_mins=0, freq_mins=15,small=True)
 
 
+# @pytest.fixture()
+# def gsp_yields_and_systems(db_session, test_t0):
+#     """Create gsp yields and systems"""
+
+#     # GSP data is mostly up to date
+#     t0_datetime_utc = test_t0
+
+#     # this pv systems has same coordiantes as the first gsp
+#     gsp_yields = []
+#     locations = []
+#     for i in range(0, 318):capacity_mwp
+#         location_sql: LocationSQL = get_location(
+#             session=db_session,
+#             gsp_id=i,
+#             installed_capacity_mw=123.0,
+#         )
+
+#         # From 3 hours ago to 8.5 hours into future
+#         for minute in range(-3 * 60, 9 * 60, 30):
+#             gsp_yield_sql = GSPYield(
+#                 datetime_utc=(t0_datetime_utc + timedelta(minutes=minute)).replace(tzinfo=timezone.utc),
+#                 solar_generation_kw=np.random.randint(low=0, high=1000),
+#                 capacity_mwp=100,
+#             ).to_orm()
+#             gsp_yield_sql.location = location_sql
+#             gsp_yields.append(gsp_yield_sql)
+#             locations.append(location_sql)
+
+#     # add to database
+#     db_session.add_all(gsp_yields)
+
+#     db_session.commit()
+
+#     return {
+#         "gsp_yields": gsp_yields,
+#         "gs_systems": locations,
+#     }
+
 @pytest.fixture()
 def gsp_yields_and_systems(db_session, test_t0):
-    """Create gsp yields and systems"""
+    """Create gsp yields and systems for data sampler format"""
+    
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        os.chdir(tmpdirname)
 
-    # GSP data is mostly up to date
-    t0_datetime_utc = test_t0
+        t0_datetime_utc = test_t0
+        gsp_yields = []
+        locations = []
+        capacity_value = 100.0
 
-    # this pv systems has same coordiantes as the first gsp
-    gsp_yields = []
-    locations = []
-    for i in range(0, 318):
-        location_sql: LocationSQL = get_location(
-            session=db_session,
-            gsp_id=i,
-            installed_capacity_mw=123.0,
+        # Database setup
+        for i in range(0, 318):
+            location_sql: LocationSQL = get_location(
+                session=db_session,
+                gsp_id=i,
+                installed_capacity_mw=capacity_value,
+            )
+
+            for minute in range(-3 * 60, 9 * 60, 30):
+                gsp_yield_sql = GSPYield(
+                    datetime_utc=(t0_datetime_utc + timedelta(minutes=minute)).replace(tzinfo=timezone.utc),
+                    solar_generation_kw=np.random.randint(low=0, high=1000),
+                    capacity_mwp=capacity_value,
+                ).to_orm()
+                gsp_yield_sql.location = location_sql
+                gsp_yields.append(gsp_yield_sql)
+                locations.append(location_sql)
+
+        db_session.add_all(gsp_yields)
+        db_session.commit()
+
+        # Create zarr dataset with special handling for capacity_mwp
+        ds = xr.Dataset()
+        times = pd.date_range(
+            start=t0_datetime_utc - timedelta(hours=3),
+            end=t0_datetime_utc + timedelta(hours=8.5),
+            freq='30min'
+        )
+        gsp_ids = np.arange(318)
+
+        # Create capacity array
+        capacity_array = np.ones(len(gsp_ids)) * capacity_value
+
+        # Add it first as a data variable (for compatibility)
+        ds['installedcapacity_mwp'] = xr.DataArray(
+            data=np.ones((len(times), len(gsp_ids))) * capacity_value,
+            dims=['time_utc', 'gsp_id'],
+            coords={
+                'time_utc': times,
+                'gsp_id': gsp_ids
+            }
         )
 
-        # From 3 hours ago to 8.5 hours into future
-        for minute in range(-3 * 60, 9 * 60, 30):
-            gsp_yield_sql = GSPYield(
-                datetime_utc=(t0_datetime_utc + timedelta(minutes=minute)).replace(tzinfo=timezone.utc),
-                solar_generation_kw=np.random.randint(low=0, high=1000),
-                capacity_mwp=100,
-            ).to_orm()
-            gsp_yield_sql.location = location_sql
-            gsp_yields.append(gsp_yield_sql)
-            locations.append(location_sql)
+        # Add it as a coordinate (this is what makes it accessible as an attribute)
+        ds = ds.assign_coords({
+            'capacity_mwp': ('gsp_id', capacity_array)
+        })
 
-    # add to database
-    db_session.add_all(gsp_yields)
+        # Set attributes required for v1 schema
+        ds.attrs['interval_start_minutes'] = -180
+        ds.attrs['interval_end_minutes'] = 510
+        ds.attrs['time_resolution_minutes'] = 30
+        ds.attrs['config_schema_version'] = 'v1'
 
-    db_session.commit()
+        # Save to zarr
+        zarr_path = os.path.join(tmpdirname, "temp_gsp.zarr")
+        os.environ["GSP_ZARR_PATH"] = zarr_path
+        ds.to_zarr(zarr_path, mode='w')
 
-    return {
-        "gsp_yields": gsp_yields,
-        "gs_systems": locations,
-    }
+        yield {
+            "gsp_yields": gsp_yields,
+            "gs_systems": locations,
+        }
 
 
 @pytest.fixture()
