@@ -16,12 +16,14 @@ def save_yaml_config(config: dict, path: str) -> None:
         yaml.dump(config, file, default_flow_style=False)
 
 
-def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -> dict:
+def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "", schema_version: str = "v0") -> dict:
     """Populate the data source filepaths in the config with schema version handling
 
     Args:
-        config: The data config
+        config: The data config. This can be stored on HuggingFace
         gsp_path: For legacy usage only
+        schema_version: Configuration schema version from ocf-datapipes is v0. N
+            ew ocf-data-sample is v1 (> version 0.0.X).
     """
     production_paths = {
         "gsp": gsp_path,
