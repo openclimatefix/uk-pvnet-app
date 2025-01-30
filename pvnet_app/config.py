@@ -62,7 +62,7 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
                     if "zarr_path" in source_config:
                         source_config["gsp_zarr_path"] = source_config.pop("zarr_path")
 
-            if source_config.get(zarr_path_key, ""):
+            if not source_config.get(zarr_path_key, ""):
                 assert source in production_paths, f"Missing production path: {source}"
                 source_config[zarr_path_key] = production_paths[source]
 
@@ -88,7 +88,7 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
                 height_key = "nwp_image_size_pixels_height"
                 width_key = "nwp_image_size_pixels_width"
 
-            if nwp_config[nwp_source].get(path_key, ""):
+            if not nwp_config[nwp_source].get(path_key, ""):
                 provider = nwp_config[nwp_source][provider_key].lower()
                 assert provider in production_paths["nwp"], f"Missing NWP path: {provider}"
                 nwp_config[nwp_source][path_key] = production_paths["nwp"][provider]
