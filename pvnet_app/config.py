@@ -41,7 +41,7 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
             # Specific handling for GSP to ensure data sampler compatibility
             if source == "gsp":
                 # Ensure backward compatibility and add missing keys
-                source_config.setdefault('config_schema_version', schema_version)
+                # source_config.setdefault('config_schema_version', schema_version)
                 
                 # Add default keys for OCF data sampler
                 gsp_keys_to_ensure = [
@@ -51,13 +51,13 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
                     'capacity_mwp'
                 ]
                 
-                for key in gsp_keys_to_ensure:
-                    source_config.setdefault(key, True)
-                
                 # Ensure zarr path keys are consistent
                 if schema_version == "v1":
                     if f"gsp_zarr_path" in source_config:
                         source_config["zarr_path"] = source_config.pop(f"gsp_zarr_path")
+
+                        for key in gsp_keys_to_ensure:
+                            source_config.setdefault(key, True)
                 else:
                     if "zarr_path" in source_config:
                         source_config["gsp_zarr_path"] = source_config.pop("zarr_path")
