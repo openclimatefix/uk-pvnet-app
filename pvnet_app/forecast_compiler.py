@@ -205,6 +205,10 @@ class ForecastCompiler:
             ),
         )
 
+        # check that the gsp capacities are not nans
+        if np.isnan(self.gsp_capacities.values).any():
+            raise ValueError("GSP capacities contain NaNs")
+
         # Multiply normalised forecasts by capacities and clip negatives
         self.log_info(f"Converting to absolute MW using {self.gsp_capacities}")
         da_abs = da_normed.clip(0, None) * self.gsp_capacities.values[:, None, None]
