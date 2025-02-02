@@ -27,6 +27,7 @@ def get_dataloader(
     # Populate the data config with production data paths
     modified_data_config_filename = Path(config_filename).parent / "data_config.yaml"
 
+    # TODO pass in schema_version to populated_data_config_filename using partial
     modify_data_config_for_production(config_filename, modified_data_config_filename)
 
     dataset = PVNetUKRegionalDataset(
