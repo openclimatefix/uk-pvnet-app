@@ -6,7 +6,7 @@ PVNet-summation==0.3.2
 pvnet==3.0.50
 ocf_datapipes==3.3.39
 ocf_data_sampler==0.0.19
-nowcasting_datamodel>=1.5.45
+nowcasting_datamodel>=1.5.60
 fsspec[s3]
 xarray
 zarr==2.18.3
