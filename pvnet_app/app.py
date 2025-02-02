@@ -14,7 +14,9 @@ import torch
 import typer
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
-from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
+from nowcasting_datamodel.models.gsp import LocationSQL
+# from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
+from nowcasting_datamodel.read.read import get_location
 from ocf_datapipes.batch import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 import sentry_sdk
@@ -164,12 +166,13 @@ def app(
     db_connection = DatabaseConnection(url=os.getenv("DB_URL"), base=Base_Forecast, echo=False)
     with db_connection.get_session() as session:
         #  Pandas series of most recent GSP capacities
-        gsp_capacities = get_latest_gsp_capacities(
-            session=session, gsp_ids=gsp_ids, datetime_utc=t0 - timedelta(days=2)
-        )
+
+        locations = session.query(LocationSQL).where(LocationSQL.gsp_id.in_(gsp_ids)).all()
+        gsp_capacities = pd.Series([location.installed_capacity_mw for location in locations],
+                                   index=[location.gsp_id for location in locations])
 
         # National capacity is needed if using summation model
-        national_capacity = get_latest_gsp_capacities(session, [0])[0]
+        national_capacity = get_location(session, gsp_id=0).installed_capacity_mw
 
     # Download satellite data
     logger.info("Downloading satellite data")
