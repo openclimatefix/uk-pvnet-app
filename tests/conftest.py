@@ -205,10 +205,16 @@ def gsp_yields_and_systems(db_session, test_t0):
     gsp_yields = []
     locations = []
     for i in range(0, 318):
+
+        if i == 0:
+            installed_capacity_mw = 17000
+        else:
+            installed_capacity_mw = 17000/318
+        
         location_sql: LocationSQL = get_location(
             session=db_session,
             gsp_id=i,
-            installed_capacity_mw=123.0,
+            installed_capacity_mw = installed_capacity_mw,
         )
 
         # From 3 hours ago to 8.5 hours into future
