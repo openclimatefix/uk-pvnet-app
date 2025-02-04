@@ -95,7 +95,7 @@ models:
   - name: pvnet_day_ahead
     pvnet:
         repo: openclimatefix/pvnet_uk_region_day_ahead
-        version: c55ae982ff6eac1b737c15f46aa6bca43046e51d
+        version: 263741ebb6b71559d113d799c9a579a973cc24ba
     summation:
         repo: null
         version: null
