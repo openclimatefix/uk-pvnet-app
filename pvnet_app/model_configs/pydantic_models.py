@@ -12,8 +12,8 @@ log = logging.getLogger(__name__)
 
 
 class ModelHF(BaseModel):
-    repo: str = Field(..., title="Repo name", description="The HF Repo")
-    version: str = Field(..., title="Repo version", description="The HF version")
+    repo: Optional[str] = Field(None, title="Repo name", description="The HF Repo")
+    version: Optional[str] = Field(None, title="Repo version", description="The HF version")
 
 
 class Model(BaseModel):
@@ -55,13 +55,6 @@ class Model(BaseModel):
         description="If this model uses data sampler, old one uses ocf_datapipes",
     )
 
-    # CURRENTLY PUSHED - TO MOVE / REDUCE
-    config_schema_version: Optional[str] = Field(
-        "v1",
-        title="Config Schema Version", 
-        description="Schema version - 'v0' for legacy ocf_datapipes format or 'v1' for data-sampler"
-    )
-
 
 class Models(BaseModel):
     """A group of ml models"""
@@ -82,15 +75,6 @@ class Models(BaseModel):
         return v
 
 
-# NEWLY INTRODUCED FUNCTION - TO MOVE / REDUCE
-def validate_and_transform_model(model: Model) -> Model:
-    if model.config_schema_version == "v0":
-        if not hasattr(model, 'uses_ocf_data_sampler'):
-            model.uses_ocf_data_sampler = False
-        log.warning(f"Migrating model {model.name} from v0 to v1 schema")
-    return model
-
-
 def get_all_models(
     get_ecmwf_only: Optional[bool] = False,
     get_day_ahead_only: Optional[bool] = False,
@@ -107,45 +91,56 @@ def get_all_models(
         use_ocf_data_sampler: If the OCF Data Sampler should be used
     """
 
-    # load models from yaml file
-    filename = os.path.dirname(os.path.abspath(__file__)) + "/all_models.yaml"
+    try:
+        # load models from yaml file
+        filename = os.path.dirname(os.path.abspath(__file__)) + "/all_models.yaml"
 
-    with fsspec.open(filename, mode="r") as stream:
-        models = parse_config(data=stream)
+        with fsspec.open(filename, mode="r") as stream:
+            try:
+                models_dict = parse_config(data=stream)
+                models = Models(**models_dict)
+            except Exception as config_error:
+                log.error(f"Error parsing model configuration: {config_error}")
+                raise
 
-        # UPDATE LINE - MOVE
-        models['models'] = [validate_and_transform_model(Model(**model)) for model in models['models']]
-        models = Models(**models)
+        models = config_pvnet_v2_model(models)
 
-    models = config_pvnet_v2_model(models)
+        # Apply filters based on input parameters
+        filtered_models = models.models.copy()
 
-    if get_ecmwf_only:
-        log.info("Using ECMWF model only")
-        models.models = [model for model in models.models if model.ecmwf_only]
+        if get_ecmwf_only:
+            log.info("Filtering for ECMWF model only")
+            filtered_models = [model for model in filtered_models if model.ecmwf_only]
 
-    if get_day_ahead_only:
-        log.info("Using Day Ahead model only")
-        models.models = [model for model in models.models if model.day_ahead]
-    else:
-        log.info("Not using Day Ahead model")
-        models.models = [model for model in models.models if not model.day_ahead]
+        if get_day_ahead_only:
+            log.info("Filtering for Day Ahead model")
+            filtered_models = [model for model in filtered_models if model.day_ahead]
+        else:
+            log.info("Excluding Day Ahead model")
+            filtered_models = [model for model in filtered_models if not model.day_ahead]
 
-    if not run_extra_models and not get_day_ahead_only and not get_ecmwf_only:
-        log.info("Not running extra models")
-        models.models = [model for model in models.models if model.name == "pvnet_v2"]
+        if not run_extra_models and not get_day_ahead_only and not get_ecmwf_only:
+            log.info("Limiting to default pvnet_v2 model")
+            filtered_models = [model for model in filtered_models if model.name == "pvnet_v2"]
 
-    if use_ocf_data_sampler:
-        log.info("Using OCF Data Sampler")
-        models.models = [model for model in models.models if model.uses_ocf_data_sampler]
-    else:
-        log.info("Not using OCF Data Sampler, using ocf_datapipes")
-        models.models = [model for model in models.models if not model.uses_ocf_data_sampler]
+        if use_ocf_data_sampler:
+            log.info("Filtering for models using OCF Data Sampler")
+            filtered_models = [model for model in filtered_models if model.uses_ocf_data_sampler]
+        else:
+            log.info("Filtering for models not using OCF Data Sampler")
+            filtered_models = [model for model in filtered_models if not model.uses_ocf_data_sampler]
 
-    log.info(
-        f"Got the following models: {[(model.name, f'uses_ocf_data_sampler={model.uses_ocf_data_sampler}') for model in models.models]}"
-    )
+        selected_model_info = [
+            (model.name, f'uses_ocf_data_sampler={model.uses_ocf_data_sampler}') 
+            for model in filtered_models
+        ]
+        log.info(f"Selected models: {selected_model_info}")
 
-    return models.models
+        return filtered_models
+
+    except Exception as e:
+        log.error(f"Critical error in get_all_models: {e}")
+        raise
 
 
 def config_pvnet_v2_model(models):
