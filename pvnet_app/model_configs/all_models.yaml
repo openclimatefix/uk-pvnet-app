@@ -1,7 +1,6 @@
 # Here we define all the models that are available in the app
 # Batches are prepared only once, so the extra models must be able to run on the batches created
 # to run the pvnet_v2 model
-
 models:
 
   - name: pvnet_v2
@@ -25,7 +24,7 @@ models:
         version: dcfdc17fda8e48c387122614bec8b284eaa868b9
 
     # single source models
-  - name: pvnet_v2-sat0-only-samples-v1
+  - name: pvnet_v2-sat0-only-samples-v1"
     pvnet:
       repo: openclimatefix/pvnet_uk_region
       version: d7ab648942c85b6788adcdbed44c91c4e1c5604a
@@ -91,20 +90,20 @@ models:
     save_gsp_to_recent: True
     day_ahead: True
     uses_ocf_data_sampler: False
-    config_schema_version: "v0"
 
 # Day ahead model that utilises data-sampler
   - name: pvnet_day_ahead
     pvnet:
         repo: openclimatefix/pvnet_uk_region_day_ahead
-        version: bc5bfcfedfbe9c722befc52d195177720582b4f7
+        version: c55ae982ff6eac1b737c15f46aa6bca43046e51d
     summation:
-        repo: openclimatefix/pvnet_summation_uk_national_day_ahead
-        version: ed60c5d32a020242ca4739dcc6dbc8864f783a08
+        repo: null
+        version: null
+        # repo: openclimatefix/pvnet_summation_uk_national_day_ahead
+        # version: ed60c5d32a020242ca4739dcc6dbc8864f783a08
     use_adjuster: True
     save_gsp_sum: True
     verbose: True
     save_gsp_to_recent: True
     day_ahead: True
     uses_ocf_data_sampler: True
-    config_schema_version: "v1"
