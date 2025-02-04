@@ -205,10 +205,16 @@ def gsp_yields_and_systems(db_session, test_t0):
     gsp_yields = []
     locations = []
     for i in range(0, 318):
+
+        if i == 0:
+            installed_capacity_mw = 17000
+        else:
+            installed_capacity_mw = 17000/318
+        
         location_sql: LocationSQL = get_location(
             session=db_session,
             gsp_id=i,
-            installed_capacity_mw=123.0,
+            installed_capacity_mw = installed_capacity_mw,
         )
 
         # From 3 hours ago to 8.5 hours into future
@@ -216,7 +222,7 @@ def gsp_yields_and_systems(db_session, test_t0):
             gsp_yield_sql = GSPYield(
                 datetime_utc=(t0_datetime_utc + timedelta(minutes=minute)).replace(tzinfo=timezone.utc),
                 solar_generation_kw=np.random.randint(low=0, high=1000),
-                capacity_mwp=100,
+                capacity_mwp=installed_capacity_mw,
             ).to_orm()
             gsp_yield_sql.location = location_sql
             gsp_yields.append(gsp_yield_sql)
