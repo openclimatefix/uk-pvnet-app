@@ -71,7 +71,7 @@ models:
     uses_satellite_data: False
     uses_ocf_data_sampler: False
 # Legacy day ahead model without data-sampler
-  - name: pvnet_day_ahead_legacy
+  - name: pvnet_day_ahead
     pvnet:
         repo: openclimatefix/pvnet_uk_region_day_ahead
         version: d87565731692a6003e43caac4feaed0f69e79272
@@ -90,8 +90,8 @@ models:
         repo: openclimatefix/pvnet_uk_region_day_ahead
         version: 263741ebb6b71559d113d799c9a579a973cc24ba
     summation:
-        repo: null
-        version: null
+        repo: openclimatefix/pvnet_summation_uk_national_day_ahead
+        version: ed60c5d32a020242ca4739dcc6dbc8864f783a08
     use_adjuster: True
     save_gsp_sum: True
     verbose: True

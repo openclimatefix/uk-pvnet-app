@@ -353,7 +353,7 @@ def test_app_ocf_datapipes(
 # Test for new DA model with data sampler utilisation
 # To note - Satellite omitted
 def test_app_day_ahead_data_sampler(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+    db_session, nwp_ukv_data, nwp_ecmwf_data, gsp_yields_and_systems, me_latest
 ):
     """Test the app running the day ahead model"""
 

@@ -12,8 +12,8 @@ log = logging.getLogger(__name__)
 
 
 class ModelHF(BaseModel):
-    repo: Optional[str] = Field(None, title="Repo name", description="The HF Repo")
-    version: Optional[str] = Field(None, title="Repo version", description="The HF version")
+    repo: str = Field(..., title="Repo name", description="The HF Repo")
+    version: str = Field(..., title="Repo version", description="The HF version")
 
 
 class Model(BaseModel):
