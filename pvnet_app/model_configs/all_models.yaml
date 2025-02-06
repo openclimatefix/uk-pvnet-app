@@ -70,8 +70,7 @@ models:
     ecmwf_only: True
     uses_satellite_data: False
     uses_ocf_data_sampler: False
-# The day ahead model has not yet been re-trained with data-sampler.
-# It will be run with the legacy dataloader using ocf_datapipes
+# Legacy day ahead model without data-sampler
   - name: pvnet_day_ahead
     pvnet:
         repo: openclimatefix/pvnet_uk_region_day_ahead
@@ -85,4 +84,17 @@ models:
     save_gsp_to_recent: True
     day_ahead: True
     uses_ocf_data_sampler: False
-
+# Day ahead model that utilises data-sampler
+  - name: pvnet_day_ahead
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region_day_ahead
+        version: 263741ebb6b71559d113d799c9a579a973cc24ba
+    summation:
+        repo: openclimatefix/pvnet_summation_uk_national_day_ahead
+        version: ed60c5d32a020242ca4739dcc6dbc8864f783a08
+    use_adjuster: True
+    save_gsp_sum: True
+    verbose: True
+    save_gsp_to_recent: True
+    day_ahead: True
+    uses_ocf_data_sampler: True

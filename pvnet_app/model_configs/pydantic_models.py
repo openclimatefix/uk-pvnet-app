@@ -91,42 +91,56 @@ def get_all_models(
         use_ocf_data_sampler: If the OCF Data Sampler should be used
     """
 
-    # load models from yaml file
-    filename = os.path.dirname(os.path.abspath(__file__)) + "/all_models.yaml"
+    try:
+        # load models from yaml file
+        filename = os.path.dirname(os.path.abspath(__file__)) + "/all_models.yaml"
 
-    with fsspec.open(filename, mode="r") as stream:
-        models = parse_config(data=stream)
-        models = Models(**models)
+        with fsspec.open(filename, mode="r") as stream:
+            try:
+                models_dict = parse_config(data=stream)
+                models = Models(**models_dict)
+            except Exception as config_error:
+                log.error(f"Error parsing model configuration: {config_error}")
+                raise
 
-    models = config_pvnet_v2_model(models)
+        models = config_pvnet_v2_model(models)
 
-    if get_ecmwf_only:
-        log.info("Using ECMWF model only")
-        models.models = [model for model in models.models if model.ecmwf_only]
+        # Apply filters based on input parameters
+        filtered_models = models.models.copy()
 
-    if get_day_ahead_only:
-        log.info("Using Day Ahead model only")
-        models.models = [model for model in models.models if model.day_ahead]
-    else:
-        log.info("Not using Day Ahead model")
-        models.models = [model for model in models.models if not model.day_ahead]
+        if get_ecmwf_only:
+            log.info("Filtering for ECMWF model only")
+            filtered_models = [model for model in filtered_models if model.ecmwf_only]
 
-    if not run_extra_models and not get_day_ahead_only and not get_ecmwf_only:
-        log.info("Not running extra models")
-        models.models = [model for model in models.models if model.name == "pvnet_v2"]
+        if get_day_ahead_only:
+            log.info("Filtering for Day Ahead model")
+            filtered_models = [model for model in filtered_models if model.day_ahead]
+        else:
+            log.info("Excluding Day Ahead model")
+            filtered_models = [model for model in filtered_models if not model.day_ahead]
 
-    if use_ocf_data_sampler:
-        log.info("Using OCF Data Sampler")
-        models.models = [model for model in models.models if model.uses_ocf_data_sampler]
-    else:
-        log.info("Not using OCF Data Sampler, using ocf_datapipes")
-        models.models = [model for model in models.models if not model.uses_ocf_data_sampler]
+        if not run_extra_models and not get_day_ahead_only and not get_ecmwf_only:
+            log.info("Limiting to default pvnet_v2 model")
+            filtered_models = [model for model in filtered_models if model.name == "pvnet_v2"]
 
-    log.info(
-        f"Got the following models: {[(model.name, f'uses_ocf_data_sampler={model.uses_ocf_data_sampler}') for model in models.models]}"
-    )
+        if use_ocf_data_sampler:
+            log.info("Filtering for models using OCF Data Sampler")
+            filtered_models = [model for model in filtered_models if model.uses_ocf_data_sampler]
+        else:
+            log.info("Filtering for models not using OCF Data Sampler")
+            filtered_models = [model for model in filtered_models if not model.uses_ocf_data_sampler]
 
-    return models.models
+        selected_model_info = [
+            (model.name, f'uses_ocf_data_sampler={model.uses_ocf_data_sampler}') 
+            for model in filtered_models
+        ]
+        log.info(f"Selected models: {selected_model_info}")
+
+        return filtered_models
+
+    except Exception as e:
+        log.error(f"Critical error in get_all_models: {e}")
+        raise
 
 
 def config_pvnet_v2_model(models):
