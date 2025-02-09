@@ -77,8 +77,9 @@ def get_legacy_dataloader(
         gsp_path=os.environ["DB_URL"],
     )
 
-    # Set up ID location query object
-    # get shape file
+    # Get gsp shape file, go get the osgb coorindates
+    # This now gets data from the NG data portal.
+    # We could change this so the x osgb and y osgb values are saved
     gsp_id_to_shape = get_gsp_shape_from_eso(return_filename=False)
 
     # Ensure the centroids have the same GSP ID index as the GSP PV power:
