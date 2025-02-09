@@ -1,6 +1,6 @@
 from pathlib import Path
 import pandas as pd
-from sqlalchemy.orm.session import Session
+import numpy as np
 
 from torch.utils.data import DataLoader
 from ocf_datapipes.batch import stack_np_examples_into_batch
@@ -87,7 +87,7 @@ def get_legacy_dataloader(
     y_osgb = gsp_id_to_shape.geometry.centroid.y.astype(np.float32)
     gsp_id_to_loc = GSPLocationLookup(x_osgb, y_osgb)
 
-    # Location and time datapipes
+    # Location and time datapipes, the locations objects have x_osgb and y_osgb
     location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
     t0_datapipe = IterableWrapper([t0]).repeat(len(location_pipe))
 
