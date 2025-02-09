@@ -1,15 +1,16 @@
 from pathlib import Path
 import pandas as pd
+from sqlalchemy.orm.session import Session
 
 from torch.utils.data import DataLoader
 from ocf_datapipes.batch import stack_np_examples_into_batch
+from ocf_datapipes.utils.eso import get_gsp_shape_from_eso
 from ocf_data_sampler.torch_datasets.pvnet_uk_regional import PVNetUKRegionalDataset
 
 from pvnet_app.config import modify_data_config_for_production
 
 # Legacy imports - only used for legacy dataloader
 import os
-from ocf_datapipes.load import OpenGSPFromDatabase
 from torch.utils.data.datapipes.iter import IterableWrapper
 from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
 from ocf_datapipes.batch import BatchKey
@@ -77,8 +78,14 @@ def get_legacy_dataloader(
     )
 
     # Set up ID location query object
-    ds_gsp = next(iter(OpenGSPFromDatabase()))
-    gsp_id_to_loc = GSPLocationLookup(ds_gsp.x_osgb, ds_gsp.y_osgb)
+    # get shape file
+    gsp_id_to_shape = get_gsp_shape_from_eso(return_filename=False)
+
+    # Ensure the centroids have the same GSP ID index as the GSP PV power:
+    gsp_id_to_shape = gsp_id_to_shape.loc[gsp_ids]
+    x_osgb = gsp_id_to_shape.geometry.centroid.x.astype(np.float32)
+    y_osgb = gsp_id_to_shape.geometry.centroid.y.astype(np.float32)
+    gsp_id_to_loc = GSPLocationLookup(x_osgb, y_osgb)
 
     # Location and time datapipes
     location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
