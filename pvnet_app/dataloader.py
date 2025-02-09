@@ -4,7 +4,6 @@ import numpy as np
 
 from torch.utils.data import DataLoader
 from ocf_datapipes.batch import stack_np_examples_into_batch
-from ocf_datapipes.utils.eso import get_gsp_shape_from_eso
 from ocf_data_sampler.torch_datasets.pvnet_uk_regional import PVNetUKRegionalDataset
 
 from pvnet_app.config import modify_data_config_for_production
@@ -14,7 +13,8 @@ import os
 from torch.utils.data.datapipes.iter import IterableWrapper
 from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
 from ocf_datapipes.batch import BatchKey
-from pvnet.utils import GSPLocationLookup
+from ocf_datapipes.utils.eso import get_gsp_shape_from_eso
+from ocf_datapipes.utils import Location
 
 
 def get_dataloader(
@@ -85,10 +85,13 @@ def get_legacy_dataloader(
     gsp_id_to_shape = gsp_id_to_shape.loc[gsp_ids]
     x_osgb = gsp_id_to_shape.geometry.centroid.x.astype(np.float32)
     y_osgb = gsp_id_to_shape.geometry.centroid.y.astype(np.float32)
-    gsp_id_to_loc = GSPLocationLookup(x_osgb, y_osgb)
+    locations = []
+    for gsp_id in gsp_ids:
+        location = Location(x=x_osgb.loc[gsp_id], y=y_osgb.loc[gsp_id], id=gsp_id)
+        locations.append(location)
 
     # Location and time datapipes, the locations objects have x_osgb and y_osgb
-    location_pipe = IterableWrapper([gsp_id_to_loc(gsp_id) for gsp_id in gsp_ids])
+    location_pipe = IterableWrapper(locations)
     t0_datapipe = IterableWrapper([t0]).repeat(len(location_pipe))
 
     location_pipe = location_pipe.sharding_filter()
