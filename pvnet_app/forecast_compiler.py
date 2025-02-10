@@ -16,6 +16,8 @@ from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 
+from ocf_data_sampler.numpy_sample.gsp import GSPSampleKey
+
 import pvnet_app
 from pvnet_app.model_configs.pydantic_models import Model
 
@@ -137,12 +139,20 @@ class ForecastCompiler:
 
         self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
         # Store GSP IDs for this batch for reordering later
-        these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
+
+        if self.use_legacy:
+            gsp_id_label = BatchKey.gsp_id
+        else:
+            gsp_id_label = GSPSampleKey.gsp_id
+
+        these_gsp_ids = batch[gsp_id_label].cpu().numpy()
         self.gsp_ids_each_batch += [these_gsp_ids]
 
-        self.log_info(f"{batch[BatchKey.gsp_id]=}")
+        self.log_info(f"{batch[gsp_id_label]=}")
+
         # TODO: This change should be moved inside PVNet
-        batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
+        batch[gsp_id_label] = batch[gsp_id_label].unsqueeze(1)
+
 
         # Run batch through model
         preds = self.model(batch).detach().cpu().numpy()
