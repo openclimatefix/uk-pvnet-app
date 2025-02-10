@@ -49,22 +49,23 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
     return config
 
 
-def overwrite_config_dropouts(config: dict, drop_input_data_forecast_and_history:bool=False) -> dict:
+def overwrite_config_dropouts(config: dict) -> dict:
     """Overwrite the config drouput parameters for production
 
     Args:
         config: The data config
-        drop_input_data_forecast_and_history: Option to drop input_data.forecast_minutes
-            and input_data.history_minutes. Default is false
 
     """
 
     # Replace data sources
     for source in ["satellite"]:
         if source in config["input_data"]:
-            if config["input_data"][source][f"{source}_zarr_path"] != "":
-                config["input_data"][source][f"dropout_timedeltas_minutes"] = None
-                config["input_data"][source][f"dropout_fraction"] = 0
+
+            satellite_config = config["input_data"][source]
+
+            if satellite_config[f"{source}_zarr_path"] != "":
+                satellite_config[f"dropout_timedeltas_minutes"] = None
+                satellite_config[f"dropout_fraction"] = 0
 
     # NWP is nested so much be treated separately
     if "nwp" in config["input_data"]:
@@ -74,18 +75,104 @@ def overwrite_config_dropouts(config: dict, drop_input_data_forecast_and_history
                 nwp_config[nwp_source]["dropout_timedeltas_minutes"] = None
                 nwp_config[nwp_source]["dropout_fraction"] = 0
 
-    # this are not used anymore
-    if drop_input_data_forecast_and_history:
-        for drop_key in ["default_forecast_minutes", "default_history_minutes"]:
-            if drop_key in config["input_data"]:
-                # drop this key
-                del config["input_data"][drop_key]
+    return config
+
+
+def reformat_config_data_sampler(config: dict) -> dict:
+    """Reformat config
+
+    This is to keep configuration from 0.0.19 working,
+    we need to upgrade them a bit to the lastest configuration
+
+    Args:
+        config: The data config
+
+    """
+
+    # Replace data sources
+    source = "satellite"
+    if source in config["input_data"]:
+
+        satellite_config = config["input_data"][source]
+
+        if satellite_config[f"{source}_zarr_path"] != "":
+
+            rename_pairs = [
+                ("satellite_image_size_pixels_width", "image_size_pixels_width"),
+                ("satellite_image_size_pixels_height", "image_size_pixels_height"),
+                ("forecast_minutes", "interval_end_minutes"),
+                ("satellite_zarr_path", "zarr_path"),
+                ("satellite_channels", "channels"),
+            ]
+
+            for old, new in rename_pairs:
+                if old in satellite_config:
+                    satellite_config[new] = satellite_config[old]
+                    del satellite_config[old]
+
+            if "history_minutes" in satellite_config:
+                satellite_config["interval_start_minutes"] = -satellite_config["history_minutes"]
+                del satellite_config["history_minutes"]
+
+            if "live_delay_minutes" in satellite_config:
+                # TODO do we need to do anything with this first?
+                del satellite_config["live_delay_minutes"]
+
+    # NWP is nested so much be treated separately
+    if "nwp" in config["input_data"]:
+        nwp_config = config["input_data"]["nwp"]
+        for nwp_source in nwp_config.keys():
+            if nwp_config[nwp_source]["nwp_zarr_path"] != "":
+
+                rename_pairs = [
+                    ("nwp_image_size_pixels_width", "image_size_pixels_width"),
+                    ("nwp_image_size_pixels_height", "image_size_pixels_height"),
+                    ("forecast_minutes", "interval_end_minutes"),
+                    ("nwp_zarr_path", "zarr_path"),
+                    ("nwp_accum_channels", "accum_channels"),
+                    ("nwp_channels", "channels"),
+                    ("nwp_provider", "provider"),
+                ]
+
+                for old, new in rename_pairs:
+                    if old in nwp_config[nwp_source]:
+                        nwp_config[nwp_source][new] = nwp_config[nwp_source][old]
+                        del nwp_config[nwp_source][old]
+
+                if "history_minutes" in nwp_config[nwp_source]:
+                    nwp_config[nwp_source]["interval_start_minutes"] = -nwp_config[nwp_source][
+                        "history_minutes"
+                    ]
+                    del nwp_config[nwp_source]["history_minutes"]
+
+    source = "gsp"
+    if source in config["input_data"]:
+
+        gsp_config = config["input_data"][source]
+
+        rename_pairs = [
+            ("forecast_minutes", "interval_end_minutes"),
+            ("gsp_zarr_path", "zarr_path"),
+        ]
+
+        for old, new in rename_pairs:
+            if old in gsp_config:
+                gsp_config[new] = gsp_config[old]
+                del gsp_config[old]
+
+        if "history_minutes" in gsp_config:
+            gsp_config["interval_start_minutes"] = -gsp_config["history_minutes"]
+            del gsp_config["history_minutes"]
+
+    for drop_key in ["default_forecast_minutes", "default_history_minutes"]:
+        if drop_key in config["input_data"]:
+            del config["input_data"][drop_key]
 
     return config
 
 
 def modify_data_config_for_production(
-    input_path: str, output_path: str, gsp_path: str = "", drop_input_data_forecast_and_history:bool=False
+    input_path: str, output_path: str, gsp_path: str = "", reformat_config: bool = False
 ) -> None:
     """Resave the data config with the data source filepaths and dropouts overwritten
 
@@ -93,12 +180,14 @@ def modify_data_config_for_production(
         input_path: Path to input datapipes configuration file
         output_path: Location to save the output configuration file
         gsp_path: For lagacy usage only
-        drop_input_data_forecast_and_history: Option to drop input_data.forecast_minutes
+        reformat_config: Reformat config to new format
     """
     config = load_yaml_config(input_path)
 
     config = populate_config_with_data_data_filepaths(config, gsp_path=gsp_path)
-    config = overwrite_config_dropouts(config, drop_input_data_forecast_and_history=drop_input_data_forecast_and_history)
+    config = overwrite_config_dropouts(config)
+    if reformat_config:
+        config = reformat_config_data_sampler(config)
 
     save_yaml_config(config, output_path)
 

@@ -29,7 +29,7 @@ def test_data_config():
             modify_data_config_for_production(
                 input_path=data_config_path,
                 output_path=temp_data_config_path,
-                drop_input_data_forecast_and_history=True,
+                reformat_config=True,
             )
 
             _ = load_yaml_configuration(temp_data_config_path)
