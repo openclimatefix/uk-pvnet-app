@@ -172,15 +172,15 @@ class ForecastCompiler:
         self.log_info(f"Max prediction: {np.max(preds, axis=1)}")
     
     def validate_forecast(
-        max_forecast_mw: float,
+        national_forecast_values: np.ndarray,
         national_capacity: float,
         logger_func: Callable[[str], None],
     ) -> None:
         """
-        Checks various conditions on max_forecast_mw and raises/warns accordingly.
+        Checks various conditions using the full forecast values (in MW).
     
         Args:
-            max_forecast_mw: Maximum forecast (in MW).
+            national_forecast_values: All the forecast values for the nation (in MW).
             national_capacity: The national PV capacity (in MW).
             logger_func: A function that takes a string and logs it 
                          (e.g. self.log_info or logging.info).
@@ -188,7 +188,10 @@ class ForecastCompiler:
         Raises:
             Exception: if above certain critical thresholds.
         """
-        
+    
+        # Compute the maximum from the entire forecast array
+        max_forecast_mw = float(np.max(national_forecast_values))
+    
         # Check it doesn't exceed 10% above national capacity
         if max_forecast_mw > 1.1 * national_capacity:
             raise Exception(
@@ -197,13 +200,13 @@ class ForecastCompiler:
             )
     
         # Warn if forecast > 30 GW
-        if max_forecast_mw > 30_000:  # 30 GW
+        if max_forecast_mw > 30_000:  # 30 GW in MW
             logger_func(
                 f"WARNING: National forecast exceeds 30 GW ({max_forecast_mw / 1e3:.2f} GW)."
             )
     
-        # Hard fail if > 100 GW
-        if max_forecast_mw > 100_000:  # 100 GW
+        # Hard fail if forecast > 100 GW
+        if max_forecast_mw > 100_000:  # 100 GW in MW
             raise Exception(
                 f"Hard FAIL: The maximum of the forecast is above 100 GW! "
                 f"Forecast is {max_forecast_mw / 1e3:.2f} GW."
@@ -294,12 +297,10 @@ class ForecastCompiler:
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}"
         )
 
-        # Convert from xarray to a scalar
-        max_national_forecast_val = da_abs_national.sel(output_label="forecast_mw").max().values
-
-        # Validate
+        # Pass the entire national forecast array (for potential extra checks in future).
+        national_forecast_values = da_abs_national.sel(output_label="forecast_mw").values
         validate_forecast(
-            max_forecast_mw=max_national_forecast_val,
+            national_forecast_values=national_forecast_values,
             national_capacity=self.national_capacity,
             logger_func=self.log_info
         )
