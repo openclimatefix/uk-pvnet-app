@@ -60,14 +60,22 @@ def overwrite_config_dropouts(config: dict) -> dict:
     for source in ["satellite"]:
         if source in config["input_data"]:
             if config["input_data"][source][f"{source}_zarr_path"] != "":
-                config["input_data"][source][f"dropout_timedeltas_minutes"] = [0]
+                config["input_data"][source][f"dropout_timedeltas_minutes"] = None
+                config["input_data"][source][f"dropout_fraction"] = 0
 
     # NWP is nested so much be treated separately
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
             if nwp_config[nwp_source]["nwp_zarr_path"] != "":
-                nwp_config[nwp_source]["dropout_timedeltas_minutes"] = [0]
+                nwp_config[nwp_source]["dropout_timedeltas_minutes"] = None
+                nwp_config[nwp_source]["dropout_fraction"] = 0
+
+    # this are not used anymore
+    for drop_key in ["default_forecast_minutes", "default_history_minutes"]:
+        if drop_key in config["input_data"]:
+            # drop this key
+            del config["input_data"][drop_key]
 
     return config
 
