@@ -198,8 +198,8 @@ def sat_15_data_small(test_t0):
 def gsp_yields_and_systems(db_session, test_t0):
     """Create gsp yields and systems"""
 
-    # GSP data is mostly up to date
-    t0_datetime_utc = test_t0
+    # GSP data is mostly up to date, but 10 hours delayed
+    t0_datetime_utc = test_t0 - timedelta(hours=10)
 
     # this pv systems has same coordiantes as the first gsp
     gsp_yields = []
