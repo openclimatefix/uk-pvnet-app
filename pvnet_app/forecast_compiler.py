@@ -254,6 +254,12 @@ class ForecastCompiler:
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}"
         )
 
+        # check that maximum national is above 10% of national capacity.
+        if da_abs_national.max() > 1.1 * self.national_capacity:
+            raise Exception(f'The Maximum of the national forecast is {da_abs_national.max().values} '
+                            f'which is greater than 10% of the national capacity '
+                            f'({self.national_capacity})')
+
         # Convert from xarray to a scalar
         max_national_forecast_val = da_abs_national.sel(output_label="forecast_mw").max().values
 
