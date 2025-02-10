@@ -177,7 +177,7 @@ class ForecastCompiler:
             )
         else:
             # The new dataloader normalises the data to [0, 1]
-            elevation = (batch[BatchKey.gsp_solar_elevation].cpu().numpy() - 0.5) * 180
+            elevation = (batch[GSPSampleKey.solar_elevation].cpu().numpy() - 0.5) * 180
 
         # We only need elevation mask for forecasted values, not history
         elevation = elevation[:, -preds.shape[1] :]
