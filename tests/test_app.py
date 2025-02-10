@@ -81,8 +81,6 @@ def test_app(
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
 
-
-
 def test_app_no_sat(
     db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
 ):
