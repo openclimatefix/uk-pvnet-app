@@ -28,7 +28,9 @@ def get_dataloader(
     # Populate the data config with production data paths
     modified_data_config_filename = Path(config_filename).parent / "data_config.yaml"
 
-    modify_data_config_for_production(config_filename, modified_data_config_filename)
+    modify_data_config_for_production(input_path=config_filename,
+                                      output_path=modified_data_config_filename,
+                                      drop_input_data_forecast_and_history=True)
 
     dataset = PVNetUKRegionalDataset(
         config_filename=modified_data_config_filename,

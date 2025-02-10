@@ -49,11 +49,14 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
     return config
 
 
-def overwrite_config_dropouts(config: dict) -> dict:
+def overwrite_config_dropouts(config: dict, drop_input_data_forecast_and_history:bool=False) -> dict:
     """Overwrite the config drouput parameters for production
 
     Args:
         config: The data config
+        drop_input_data_forecast_and_history: Option to drop input_data.forecast_minutes
+            and input_data.history_minutes. Default is false
+
     """
 
     # Replace data sources
@@ -72,16 +75,17 @@ def overwrite_config_dropouts(config: dict) -> dict:
                 nwp_config[nwp_source]["dropout_fraction"] = 0
 
     # this are not used anymore
-    for drop_key in ["default_forecast_minutes", "default_history_minutes"]:
-        if drop_key in config["input_data"]:
-            # drop this key
-            del config["input_data"][drop_key]
+    if drop_input_data_forecast_and_history:
+        for drop_key in ["default_forecast_minutes", "default_history_minutes"]:
+            if drop_key in config["input_data"]:
+                # drop this key
+                del config["input_data"][drop_key]
 
     return config
 
 
 def modify_data_config_for_production(
-    input_path: str, output_path: str, gsp_path: str = ""
+    input_path: str, output_path: str, gsp_path: str = "", drop_input_data_forecast_and_history:bool=False
 ) -> None:
     """Resave the data config with the data source filepaths and dropouts overwritten
 
@@ -89,11 +93,12 @@ def modify_data_config_for_production(
         input_path: Path to input datapipes configuration file
         output_path: Location to save the output configuration file
         gsp_path: For lagacy usage only
+        drop_input_data_forecast_and_history: Option to drop input_data.forecast_minutes
     """
     config = load_yaml_config(input_path)
 
     config = populate_config_with_data_data_filepaths(config, gsp_path=gsp_path)
-    config = overwrite_config_dropouts(config)
+    config = overwrite_config_dropouts(config, drop_input_data_forecast_and_history=drop_input_data_forecast_and_history)
 
     save_yaml_config(config, output_path)
 
