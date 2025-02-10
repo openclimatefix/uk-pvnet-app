@@ -143,7 +143,10 @@ class ForecastCompiler:
         if not self.use_legacy:
             # until PVNet is merged in we need to change the keys from ocf-data-sampler strings
             # to ocf-datapipes BatchKey
-            keys_to_rename = [BatchKey.satellite_actual, BatchKey.nwp]
+            keys_to_rename = [BatchKey.satellite_actual,
+                              BatchKey.nwp,
+                              BatchKey.gsp_solar_elevation,
+                              BatchKey.gsp_solar_azimuth]
             for key in keys_to_rename:
                 if key.name in batch:
                     batch[key] = batch[key.name]
@@ -177,7 +180,7 @@ class ForecastCompiler:
             )
         else:
             # The new dataloader normalises the data to [0, 1]
-            elevation = (batch[GSPSampleKey.solar_elevation].cpu().numpy() - 0.5) * 180
+            elevation = (batch[BatchKey.gsp_solar_elevation].cpu().numpy() - 0.5) * 180
 
         # We only need elevation mask for forecasted values, not history
         elevation = elevation[:, -preds.shape[1] :]
