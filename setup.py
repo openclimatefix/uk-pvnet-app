@@ -23,6 +23,7 @@ setup(
     author_email="info@openclimatefix.org",
     company="Open Climate Fix Ltd",
     install_requires=install_requires,
+    dependency_links=["https://download.pytorch.org/whl/cpu"],
     long_description=long_description,
     long_description_content_type="text/markdown",
     include_package_data=True,
