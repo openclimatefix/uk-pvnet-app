@@ -146,7 +146,8 @@ class ForecastCompiler:
             keys_to_rename = [BatchKey.satellite_actual,
                               BatchKey.nwp,
                               BatchKey.gsp_solar_elevation,
-                              BatchKey.gsp_solar_azimuth]
+                              BatchKey.gsp_solar_azimuth,
+                              BatchKey.gsp_id]
             for key in keys_to_rename:
                 if key.name in batch:
                     batch[key] = batch[key.name]
