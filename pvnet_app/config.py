@@ -81,8 +81,8 @@ def overwrite_config_dropouts(config: dict) -> dict:
 def reformat_config_data_sampler(config: dict) -> dict:
     """Reformat config
 
-    This is to keep configuration from 0.0.19 working,
-    we need to upgrade them a bit to the lastest configuration
+    This is to keep configuration from ocf-data-sampler==0.0.19 working,
+    we need to upgrade them a bit to the configuration in ocf-data-sampler>=0.1.5
 
     Args:
         config: The data config
