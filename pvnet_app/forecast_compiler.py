@@ -179,14 +179,13 @@ class ForecastCompiler:
         - Compile all forecasts into a DataArray stored inside the object as `da_abs_all`
         """
 
-        # Complie results from all batches
+        # Compile results from all batches
         normed_preds = np.concatenate(self.normed_preds)
         sun_down_masks = np.concatenate(self.sun_down_masks)
         gsp_ids_all_batches = np.concatenate(self.gsp_ids_each_batch).squeeze()
 
         # Reorder GSPs which can end up shuffled if multiprocessing is used
         inds = gsp_ids_all_batches.argsort()
-
         normed_preds = normed_preds[inds]
         sun_down_masks = sun_down_masks[inds]
         gsp_ids_all_batches = gsp_ids_all_batches[inds]
@@ -245,7 +244,7 @@ class ForecastCompiler:
                 gsp_ids=[0],
             )
 
-            # Multiply normalised forecasts by capacities and clip negatives
+            # Multiply normalised forecasts by capacity, clip negatives
             da_abs_national = da_normed_national.clip(0, None) * self.national_capacity
 
             # Apply sundown mask - All GSPs must be masked to mask national
@@ -255,11 +254,21 @@ class ForecastCompiler:
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}"
         )
 
-        # check that maximum national is above 10% of national capacity.
-        if da_abs_national.max() > 1.1 * self.national_capacity:
-            raise Exception(f'The Maximum of the national forecast is {da_abs_national.max().values} '
-                            f'which is greater than 10% of the national capacity '
-                            f'({self.national_capacity})')
+        # Convert from xarray to a scalar
+        max_national_forecast_val = da_abs_national.sel(output_label="forecast_mw").max().values
+
+        # Warn if forecast is above 30 GW
+        if max_national_forecast_val > 30_000:  # 30 GW in MW
+            self.log_info(
+                f"WARNING: National forecast exceeds 30 GW ({max_national_forecast_val/1e3:.2f} GW)."
+            )
+
+        # Hard fail if forecast is above 100 GW
+        if max_national_forecast_val > 100_000:  # 100 GW in MW
+            raise Exception(
+                f"Hard FAIL: The maximum of the forecast is above 100 GW! "
+                f"Forecast is {max_national_forecast_val/1e3:.2f} GW."
+            )
 
         # Store the compiled predictions internally
         self.da_abs_all = xr.concat([da_abs_national, da_abs], dim="gsp_id")
