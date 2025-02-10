@@ -3,7 +3,6 @@ general:
   name: PVNet current
 git: null
 input_data:
-  data_source_which_defines_geospatial_locations: gsp
   default_forecast_minutes: 480
   default_history_minutes: 120
   gsp:
