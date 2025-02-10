@@ -186,6 +186,7 @@ class ForecastCompiler:
 
         # Reorder GSPs which can end up shuffled if multiprocessing is used
         inds = gsp_ids_all_batches.argsort()
+
         normed_preds = normed_preds[inds]
         sun_down_masks = sun_down_masks[inds]
         gsp_ids_all_batches = gsp_ids_all_batches[inds]
