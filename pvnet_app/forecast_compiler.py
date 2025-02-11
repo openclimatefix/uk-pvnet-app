@@ -139,19 +139,17 @@ class ForecastCompiler:
 
         self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
         # Store GSP IDs for this batch for reordering later
+        these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
 
         if not self.use_legacy:
             change_keys_to_ocf_datapipes_keys(batch)
 
-        gsp_id_label = BatchKey.gsp_id
-
-        these_gsp_ids = batch[gsp_id_label].cpu().numpy()
         self.gsp_ids_each_batch += [these_gsp_ids]
 
-        self.log_info(f"{batch[gsp_id_label]=}")
+        self.log_info(f"{batch[BatchKey.gsp_id]=}")
 
         # TODO: This change should be moved inside PVNet
-        batch[gsp_id_label] = batch[gsp_id_label].unsqueeze(1)
+        batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
 
         # Run batch through model
         preds = self.model(batch).detach().cpu().numpy()
