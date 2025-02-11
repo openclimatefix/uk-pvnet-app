@@ -58,16 +58,15 @@ def overwrite_config_dropouts(config: dict) -> dict:
     """
 
     # Replace data sources
-    for source in ["satellite"]:
-        if source in config["input_data"]:
+    if "satellite" in config["input_data"]:
 
-            satellite_config = config["input_data"][source]
+        satellite_config = config["input_data"]["satellite"]
 
-            if satellite_config[f"{source}_zarr_path"] != "":
-                satellite_config[f"dropout_timedeltas_minutes"] = None
-                satellite_config[f"dropout_fraction"] = 0
+        if satellite_config[f"satellite_zarr_path"] != "":
+            satellite_config[f"dropout_timedeltas_minutes"] = None
+            satellite_config[f"dropout_fraction"] = 0
 
-    # NWP is nested so much be treated separately
+    # NWP is nested so must be treated separately
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
@@ -89,13 +88,12 @@ def reformat_config_data_sampler(config: dict) -> dict:
 
     """
 
-    # Replace data sources
-    source = "satellite"
-    if source in config["input_data"]:
+    # Replace satellite
+    if "satellite" in config["input_data"]:
 
-        satellite_config = config["input_data"][source]
+        satellite_config = config["input_data"]["satellite"]
 
-        if satellite_config[f"{source}_zarr_path"] != "":
+        if satellite_config[f"satellite_zarr_path"] != "":
 
             rename_pairs = [
                 ("satellite_image_size_pixels_width", "image_size_pixels_width"),
@@ -109,7 +107,7 @@ def reformat_config_data_sampler(config: dict) -> dict:
                           config=satellite_config,
                           remove_keys=["live_delay_minutes"])
 
-    # NWP is nested so much be treated separately
+    # NWP is nested so must be treated separately
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
@@ -127,10 +125,9 @@ def reformat_config_data_sampler(config: dict) -> dict:
 
                 update_config(rename_pairs=rename_pairs, config=nwp_config[nwp_source])
 
-    source = "gsp"
-    if source in config["input_data"]:
+    if "gsp" in config["input_data"]:
 
-        gsp_config = config["input_data"][source]
+        gsp_config = config["input_data"]["gsp"]
 
         rename_pairs = [
             ("forecast_minutes", "interval_end_minutes"),
@@ -185,7 +182,7 @@ def modify_data_config_for_production(
     Args:
         input_path: Path to input datapipes configuration file
         output_path: Location to save the output configuration file
-        gsp_path: For lagacy usage only
+        gsp_path: For legacy usage only
         reformat_config: Reformat config to new format
     """
     config = load_yaml_config(input_path)
