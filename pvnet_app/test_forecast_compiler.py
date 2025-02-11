@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import logging
 
-from forecast_compiler import validate_forecast
+from pvnet_app.forecast_compiler import validate_forecast
 
 def test_validate_forecast_ok():
     """
