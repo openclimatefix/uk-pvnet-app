@@ -15,6 +15,7 @@ from ocf_datapipes.utils.consts import ELEVATION_MEAN, ELEVATION_STD
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
+from typing import Callable
 
 import pvnet_app
 from pvnet_app.model_configs.pydantic_models import Model
@@ -31,6 +32,47 @@ _model_mismatch_msg = (
     "the shape of PVNet output doesn't match the expected shape of the summation model. Combining "
     "may lead to unreliable results even if the shapes match."
 )
+
+def validate_forecast(
+    national_forecast_values: np.ndarray,
+    national_capacity: float,
+    logger_func: Callable[[str], None],
+) -> None:
+    """
+    Checks various conditions using the full forecast values (in MW).
+
+    Args:
+        national_forecast_values: All the forecast values for the nation (in MW).
+        national_capacity: The national PV capacity (in MW).
+        logger_func: A function that takes a string and logs it 
+                     (e.g. self.log_info or logging.info).
+    
+    Raises:
+        Exception: if above certain critical thresholds.
+    """
+
+    # Compute the maximum from the entire forecast array
+    max_forecast_mw = float(np.max(national_forecast_values))
+
+    # Check it doesn't exceed 10% above national capacity
+    if max_forecast_mw > 1.1 * national_capacity:
+        raise Exception(
+            f"The maximum of the national forecast is {max_forecast_mw} which is "
+            f"greater than 10% above the national capacity ({national_capacity})."
+        )
+
+    # Warn if forecast > 30 GW
+    if max_forecast_mw > 30_000:  # 30 GW in MW
+        logger_func(
+            f"WARNING: National forecast exceeds 30 GW ({max_forecast_mw / 1e3:.2f} GW)."
+        )
+
+    # Hard fail if forecast > 100 GW
+    if max_forecast_mw > 100_000:  # 100 GW in MW
+        raise Exception(
+            f"Hard FAIL: The maximum of the forecast is above 100 GW! "
+            f"Forecast is {max_forecast_mw / 1e3:.2f} GW."
+        )
 
 
 class ForecastCompiler:
@@ -179,7 +221,7 @@ class ForecastCompiler:
         - Compile all forecasts into a DataArray stored inside the object as `da_abs_all`
         """
 
-        # Complie results from all batches
+        # Compile results from all batches
         normed_preds = np.concatenate(self.normed_preds)
         sun_down_masks = np.concatenate(self.sun_down_masks)
         gsp_ids_all_batches = np.concatenate(self.gsp_ids_each_batch).squeeze()
@@ -205,7 +247,7 @@ class ForecastCompiler:
             ),
         )
 
-        # check that the gsp capacities are not nans
+        # Check that the GSP capacities are not NaNs
         if np.isnan(self.gsp_capacities.values).any():
             raise ValueError("GSP capacities contain NaNs")
 
@@ -245,7 +287,7 @@ class ForecastCompiler:
                 gsp_ids=[0],
             )
 
-            # Multiply normalised forecasts by capacities and clip negatives
+            # Multiply normalised forecasts by capacity, clip negatives
             da_abs_national = da_normed_national.clip(0, None) * self.national_capacity
 
             # Apply sundown mask - All GSPs must be masked to mask national
@@ -255,11 +297,13 @@ class ForecastCompiler:
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}"
         )
 
-        # check that maximum national is above 10% of national capacity.
-        if da_abs_national.max() > 1.1 * self.national_capacity:
-            raise Exception(f'The Maximum of the national forecast is {da_abs_national.max().values} '
-                            f'which is greater than 10% of the national capacity '
-                            f'({self.national_capacity})')
+        # Pass the entire national forecast array (for potential extra checks in future).
+        national_forecast_values = da_abs_national.sel(output_label="forecast_mw").values
+        validate_forecast(
+            national_forecast_values=national_forecast_values,
+            national_capacity=self.national_capacity,
+            logger_func=self.log_info
+        )
 
         # Store the compiled predictions internally
         self.da_abs_all = xr.concat([da_abs_national, da_abs], dim="gsp_id")
