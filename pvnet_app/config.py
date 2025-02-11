@@ -105,18 +105,9 @@ def reformat_config_data_sampler(config: dict) -> dict:
                 ("satellite_channels", "channels"),
             ]
 
-            for old, new in rename_pairs:
-                if old in satellite_config:
-                    satellite_config[new] = satellite_config[old]
-                    del satellite_config[old]
-
-            if "history_minutes" in satellite_config:
-                satellite_config["interval_start_minutes"] = -satellite_config["history_minutes"]
-                del satellite_config["history_minutes"]
-
-            if "live_delay_minutes" in satellite_config:
-                # TODO do we need to do anything with this first?
-                del satellite_config["live_delay_minutes"]
+            update_config(rename_pairs=rename_pairs,
+                          config=satellite_config,
+                          remove_keys=["live_delay_minutes"])
 
     # NWP is nested so much be treated separately
     if "nwp" in config["input_data"]:
@@ -134,16 +125,7 @@ def reformat_config_data_sampler(config: dict) -> dict:
                     ("nwp_provider", "provider"),
                 ]
 
-                for old, new in rename_pairs:
-                    if old in nwp_config[nwp_source]:
-                        nwp_config[nwp_source][new] = nwp_config[nwp_source][old]
-                        del nwp_config[nwp_source][old]
-
-                if "history_minutes" in nwp_config[nwp_source]:
-                    nwp_config[nwp_source]["interval_start_minutes"] = -nwp_config[nwp_source][
-                        "history_minutes"
-                    ]
-                    del nwp_config[nwp_source]["history_minutes"]
+                update_config(rename_pairs=rename_pairs, config=nwp_config[nwp_source])
 
     source = "gsp"
     if source in config["input_data"]:
@@ -155,20 +137,44 @@ def reformat_config_data_sampler(config: dict) -> dict:
             ("gsp_zarr_path", "zarr_path"),
         ]
 
-        for old, new in rename_pairs:
-            if old in gsp_config:
-                gsp_config[new] = gsp_config[old]
-                del gsp_config[old]
+        update_config(rename_pairs=rename_pairs, config=gsp_config)
 
-        if "history_minutes" in gsp_config:
-            gsp_config["interval_start_minutes"] = -gsp_config["history_minutes"]
-            del gsp_config["history_minutes"]
-
-    for drop_key in ["default_forecast_minutes", "default_history_minutes"]:
-        if drop_key in config["input_data"]:
-            del config["input_data"][drop_key]
+    update_config(rename_pairs=[],
+                  config=config["input_data"],
+                  change_history_minutes=False,
+                  remove_keys=["default_forecast_minutes", "default_history_minutes"])
 
     return config
+
+
+def update_config(rename_pairs: list, config: dict, change_history_minutes: bool = True, remove_keys=None):
+    """
+    Update the config with rename pairs, and remove keys if they exist
+
+    1. Rename keys in the config
+    2. Change history minutes to interval start minutes, with a negative value
+    3. Remove keys from the config
+
+    :param rename_pairs: list of pairs to rename
+    :param config: the config dict
+    :param change_history_minutes: option to change history minutes to interval start minutes
+    :param remove_keys: list of key to remove
+    """
+
+    for old, new in rename_pairs:
+        if old in config:
+            config[new] = config[old]
+            del config[old]
+
+    if change_history_minutes:
+        if "history_minutes" in config:
+            config["interval_start_minutes"] = -config["history_minutes"]
+            del config["history_minutes"]
+
+    if remove_keys is not None:
+        for key in remove_keys:
+            if key in config:
+                del config[key]
 
 
 def modify_data_config_for_production(

@@ -18,6 +18,7 @@ jobs:
           channels: bioconda, conda-forge, defaults
           auto-update-conda: true
           auto-activate-base: true
+          python-version: "3.12"
 
       - name: Install the conda
         shell: bash -l {0}
