@@ -138,11 +138,12 @@ class ForecastCompiler:
         """Make predictions for a batch and store results internally"""
 
         self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
-        # Store GSP IDs for this batch for reordering later
-        these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
 
         if not self.use_legacy:
             change_keys_to_ocf_datapipes_keys(batch)
+            
+        # Store GSP IDs for this batch for reordering later
+        these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
 
         self.gsp_ids_each_batch += [these_gsp_ids]
 
