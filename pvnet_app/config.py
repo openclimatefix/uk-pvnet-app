@@ -152,10 +152,11 @@ def update_config(rename_pairs: list, config: dict, change_history_minutes: bool
     2. Change history minutes to interval start minutes, with a negative value
     3. Remove keys from the config
 
-    :param rename_pairs: list of pairs to rename
-    :param config: the config dict
-    :param change_history_minutes: option to change history minutes to interval start minutes
-    :param remove_keys: list of key to remove
+    Args:
+        rename_pairs: list of pairs to rename
+        config: the config dict
+        change_history_minutes: option to change history minutes to interval start minutes
+        remove_keys: list of key to remove
     """
 
     for old, new in rename_pairs:
