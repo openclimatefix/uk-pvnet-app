@@ -12,8 +12,9 @@ from nowcasting_datamodel.models.forecast import (
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
+# Updated to account for the zero delay specification
 def test_app(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, gsp_yields_and_systems, me_latest
 ):
 
     """Test the app running the intraday models"""
@@ -36,7 +37,7 @@ def test_app(
         temp_sat_path = "temp_sat.zarr.zip"
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
         with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
-            sat_5_data.to_zarr(store)
+            sat_5_data_zero_delay.to_zarr(store)
 
         # Set environmental variables
         os.environ["RUN_EXTRA_MODELS"] = "True"
