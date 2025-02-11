@@ -33,6 +33,47 @@ _model_mismatch_msg = (
     "may lead to unreliable results even if the shapes match."
 )
 
+def validate_forecast(
+    national_forecast_values: np.ndarray,
+    national_capacity: float,
+    logger_func: Callable[[str], None],
+) -> None:
+    """
+    Checks various conditions using the full forecast values (in MW).
+
+    Args:
+        national_forecast_values: All the forecast values for the nation (in MW).
+        national_capacity: The national PV capacity (in MW).
+        logger_func: A function that takes a string and logs it 
+                     (e.g. self.log_info or logging.info).
+    
+    Raises:
+        Exception: if above certain critical thresholds.
+    """
+
+    # Compute the maximum from the entire forecast array
+    max_forecast_mw = float(np.max(national_forecast_values))
+
+    # Check it doesn't exceed 10% above national capacity
+    if max_forecast_mw > 1.1 * national_capacity:
+        raise Exception(
+            f"The maximum of the national forecast is {max_forecast_mw} which is "
+            f"greater than 10% above the national capacity ({national_capacity})."
+        )
+
+    # Warn if forecast > 30 GW
+    if max_forecast_mw > 30_000:  # 30 GW in MW
+        logger_func(
+            f"WARNING: National forecast exceeds 30 GW ({max_forecast_mw / 1e3:.2f} GW)."
+        )
+
+    # Hard fail if forecast > 100 GW
+    if max_forecast_mw > 100_000:  # 100 GW in MW
+        raise Exception(
+            f"Hard FAIL: The maximum of the forecast is above 100 GW! "
+            f"Forecast is {max_forecast_mw / 1e3:.2f} GW."
+        )
+
 
 class ForecastCompiler:
     """Class for making and compiling solar forecasts from for all GB GSPsn and national total"""
@@ -170,47 +211,6 @@ class ForecastCompiler:
         # Log max prediction
         self.log_info(f"GSP IDs: {these_gsp_ids}")
         self.log_info(f"Max prediction: {np.max(preds, axis=1)}")
-    
-    def validate_forecast(
-        national_forecast_values: np.ndarray,
-        national_capacity: float,
-        logger_func: Callable[[str], None],
-    ) -> None:
-        """
-        Checks various conditions using the full forecast values (in MW).
-    
-        Args:
-            national_forecast_values: All the forecast values for the nation (in MW).
-            national_capacity: The national PV capacity (in MW).
-            logger_func: A function that takes a string and logs it 
-                         (e.g. self.log_info or logging.info).
-        
-        Raises:
-            Exception: if above certain critical thresholds.
-        """
-    
-        # Compute the maximum from the entire forecast array
-        max_forecast_mw = float(np.max(national_forecast_values))
-    
-        # Check it doesn't exceed 10% above national capacity
-        if max_forecast_mw > 1.1 * national_capacity:
-            raise Exception(
-                f"The maximum of the national forecast is {max_forecast_mw} which is "
-                f"greater than 10% above the national capacity ({national_capacity})."
-            )
-    
-        # Warn if forecast > 30 GW
-        if max_forecast_mw > 30_000:  # 30 GW in MW
-            logger_func(
-                f"WARNING: National forecast exceeds 30 GW ({max_forecast_mw / 1e3:.2f} GW)."
-            )
-    
-        # Hard fail if forecast > 100 GW
-        if max_forecast_mw > 100_000:  # 100 GW in MW
-            raise Exception(
-                f"Hard FAIL: The maximum of the forecast is above 100 GW! "
-                f"Forecast is {max_forecast_mw / 1e3:.2f} GW."
-            )
 
     def compile_forecasts(self) -> None:
         """Compile all forecasts internally in a single DataArray
