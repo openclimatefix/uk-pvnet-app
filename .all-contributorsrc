@@ -51,12 +51,21 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "aryanbhosale",
+      "name": "Aryan Bhosale",
+      "avatar_url": "https://avatars.githubusercontent.com/u/36108149?v=4",
+      "profile": "http://github.com/aryanbhosale",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
   "skipCi": true,
   "repoType": "github",
   "repoHost": "https://github.com",
-  "projectName": "pvnet_app",
+  "projectName": "uk-pvnet-app",
   "projectOwner": "openclimatefix"
 }
