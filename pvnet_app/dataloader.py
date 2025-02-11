@@ -3,10 +3,11 @@ import pandas as pd
 import numpy as np
 
 from torch.utils.data import DataLoader
-from ocf_datapipes.batch import stack_np_examples_into_batch
-from ocf_data_sampler.torch_datasets.pvnet_uk_regional import PVNetUKRegionalDataset
+from ocf_datapipes.batch import stack_np_examples_into_batch as legacy_stack_np_examples_into_batch
+from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKRegionalDataset
 
 from pvnet_app.config import modify_data_config_for_production
+from ocf_data_sampler.numpy_sample.collate import stack_np_samples_into_batch
 
 # Legacy imports - only used for legacy dataloader
 import os
@@ -28,7 +29,9 @@ def get_dataloader(
     # Populate the data config with production data paths
     modified_data_config_filename = Path(config_filename).parent / "data_config.yaml"
 
-    modify_data_config_for_production(config_filename, modified_data_config_filename)
+    modify_data_config_for_production(input_path=config_filename,
+                                      output_path=modified_data_config_filename,
+                                      reformat_config=True)
 
     dataset = PVNetUKRegionalDataset(
         config_filename=modified_data_config_filename,
@@ -44,7 +47,7 @@ def get_dataloader(
         sampler=None,
         batch_sampler=None,
         num_workers=num_workers,
-        collate_fn=stack_np_examples_into_batch,
+        collate_fn=stack_np_samples_into_batch,
         pin_memory=False,
         drop_last=False,
         timeout=0,
@@ -107,7 +110,7 @@ def get_legacy_dataloader(
             production=True,
         )
         .batch(batch_size)
-        .map(stack_np_examples_into_batch)
+        .map(legacy_stack_np_examples_into_batch)
         .map(legacy_squeeze)
     )
 

@@ -10,12 +10,14 @@ from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
 from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
-from ocf_datapipes.batch import BatchKey, NumpyBatch
+from ocf_datapipes.batch import BatchKey, NumpyBatch, NWPBatchKey
 from ocf_datapipes.utils.consts import ELEVATION_MEAN, ELEVATION_STD
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 from typing import Callable
+
+from ocf_data_sampler.numpy_sample.gsp import GSPSampleKey
 
 import pvnet_app
 from pvnet_app.model_configs.pydantic_models import Model
@@ -178,11 +180,17 @@ class ForecastCompiler:
         """Make predictions for a batch and store results internally"""
 
         self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
+
+        if not self.use_legacy:
+            change_keys_to_ocf_datapipes_keys(batch)
+            
         # Store GSP IDs for this batch for reordering later
         these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
+
         self.gsp_ids_each_batch += [these_gsp_ids]
 
         self.log_info(f"{batch[BatchKey.gsp_id]=}")
+
         # TODO: This change should be moved inside PVNet
         batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
 
@@ -490,3 +498,28 @@ class ForecastCompiler:
             forecasts.append(forecast)
 
         return forecasts
+
+
+def change_keys_to_ocf_datapipes_keys(batch):
+    """
+    Change string keys from ocf-data-sampler to BatchKey from ocf-datapipes
+
+    Until PVNet is merged from dev-data-sampler, we need to do this.
+    After this, we might need to change the other way around, for the legacy models.
+    """
+    keys_to_rename = [BatchKey.satellite_actual,
+                      BatchKey.nwp,
+                      BatchKey.gsp_solar_elevation,
+                      BatchKey.gsp_solar_azimuth,
+                      BatchKey.gsp_id]
+
+    for key in keys_to_rename:
+        if key.name in batch:
+            batch[key] = batch[key.name]
+            del batch[key.name]
+
+    if BatchKey.nwp in batch.keys():
+        nwp_config = batch[BatchKey.nwp]
+        for nwp_source in nwp_config.keys():
+            batch[BatchKey.nwp][nwp_source][NWPBatchKey.nwp] = batch[BatchKey.nwp][nwp_source]["nwp"]
+            del batch[BatchKey.nwp][nwp_source]["nwp"]

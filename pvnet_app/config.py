@@ -54,38 +54,144 @@ def overwrite_config_dropouts(config: dict) -> dict:
 
     Args:
         config: The data config
+
     """
 
     # Replace data sources
-    for source in ["satellite"]:
-        if source in config["input_data"]:
-            if config["input_data"][source][f"{source}_zarr_path"] != "":
-                config["input_data"][source][f"dropout_timedeltas_minutes"] = None
+    if "satellite" in config["input_data"]:
 
-    # NWP is nested so much be treated separately
+        satellite_config = config["input_data"]["satellite"]
+
+        if satellite_config[f"satellite_zarr_path"] != "":
+            satellite_config[f"dropout_timedeltas_minutes"] = None
+            satellite_config[f"dropout_fraction"] = 0
+
+    # NWP is nested so must be treated separately
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
             if nwp_config[nwp_source]["nwp_zarr_path"] != "":
                 nwp_config[nwp_source]["dropout_timedeltas_minutes"] = None
+                nwp_config[nwp_source]["dropout_fraction"] = 0
 
     return config
 
 
+def reformat_config_data_sampler(config: dict) -> dict:
+    """Reformat config
+
+    This is to keep the configurations from ocf-data-sampler==0.0.19 working,
+    we need to upgrade them a bit to the configuration in ocf-data-sampler>=0.1.5
+
+    Args:
+        config: The data config
+
+    """
+
+    # Replace satellite
+    if "satellite" in config["input_data"]:
+
+        satellite_config = config["input_data"]["satellite"]
+
+        if satellite_config[f"satellite_zarr_path"] != "":
+
+            rename_pairs = [
+                ("satellite_image_size_pixels_width", "image_size_pixels_width"),
+                ("satellite_image_size_pixels_height", "image_size_pixels_height"),
+                ("forecast_minutes", "interval_end_minutes"),
+                ("satellite_zarr_path", "zarr_path"),
+                ("satellite_channels", "channels"),
+            ]
+
+            update_config(rename_pairs=rename_pairs,
+                          config=satellite_config,
+                          remove_keys=["live_delay_minutes"])
+
+    # NWP is nested so must be treated separately
+    if "nwp" in config["input_data"]:
+        nwp_config = config["input_data"]["nwp"]
+        for nwp_source in nwp_config.keys():
+            if nwp_config[nwp_source]["nwp_zarr_path"] != "":
+
+                rename_pairs = [
+                    ("nwp_image_size_pixels_width", "image_size_pixels_width"),
+                    ("nwp_image_size_pixels_height", "image_size_pixels_height"),
+                    ("forecast_minutes", "interval_end_minutes"),
+                    ("nwp_zarr_path", "zarr_path"),
+                    ("nwp_accum_channels", "accum_channels"),
+                    ("nwp_channels", "channels"),
+                    ("nwp_provider", "provider"),
+                ]
+
+                update_config(rename_pairs=rename_pairs, config=nwp_config[nwp_source])
+
+    if "gsp" in config["input_data"]:
+
+        gsp_config = config["input_data"]["gsp"]
+
+        rename_pairs = [
+            ("forecast_minutes", "interval_end_minutes"),
+            ("gsp_zarr_path", "zarr_path"),
+        ]
+
+        update_config(rename_pairs=rename_pairs, config=gsp_config)
+
+    update_config(rename_pairs=[],
+                  config=config["input_data"],
+                  change_history_minutes=False,
+                  remove_keys=["default_forecast_minutes", "default_history_minutes"])
+
+    return config
+
+
+def update_config(rename_pairs: list, config: dict, change_history_minutes: bool = True, remove_keys=None):
+    """
+    Update the config with rename pairs, and remove keys if they exist
+
+    1. Rename keys in the config
+    2. Change history minutes to interval start minutes, with a negative value
+    3. Remove keys from the config
+
+    Args:
+        rename_pairs: list of pairs to rename
+        config: the config dict
+        change_history_minutes: option to change history minutes to interval start minutes
+        remove_keys: list of key to remove
+    """
+
+    for old, new in rename_pairs:
+        if old in config:
+            config[new] = config[old]
+            del config[old]
+
+    if change_history_minutes:
+        if "history_minutes" in config:
+            config["interval_start_minutes"] = -config["history_minutes"]
+            del config["history_minutes"]
+
+    if remove_keys is not None:
+        for key in remove_keys:
+            if key in config:
+                del config[key]
+
+
 def modify_data_config_for_production(
-    input_path: str, output_path: str, gsp_path: str = ""
+    input_path: str, output_path: str, gsp_path: str = "", reformat_config: bool = False
 ) -> None:
     """Resave the data config with the data source filepaths and dropouts overwritten
 
     Args:
         input_path: Path to input datapipes configuration file
         output_path: Location to save the output configuration file
-        gsp_path: For lagacy usage only
+        gsp_path: For legacy usage only
+        reformat_config: Reformat config to new format
     """
     config = load_yaml_config(input_path)
 
     config = populate_config_with_data_data_filepaths(config, gsp_path=gsp_path)
     config = overwrite_config_dropouts(config)
+    if reformat_config:
+        config = reformat_config_data_sampler(config)
 
     save_yaml_config(config, output_path)
 
