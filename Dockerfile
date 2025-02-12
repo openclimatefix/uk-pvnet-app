@@ -2,9 +2,9 @@
 FROM quay.io/condaforge/miniforge3:latest AS build-venv
 
 RUN apt-get update && \
-    apt-get install git -y && \
     echo "Creating virtualenv at /app/.venv" && \
     conda create --quiet --yes -p /app/.venv python=3.12 esmpy gdal
+
 
 # --- Build dependencies in own layer --- #
 FROM python:3.12 AS build-deps
@@ -31,6 +31,7 @@ RUN uv sync --no-editable --no-dev --compile-bytecode --inexact
 FROM python:3.12-slim
 
 COPY --from=build-app /app/.venv /app/.venv
+COPY --from=build-app /usr/bin/git /usr/bin/git
 
 # This is just a check to make sure it works, we've had problems with this in the past
 ENV PATH="/app/.venv/bin:${PATH}"
