@@ -34,3 +34,12 @@ jobs:
       - name: Run unit tests (with pytest)
         run: uv run python -m pytest --junitxml=ut-report.xml tests
 
+      # Create test summary to be visualised on the job summary screen on GitHub
+      # * Runs even if previous steps fail
+      - name: Create test summary
+        uses: test-summary/action@v2
+        with:
+          paths: "*t-report.xml"
+          show: "fail, skip"
+        if: always()
+
