@@ -26,7 +26,7 @@ COPY scripts /app/scripts
 # is this data just for testing?
 COPY data /app/data
 
-RUN uv sync --no-dev --compile-bytecode --inexact
+RUN uv sync --no-editable --no-dev --compile-bytecode --inexact
 
 FROM python:3.12-slim
 
@@ -36,4 +36,4 @@ COPY --from=build-app /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:${PATH}"
 RUN /app/.venv/bin/python -c "import torchvision"
 
-ENTRYPOINT ["/app/.venv/bin/python", "-u","pvnet_app/app.py"]
+ENTRYPOINT ["/app/.venv/bin/python/pvnet"]
