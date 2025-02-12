@@ -28,9 +28,12 @@ COPY data /app/data
 
 RUN uv sync --no-dev --compile-bytecode --inexact
 
-# Should copy the venv into a runtime image for reduced size
+FROM python:3.12
+
+COPY --from=build-app /app/.venv /app/.venv
 
 # This is just a check to make sure it works, we've had problems with this in the past
-RUN uv run python -c "import torchvision"
+ENV PATH="/app/.venv/bin:${PATH}"
+RUN python -c "import torchvision"
 
-CMD ["uv", "run", "python", "-u","pvnet_app/app.py"]
+CMD ["python", "-u","pvnet_app/app.py"]
