@@ -4,6 +4,9 @@ on:
     branches-ignore: ['main']
     paths-ignore: ['README.md']
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-container:
