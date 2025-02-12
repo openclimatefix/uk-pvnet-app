@@ -13,8 +13,7 @@ def test_validate_forecast_ok():
     # Ccapture log messages in a list so assertions can be done on them if needed
     logs = []
 
-    def dummy_logger(msg: str):
-        logs.append(msg)
+    def dummy_logger(msg: str): logs.append(msg)
 
     # Forecast is significantly below capacity => no warnings or errors
     national_forecast_values = np.array([10, 20, 30])  # MW
@@ -82,8 +81,7 @@ def test_validate_forecast_sudden_fluctuations():
     # Mock logger to capture warnings
     logged_messages = []
 
-    def logger_func(message):
-        logged_messages.append(message)
+    def logger_func(message): logged_messages.append(message)
 
     national_capacity = 2000
 
