@@ -36,4 +36,4 @@ COPY --from=build-app /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:${PATH}"
 RUN /app/.venv/bin/python -c "import torchvision"
 
-ENTRYPOINT ["/app/.venv/bin/python/pvnet"]
+ENTRYPOINT ["/app/.venv/bin/pvnet-app"]
