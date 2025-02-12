@@ -75,30 +75,48 @@ def test_validate_forecast_above_100_gw_raises():
         excinfo.value)
 
 
-def test_validate_forecast_sudden_fluctuations():
-    import warnings
-
-    # Mock logger to capture warnings
+def test_validate_forecast_no_fluctuations():
+    """Test case with no significant fluctuations."""
     logged_messages = []
 
-    def logger_func(message): logged_messages.append(message)
+    def logger_func(message):
+        logged_messages.append(message)
 
+    national_forecast_values = np.array([1000, 1100, 1050, 1200, 1150])
     national_capacity = 2000
 
-    # Test case with large fluctuations (≥250 MW up and down)
-    national_forecast_values = np.array([1000, 1300, 800, 1200, 500])
-
-    # Call the function
+    # No warnings or exceptions expected
     validate_forecast(national_forecast_values, national_capacity, logger_func)
 
-    # Check if a warning message was logged
-    assert any(
-        "WARNING: Forecast has sudden fluctuations" in msg for msg in logged_messages), "Expected warning not found!"
+    assert not logged_messages, "Unexpected warnings logged!"
 
-    # Test case with critical fluctuations (≥500 MW up and down)
+
+def test_validate_forecast_with_warning():
+    """Test case where a warning should be logged due to fluctuations ≥250 MW up and down."""
+    logged_messages = []
+
+    def logger_func(message):
+        logged_messages.append(message)
+
+    national_forecast_values = np.array([1000, 1300, 800, 1200, 500])
+    national_capacity = 2000
+
+    validate_forecast(national_forecast_values, national_capacity, logger_func)
+
+    assert any("WARNING: Forecast has sudden fluctuations" in msg for msg in logged_messages), \
+        "Expected warning not found!"
+
+
+def test_validate_forecast_with_exception():
+    """Test case where an exception should be raised due to critical fluctuations ≥500 MW up and down."""
+    logged_messages = []
+
+    def logger_func(message):
+        logged_messages.append(message)
+
     national_forecast_values = np.array([1000, 1600, 800, 1300, 500])
+    national_capacity = 2000
 
-    # Expect an exception
     with pytest.raises(Exception, match="FAIL: Forecast has critical fluctuations"):
         validate_forecast(national_forecast_values,
                           national_capacity, logger_func)
