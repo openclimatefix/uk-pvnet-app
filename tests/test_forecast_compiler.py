@@ -4,6 +4,7 @@ import logging
 
 from pvnet_app.forecast_compiler import validate_forecast
 
+
 def test_validate_forecast_ok():
     """
     Test that validate_forecast does not raise an error when the forecast
@@ -11,6 +12,7 @@ def test_validate_forecast_ok():
     """
     # Ccapture log messages in a list so assertions can be done on them if needed
     logs = []
+
     def dummy_logger(msg: str):
         logs.append(msg)
 
@@ -27,6 +29,7 @@ def test_validate_forecast_ok():
     # Assert that we didn't raise any Exceptions and no logs were produced
     assert len(logs) == 0
 
+
 def test_validate_forecast_above_110percent_raises():
     """
     Test that validate_forecast raises an Exception when the maximum
@@ -40,6 +43,7 @@ def test_validate_forecast_above_110percent_raises():
             logger_func=lambda x: None,  # We don't care about logs here
         )
     assert "greater than 10% above the national capacity" in str(excinfo.value)
+
 
 def test_validate_forecast_warns_when_over_30gw(caplog):
     """
@@ -56,6 +60,7 @@ def test_validate_forecast_warns_when_over_30gw(caplog):
     # Check that the warning message is in the logs
     assert "WARNING: National forecast exceeds 30 GW (31.00 GW)." in caplog.text
 
+
 def test_validate_forecast_above_100_gw_raises():
     """
     Test that validate_forecast raises an Exception if forecast is above 100 GW.
@@ -67,4 +72,35 @@ def test_validate_forecast_above_100_gw_raises():
             national_capacity=200_000,
             logger_func=lambda x: None
         )
-    assert "Hard FAIL: The maximum of the forecast is above 100 GW!" in str(excinfo.value)
+    assert "Hard FAIL: The maximum of the forecast is above 100 GW!" in str(
+        excinfo.value)
+
+
+def test_validate_forecast_sudden_fluctuations():
+    import warnings
+
+    # Mock logger to capture warnings
+    logged_messages = []
+
+    def logger_func(message):
+        logged_messages.append(message)
+
+    national_capacity = 2000
+
+    # Test case with large fluctuations (≥250 MW up and down)
+    national_forecast_values = np.array([1000, 1300, 800, 1200, 500])
+
+    # Call the function
+    validate_forecast(national_forecast_values, national_capacity, logger_func)
+
+    # Check if a warning message was logged
+    assert any(
+        "WARNING: Forecast has sudden fluctuations" in msg for msg in logged_messages), "Expected warning not found!"
+
+    # Test case with critical fluctuations (≥500 MW up and down)
+    national_forecast_values = np.array([1000, 1600, 800, 1300, 500])
+
+    # Expect an exception
+    with pytest.raises(Exception, match="FAIL: Forecast has critical fluctuations"):
+        validate_forecast(national_forecast_values,
+                          national_capacity, logger_func)
