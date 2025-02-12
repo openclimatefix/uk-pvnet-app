@@ -175,9 +175,12 @@ def rename_ecmwf_variables():
     """ Rename the ECMWF variables to what we use in the ML Model"""
     d = xr.open_zarr(nwp_ecmwf_path)
     # if the variable HRES-IFS_uk is there
-    if "HRES-IFS_uk" in d.data_vars:
+    if ("HRES-IFS_uk" in d.data_vars) or ("hres-ifs_uk" in d.data_vars):
         logger.info(f"Renaming the ECMWF variables")
-        d = d.rename({"HRES-IFS_uk": "ECMWF_UK"})
+        if "HRES-IFS_uk" in d.data_vars:
+            d = d.rename({"HRES-IFS_uk": "ECMWF_UK"})
+        else:
+            d = d.rename({"hres-ifs_uk": "ECMWF_UK"})
 
         # remove anything >60 in latitude
         logger.info(f"Removing data above 60 latitude")
