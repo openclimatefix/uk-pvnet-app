@@ -20,16 +20,16 @@ from pvnet.models.base_model import BaseModel as PVNetBaseModel
 import sentry_sdk
 
 import pvnet_app
-from pvnet_app.config import get_union_of_configs, load_yaml_config, save_yaml_config
-from pvnet_app.data.nwp import download_all_nwp_data, preprocess_nwp_data
-from pvnet_app.data.satellite import (
+from .config import get_union_of_configs, load_yaml_config, save_yaml_config
+from .data.nwp import download_all_nwp_data, preprocess_nwp_data
+from .data.satellite import (
     download_all_sat_data,
     preprocess_sat_data,
     check_model_satellite_inputs_available,
 )
-from pvnet_app.dataloader import get_legacy_dataloader, get_dataloader
-from pvnet_app.forecast_compiler import ForecastCompiler
-from pvnet_app.model_configs.pydantic_models import get_all_models
+from .dataloader import get_legacy_dataloader, get_dataloader
+from .forecast_compiler import ForecastCompiler
+from .model_configs.pydantic_models import get_all_models
 
 from importlib.metadata import PackageNotFoundError, version
 

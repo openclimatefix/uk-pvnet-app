@@ -1,6 +1,6 @@
 import yaml
 
-from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
+from .consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
 
 
 def load_yaml_config(path: str) -> dict:

@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from ocf_datapipes.batch import stack_np_examples_into_batch as legacy_stack_np_examples_into_batch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKRegionalDataset
 
-from pvnet_app.config import modify_data_config_for_production
+from .config import modify_data_config_for_production
 from ocf_data_sampler.numpy_sample.collate import stack_np_samples_into_batch
 
 # Legacy imports - only used for legacy dataloader
