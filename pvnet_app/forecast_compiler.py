@@ -16,6 +16,7 @@ from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 from typing import Callable
+from importlib.metadata import PackageNotFoundError, version
 
 from ocf_data_sampler.numpy_sample.gsp import GSPSampleKey
 
@@ -23,6 +24,11 @@ import pvnet_app
 from pvnet_app.model_configs.pydantic_models import Model
 
 logger = logging.getLogger(__name__)
+
+try:
+    __version__ = version("pvnet-app")
+except PackageNotFoundError:
+    __version__ = "v?"
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -390,7 +396,7 @@ class ForecastCompiler:
             self.da_abs_all,
             session,
             model_tag=self.model_tag,
-            version=pvnet_app.__version__,
+            version=__version__,
         )
 
         self.log_info("Saving ForecastSQL to database")
@@ -444,7 +450,7 @@ class ForecastCompiler:
                 da_abs_sum_gsps,
                 session,
                 model_tag=f"{self.model_tag}_gsp_sum",
-                version=pvnet_app.__version__,
+                version=__version__,
             )
 
             save_sql_forecasts(

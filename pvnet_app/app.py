@@ -31,6 +31,12 @@ from pvnet_app.dataloader import get_legacy_dataloader, get_dataloader
 from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("pvnet-app")
+except PackageNotFoundError:
+    __version__ = "v?"
 
 # sentry
 sentry_sdk.init(
@@ -38,7 +44,7 @@ sentry_sdk.init(
 )
 
 sentry_sdk.set_tag("app_name", "pvnet_app")
-sentry_sdk.set_tag("version", pvnet_app.__version__)
+sentry_sdk.set_tag("version", __version__)
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
@@ -122,8 +128,8 @@ def app(
     run_extra_models = os.getenv("RUN_EXTRA_MODELS", "false").lower() == "true"
     use_ocf_data_sampler = os.getenv("USE_OCF_DATA_SAMPLER", "true").lower() == "true"
 
-    logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
-    logger.info(f"Using `pvnet_app` library version: {pvnet_app.__version__}")
+    logger.info(f"Using `pvnet` library version: {__version__}")
+    logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using day ahead model: {use_day_ahead_model}")
     logger.info(f"Using ecmwf only: {use_ecmwf_only}")
@@ -314,6 +320,8 @@ def app(
     temp_dir.cleanup()
     logger.info("Finished forecast")
 
+def main():
+    typer.run(app)
 
 if __name__ == "__main__":
-    typer.run(app)
+    main()
