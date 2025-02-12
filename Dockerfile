@@ -28,12 +28,12 @@ COPY data /app/data
 
 RUN uv sync --no-dev --compile-bytecode --inexact
 
-FROM python:3.12
+FROM python:3.12-slim
 
 COPY --from=build-app /app/.venv /app/.venv
 
 # This is just a check to make sure it works, we've had problems with this in the past
 ENV PATH="/app/.venv/bin:${PATH}"
-RUN python -c "import torchvision"
+RUN /app/.venv/bin/python -c "import torchvision"
 
-CMD ["python", "-u","pvnet_app/app.py"]
+ENTRYPOINT ["/app/.venv/bin/python", "-u","pvnet_app/app.py"]
