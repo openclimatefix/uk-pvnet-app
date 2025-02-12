@@ -26,7 +26,7 @@ COPY scripts /app/scripts
 # is this data just for testing?
 COPY data /app/data
 
-RUN uv sync --no-dev --compile-bytecode
+RUN uv sync --no-dev --compile-bytecode --inexact
 
 # This is just a check to make sure it works, we've had problems with this in the past
 RUN uv run python -c "import torchvision"
