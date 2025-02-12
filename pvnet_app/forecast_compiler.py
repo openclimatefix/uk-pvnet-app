@@ -194,6 +194,13 @@ class ForecastCompiler:
         # TODO: This change should be moved inside PVNet
         batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
 
+        # validate nwp data is not all zeros
+        for nwp_source in batch[BatchKey.nwp].keys():
+            if np.all(batch[BatchKey.nwp][nwp_source][NWPBatchKey.nwp] == 0):
+                raise ValueError(f"nwp data for {nwp_source} is all zeros. "
+                                 f"This cant be right. "
+                                 f"To fix this check raw NWP data, and the nwp-consumer")
+
         # Run batch through model
         preds = self.model(batch).detach().cpu().numpy()
 
