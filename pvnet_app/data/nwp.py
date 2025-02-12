@@ -118,7 +118,7 @@ def fix_ecmwf_data():
     ds = ds.reindex(latitude=np.concatenate([np.arange(62, 60, -0.05), ds.latitude.values]))
 
     # Re-save inplace
-    os.system(f"rm -rf {nwp_ecmwf_path}")
+    shutil.rmtree(nwp_ecmwf_path, ignore_errors=True)
     ds.to_zarr(nwp_ecmwf_path)
 
 
@@ -135,7 +135,7 @@ def fix_ukv_data():
     ds["variable"] = ds["variable"].astype(str)
 
     # Re-save inplace
-    os.system(f"rm -rf {nwp_ukv_path}")
+    shutil.rmtree(nwp_ukv_path, ignore_errors=True)
     ds.to_zarr(nwp_ukv_path)
 
 
@@ -223,5 +223,5 @@ def rename_ecmwf_variables():
         d = d.compute()
 
         # save back to path
-        os.system(f"rm -rf {nwp_ecmwf_path}")
+        shutil.rmtree(nwp_ecmwf_path, ignore_errors=True)
         d.to_zarr(nwp_ecmwf_path)
