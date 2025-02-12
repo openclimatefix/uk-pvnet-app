@@ -10,7 +10,7 @@ import ocf_blosc2
 from ocf_datapipes.config.load import load_yaml_configuration
 import shutil
 
-from .consts import sat_path
+from pvnet_app.consts import sat_path
 
 logger = logging.getLogger(__name__)
 

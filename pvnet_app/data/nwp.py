@@ -7,7 +7,7 @@ from typing import Optional
 import os
 import fsspec
 
-from .consts import nwp_ukv_path, nwp_ecmwf_path
+from pvnet_app.consts import nwp_ukv_path, nwp_ecmwf_path
 
 logger = logging.getLogger(__name__)
 
