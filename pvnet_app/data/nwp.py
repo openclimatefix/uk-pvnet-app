@@ -175,9 +175,13 @@ def rename_ecmwf_variables():
     """ Rename the ECMWF variables to what we use in the ML Model"""
     d = xr.open_zarr(nwp_ecmwf_path)
     # if the variable HRES-IFS_uk is there
-    if "HRES-IFS_uk" in d.data_vars:
+    if ("HRES-IFS_uk" in d.data_vars) or ("hres-ifs_uk" in d.data_vars):
         logger.info(f"Renaming the ECMWF variables")
-        d = d.rename({"HRES-IFS_uk": "ECMWF_UK"})
+
+        if "HRES-IFS_uk" in d.data_vars:
+            d = d.rename({"HRES-IFS_uk": "ECMWF_UK"})
+        else:
+            d = d.rename({"hres-ifs_uk": "ECMWF_UK"})
 
         # remove anything >60 in latitude
         logger.info(f"Removing data above 60 latitude")
@@ -221,3 +225,51 @@ def rename_ecmwf_variables():
         # save back to path
         os.system(f"rm -rf {nwp_ecmwf_path}")
         d.to_zarr(nwp_ecmwf_path)
+
+
+def rename_ukv_variables():
+    """ Rename the UKV variables to what we use in the ML Model"""
+    d = xr.open_zarr(nwp_ukv_path)
+    # if the variable um-ukv is there
+    if "um-ukv" in d.data_vars:
+
+        d = d.rename({"um-ukv": "UKV"})
+
+        # remove anything >60 in latitude
+        logger.info(f"Removing data above 60 latitude")
+        d = d.where(d.latitude <= 60, drop=True)
+
+        # remove anything step > 83
+        logger.info(f"Removing data after step 83, step 84 is nan")
+        d = d.where(d.step <= d.step[83], drop=True)
+
+        # rename variable names in the variable coordinate
+        # This is a renaming from ECMWF variables to what we use in the ML Model
+        # This change happened in the new nwp-consumer>=1.0.0
+        # Ideally we won't need this step in the future
+        variable_coords = d.variable.values
+        rename = {'cloud_cover_high': 'hcc',
+                  'cloud_cover_low': 'lcc',
+                  'cloud_cover_medium': 'mcc',
+                  'snow_depth_gl': 'sde',
+                  'downward_longwave_radiation_flux_gl': 'dlwrf',
+                  'downward_shortwave_radiation_flux_gl': 'dswrf',
+                  'temperature_sl': 't',
+                  'total_precipitation_rate_gl': 'prate',
+                  'visibility_sl': 'vis',
+                  'wind_u_component_10m': 'u10',
+                  'wind_v_component_10m': 'v10',
+                  'wind_direction_10m': 'wdir10',
+                  'wind_speed_10m': 'si10',
+                  'relative_humidity_sl': 'r',}
+
+        for k, v in rename.items():
+            variable_coords[variable_coords == k] = v
+
+        # assign the new variable names
+        d = d.assign_coords(variable=variable_coords)
+        d = d.compute()
+
+        # save back to path
+        os.system(f"rm -rf {nwp_ukv_path}")
+        d.to_zarr(nwp_ukv_path)
