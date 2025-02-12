@@ -79,7 +79,7 @@ def regrid_nwp_data(nwp_zarr, target_coords_path, method):
     ).compute(scheduler="single-threaded")
 
     # Re-save - including rechunking
-    os.system(f"rm -rf {nwp_zarr}")
+    shutil.rmtree(nwp_zarr, ignore_errors=True)
     ds_regridded["variable"] = ds_regridded["variable"].astype(str)
 
     # Rechunk to these dimensions when saving

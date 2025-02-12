@@ -2,11 +2,13 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import logging
+import zipfile
 from typing import Optional
 import os
 import fsspec
 import ocf_blosc2
 from ocf_datapipes.config.load import load_yaml_configuration
+import shutil
 
 from pvnet_app.consts import sat_path
 
@@ -27,7 +29,9 @@ def download_all_sat_data() -> bool:
     """
 
     # Clean out old files
-    os.system(f"rm -r {sat_path} {sat_5_path} {sat_15_path}")
+    for p in [sat_path, sat_5_path, sat_15_path]:
+        if os.path.exists(p):
+            shutil.rmtree(p)
 
     # Set variable to track whether the satellite download is successful
     sat_available = False
@@ -40,23 +44,25 @@ def download_all_sat_data() -> bool:
     fs = fsspec.open(sat_5_dl_path).fs
     if fs.exists(sat_5_dl_path):
         sat_available = True
-        logger.info(f"Downloading 5-minute satellite data")
+        logger.info("Downloading 5-minute satellite data")
         fs.get(sat_5_dl_path, "sat_5_min.zarr.zip")
-        os.system(f"unzip -qq sat_5_min.zarr.zip -d {sat_5_path}")
-        os.system(f"rm sat_5_min.zarr.zip")
+        with zipfile.ZipFile("sat_5_min.zarr.zip", "r") as zip_ref:
+            zip_ref.extractall(sat_5_path)
+        os.remove("sat_5_min.zarr.zip")
     else:
-        logger.info(f"No 5-minute data available")
+        logger.info("No 5-minute data available")
 
     # Also download 15-minute satellite if it exists
     sat_15_dl_path = os.environ["SATELLITE_ZARR_PATH"].replace(".zarr", "_15.zarr")
     if fs.exists(sat_15_dl_path):
         sat_available = True
-        logger.info(f"Downloading 15-minute satellite data")
+        logger.info("Downloading 15-minute satellite data")
         fs.get(sat_15_dl_path, "sat_15_min.zarr.zip")
-        os.system(f"unzip -qq sat_15_min.zarr.zip -d {sat_15_path}")
-        os.system(f"rm sat_15_min.zarr.zip")
+        with zipfile.ZipFile("sat_15_min.zarr.zip", "r") as zip_ref:
+            zip_ref.extractall(sat_15_path)
+        os.remove("sat_15_min.zarr.zip")
     else:
-        logger.info(f"No 15-minute data available")
+        logger.info("No 15-minute data available")
 
     return sat_available
 
@@ -216,7 +222,7 @@ def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
             )
 
         # Save the interpolated data
-        os.system(f"rm -rf {sat_path}")
+        shutil.rmtree(sat_path)
         ds_sat.to_zarr(sat_path)
 
 
@@ -254,7 +260,8 @@ def extend_satellite_data_with_nans(
         ds_sat = ds_sat.reindex(time=np.concatenate([ds_sat.time, fill_times]), fill_value=np.nan)
 
         # Re-save inplace
-        os.system(f"rm -rf {satellite_data_path}")
+        if satellite_data_path is not None:
+            shutil.rmtree(satellite_data_path)
         ds_sat.to_zarr(satellite_data_path)
 
 
@@ -383,5 +390,5 @@ def scale_satellite_data() -> None:
     ds_sat = ds_sat.compute()
 
     # save
-    os.system(f"rm -rf {sat_path}")
+    shutil.rmtree(sat_path)
     ds_sat.to_zarr(sat_path)

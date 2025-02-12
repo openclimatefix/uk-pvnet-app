@@ -32,6 +32,9 @@ jobs:
         run: uv sync --inexact
 
       - name: Run unit tests (with pytest)
+        env:
+          SATELLITE_ZARR_PATH: "latest.zarr.zip"
+          NWP_UKV_ZARR_PATH: "temp_nwp_ukv.zarr"
         run: uv run python -m pytest --junitxml=ut-report.xml
 
       # Create test summary to be visualised on the job summary screen on GitHub
