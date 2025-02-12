@@ -32,7 +32,7 @@ jobs:
         run: uv sync --inexact
 
       - name: Run unit tests (with pytest)
-        run: uv run python -m pytest --junitxml=ut-report.xml tests
+        run: uv run python -m pytest --junitxml=ut-report.xml
 
       # Create test summary to be visualised on the job summary screen on GitHub
       # * Runs even if previous steps fail
