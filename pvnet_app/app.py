@@ -19,7 +19,6 @@ from ocf_datapipes.batch import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 import sentry_sdk
 
-import pvnet_app
 from .config import get_union_of_configs, load_yaml_config, save_yaml_config
 from .data.nwp import download_all_nwp_data, preprocess_nwp_data
 from .data.satellite import (
