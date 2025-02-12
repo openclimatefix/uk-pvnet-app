@@ -2,7 +2,7 @@
 FROM quay.io/condaforge/miniforge3:latest AS build-venv
 
 RUN apt-get update && \
-    apt-get install git unzip g++ gcc libgeos++-dev libproj-dev proj-data proj-bin -y && \
+    apt-get install git -y && \
     echo "Creating virtualenv at /app/.venv" && \
     conda create --quiet --yes -p /app/.venv python=3.12 esmpy gdal
 

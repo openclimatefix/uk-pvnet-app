@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 import xesmf as xe
 import logging
+import shutil
 from typing import Optional
 import os
 import fsspec
