@@ -20,8 +20,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from ocf_data_sampler.numpy_sample.gsp import GSPSampleKey
 
-import pvnet_app
-from .model_configs.pydantic_models import Model
+from pvnet_app.model_configs.pydantic_models import Model
 
 logger = logging.getLogger(__name__)
 

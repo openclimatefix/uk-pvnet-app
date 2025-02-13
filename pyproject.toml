@@ -54,6 +54,7 @@ dev = [
     # Linting and type checking
     "mypy",
     "ruff >= 0.9.2",
+    "pandas-stubs",
     # LSP Support
     "python-lsp-server",
     "pylsp-mypy",
