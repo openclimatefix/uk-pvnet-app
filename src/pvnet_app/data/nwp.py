@@ -1,14 +1,14 @@
+import logging
+import os
+import shutil
+from importlib.resources import files
+
+import fsspec
 import numpy as np
 import xarray as xr
 import xesmf as xe
-import logging
-import shutil
-from typing import Optional
-import os
-import fsspec
-from importlib.resources import files
 
-from pvnet_app.consts import nwp_ukv_path, nwp_ecmwf_path
+from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path
 
 logger = logging.getLogger(__name__)
 
@@ -22,24 +22,23 @@ def _download_nwp_data(source, destination):
 
 
 def download_all_nwp_data(
-    download_ukv: Optional[bool] = True, download_ecmwf: Optional[bool] = True
+    download_ukv: bool | None = True, download_ecmwf: bool | None = True,
 ):
     """Download the NWP data"""
     if download_ukv:
         _download_nwp_data(os.environ["NWP_UKV_ZARR_PATH"], nwp_ukv_path)
     else:
-        logger.info(f"Skipping download of UKV data")
+        logger.info("Skipping download of UKV data")
     if download_ecmwf:
         _download_nwp_data(os.environ["NWP_ECMWF_ZARR_PATH"], nwp_ecmwf_path)
     else:
-        logger.info(f"Skipping download of ECMWF data")
+        logger.info("Skipping download of ECMWF data")
 
 
 def regrid_nwp_data(nwp_zarr, target_coords_path, method):
     """This function loads the  NWP data, then regrids and saves it back out if the data is not
     on the same grid as expected. The data is resaved in-place.
     """
-
     logger.info(f"Regridding NWP data {nwp_zarr} to expected grid to {target_coords_path}")
 
     ds_raw = xr.open_zarr(nwp_zarr)
@@ -74,8 +73,8 @@ def regrid_nwp_data(nwp_zarr, target_coords_path, method):
     regridder = xe.Regridder(ds_raw, ds_target_coords, method=method)
     ds_regridded = regridder(
         ds_raw.chunk(
-            {k: regrid_chunk_dict[k] for k in list(ds_raw.xindexes) if k in regrid_chunk_dict}
-        )
+            {k: regrid_chunk_dict[k] for k in list(ds_raw.xindexes) if k in regrid_chunk_dict},
+        ),
     ).compute(scheduler="single-threaded")
 
     # Re-save - including rechunking
@@ -92,7 +91,7 @@ def regrid_nwp_data(nwp_zarr, target_coords_path, method):
     }
 
     ds_regridded.chunk(
-        {k: save_chunk_dict[k] for k in list(ds_raw.xindexes) if k in save_chunk_dict}
+        {k: save_chunk_dict[k] for k in list(ds_raw.xindexes) if k in save_chunk_dict},
     ).to_zarr(nwp_zarr)
 
 
@@ -104,14 +103,14 @@ def fix_ecmwf_data():
     name_sub = {"t": "t2m", "clt": "tcc"}
 
     if any(v in name_sub for v in ds["variable"].values):
-        logger.info(f"Renaming the ECMWF variables")
+        logger.info("Renaming the ECMWF variables")
         ds["variable"] = np.array(
-            [name_sub[v] if v in name_sub else v for v in ds["variable"].values]
+            [name_sub[v] if v in name_sub else v for v in ds["variable"].values],
         )
     else:
-        logger.info(f"No ECMWF renaming required - skipping this step")
+        logger.info("No ECMWF renaming required - skipping this step")
 
-    logger.info(f"Extending the ECMWF data to reach the shetlands")
+    logger.info("Extending the ECMWF data to reach the shetlands")
     # Thw data must be extended to reach the shetlands. This will fill missing lats with NaNs
     # and reflects what the model saw in training
     ds = ds.reindex(latitude=np.concatenate([np.arange(62, 60, -0.05), ds.latitude.values]))
@@ -127,7 +126,6 @@ def fix_ukv_data():
     - In training the UKV data is float16. This causes it to overflow into inf values which are then
       clipped.
     """
-
     ds = xr.open_zarr(nwp_ukv_path).compute()
     ds = ds.astype(np.float16)
 
@@ -138,20 +136,20 @@ def fix_ukv_data():
     ds.to_zarr(nwp_ukv_path)
 
 
-def preprocess_nwp_data(use_ukv: Optional[bool] = True, use_ecmwf: Optional[bool] = True):
+def preprocess_nwp_data(use_ukv: bool | None = True, use_ecmwf: bool | None = True):
 
     if use_ukv:
         # Regrid the UKV data
         regrid_nwp_data(
             nwp_zarr=nwp_ukv_path,
-            target_coords_path=files('pvnet_app.data').joinpath('nwp_ukv_target_coords.nc'),
+            target_coords_path=files("pvnet_app.data").joinpath("nwp_ukv_target_coords.nc"),
             method="bilinear",
         )
 
         # UKV data must be float16 to allow overflow to inf like in training
         fix_ukv_data()
     else:
-        logger.info(f"Skipping UKV data preprocessing")
+        logger.info("Skipping UKV data preprocessing")
 
     if use_ecmwf:
 
@@ -161,33 +159,33 @@ def preprocess_nwp_data(use_ukv: Optional[bool] = True, use_ecmwf: Optional[bool
         # Regrid the ECMWF data
         regrid_nwp_data(
             nwp_zarr=nwp_ecmwf_path,
-            target_coords_path=files('pvnet_app.data').joinpath('nwp_ecmwf_target_coords.nc'),
+            target_coords_path=files("pvnet_app.data").joinpath("nwp_ecmwf_target_coords.nc"),
             method="conservative",  # this is needed to avoid zeros around edges of ECMWF data
         )
 
         # Names need to be aligned between training and prod, and we need to infill the shetlands
         fix_ecmwf_data()
     else:
-        logger.info(f"Skipping ECMWF data preprocessing")
+        logger.info("Skipping ECMWF data preprocessing")
 
 
 def rename_ecmwf_variables():
-    """ Rename the ECMWF variables to what we use in the ML Model"""
+    """Rename the ECMWF variables to what we use in the ML Model"""
     d = xr.open_zarr(nwp_ecmwf_path)
     # if the variable HRES-IFS_uk is there
     if ("HRES-IFS_uk" in d.data_vars) or ("hres-ifs_uk" in d.data_vars):
-        logger.info(f"Renaming the ECMWF variables")
+        logger.info("Renaming the ECMWF variables")
         if "HRES-IFS_uk" in d.data_vars:
             d = d.rename({"HRES-IFS_uk": "ECMWF_UK"})
         else:
             d = d.rename({"hres-ifs_uk": "ECMWF_UK"})
 
         # remove anything >60 in latitude
-        logger.info(f"Removing data above 60 latitude")
+        logger.info("Removing data above 60 latitude")
         d = d.where(d.latitude <= 60, drop=True)
 
         # remove anything step > 83
-        logger.info(f"Removing data after step 83, step 84 is nan")
+        logger.info("Removing data after step 83, step 84 is nan")
         d = d.where(d.step <= d.step[83], drop=True)
 
         # rename variable names in the variable coordinate
@@ -195,24 +193,24 @@ def rename_ecmwf_variables():
         # This change happened in the new nwp-consumer>=1.0.0
         # Ideally we won't need this step in the future
         variable_coords = d.variable.values
-        rename = {'cloud_cover_high': 'hcc',
-                  'cloud_cover_low': 'lcc',
-                  'cloud_cover_medium': 'mcc',
-                  'cloud_cover_total': 'tcc',
-                  'snow_depth_gl': 'sde',
-                  'direct_shortwave_radiation_flux_gl': 'sr',
-                  'downward_longwave_radiation_flux_gl': 'dlwrf',
-                  'downward_shortwave_radiation_flux_gl': 'dswrf',
-                  'downward_ultraviolet_radiation_flux_gl': 'duvrs',
-                  'temperature_sl': 't',
-                  'total_precipitation_rate_gl': 'prate',
-                  'visibility_sl': 'vis',
-                  'wind_u_component_100m': 'u100',
-                  'wind_u_component_10m': 'u10',
-                  'wind_u_component_200m': 'u200',
-                  'wind_v_component_100m': 'v100',
-                  'wind_v_component_10m': 'v10',
-                  'wind_v_component_200m': 'v200'}
+        rename = {"cloud_cover_high": "hcc",
+                  "cloud_cover_low": "lcc",
+                  "cloud_cover_medium": "mcc",
+                  "cloud_cover_total": "tcc",
+                  "snow_depth_gl": "sde",
+                  "direct_shortwave_radiation_flux_gl": "sr",
+                  "downward_longwave_radiation_flux_gl": "dlwrf",
+                  "downward_shortwave_radiation_flux_gl": "dswrf",
+                  "downward_ultraviolet_radiation_flux_gl": "duvrs",
+                  "temperature_sl": "t",
+                  "total_precipitation_rate_gl": "prate",
+                  "visibility_sl": "vis",
+                  "wind_u_component_100m": "u100",
+                  "wind_u_component_10m": "u10",
+                  "wind_u_component_200m": "u200",
+                  "wind_v_component_100m": "v100",
+                  "wind_v_component_10m": "v10",
+                  "wind_v_component_200m": "v200"}
 
         for k, v in rename.items():
             variable_coords[variable_coords == k] = v

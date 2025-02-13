@@ -1,21 +1,20 @@
-from pathlib import Path
-import pandas as pd
-import numpy as np
-
-from torch.utils.data import DataLoader
-from ocf_datapipes.batch import stack_np_examples_into_batch as legacy_stack_np_examples_into_batch
-from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKRegionalDataset
-
-from pvnet_app.config import modify_data_config_for_production
-from ocf_data_sampler.numpy_sample.collate import stack_np_samples_into_batch
-
 # Legacy imports - only used for legacy dataloader
 import os
-from torch.utils.data.datapipes.iter import IterableWrapper
-from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from ocf_data_sampler.numpy_sample.collate import stack_np_samples_into_batch
+from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKRegionalDataset
 from ocf_datapipes.batch import BatchKey
-from ocf_datapipes.utils.eso import get_gsp_shape_from_eso
+from ocf_datapipes.batch import stack_np_examples_into_batch as legacy_stack_np_examples_into_batch
+from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
 from ocf_datapipes.utils import Location
+from ocf_datapipes.utils.eso import get_gsp_shape_from_eso
+from torch.utils.data import DataLoader
+from torch.utils.data.datapipes.iter import IterableWrapper
+
+from pvnet_app.config import modify_data_config_for_production
 
 
 def get_dataloader(

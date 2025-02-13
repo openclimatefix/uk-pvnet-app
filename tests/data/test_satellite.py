@@ -10,25 +10,24 @@ Tests for download_sat_data and preprocess_sat_data
 
 Note that I'm not sure these tests will work in parallel, due to files being saved in the same places
 """
-from datetime import datetime, timedelta
-
 import os
 import tempfile
+from datetime import datetime, timedelta
 
-import pytest
-import zarr
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
+import zarr
 
 from pvnet_app.data.satellite import (
-    download_all_sat_data,
-    preprocess_sat_data,
     check_model_satellite_inputs_available,
-    sat_path,
+    download_all_sat_data,
+    extend_satellite_data_with_nans,
+    preprocess_sat_data,
     sat_5_path,
     sat_15_path,
-    extend_satellite_data_with_nans,
+    sat_path,
 )
 
 

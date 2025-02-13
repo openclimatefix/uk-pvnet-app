@@ -1,6 +1,7 @@
-import pytest
-import numpy as np
 import logging
+
+import numpy as np
+import pytest
 
 from pvnet_app.forecast_compiler import validate_forecast
 
@@ -54,7 +55,7 @@ def test_validate_forecast_warns_when_over_30gw(caplog):
         validate_forecast(
             national_forecast_values=np.array([31_000]),
             national_capacity=100_000,
-            logger_func=logging.info
+            logger_func=logging.info,
         )
     # Check that the warning message is in the logs
     assert "WARNING: National forecast exceeds 30 GW (31.00 GW)." in caplog.text
@@ -69,7 +70,7 @@ def test_validate_forecast_above_100_gw_raises():
         validate_forecast(
             national_forecast_values=np.array([101_000]),
             national_capacity=200_000,
-            logger_func=lambda x: None
+            logger_func=lambda x: None,
         )
     assert "Hard FAIL: The maximum of the forecast is above 100 GW!" in str(
         excinfo.value)

@@ -5,7 +5,6 @@ is run.
 """
 
 import typer
-
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
