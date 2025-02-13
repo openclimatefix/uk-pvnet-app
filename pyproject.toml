@@ -33,12 +33,11 @@ dependencies = [
     "pytorch-lightning==2.3.3",
     "requests==2.32.3",
     "sentry-sdk==2.21.0",
+    # Since torch distributes CPU only packages as wheels, have to specify the target platform in order to pull the wheel compiled for that specific platform
     "torch @ https://download.pytorch.org/whl/cpu/torch-2.3.1-cp312-none-macosx_11_0_arm64.whl ; platform_system == 'Darwin' and platform_machine == 'arm64'",
     "torchvision @ https://download.pytorch.org/whl/cpu/torchvision-0.18.1-cp312-cp312-macosx_11_0_arm64.whl ; platform_system == 'Darwin' and platform_machine == 'arm64'",
     "torch @ https://download.pytorch.org/whl/cpu/torch-2.3.1%2Bcpu-cp312-cp312-linux_x86_64.whl ; platform_system == 'Linux' and platform_machine == 'x86_64'",
     "torchvision @ https://download.pytorch.org/whl/cpu/torchvision-0.18.1%2Bcpu-cp312-cp312-linux_x86_64.whl ; platform_system == 'Linux' and platform_machine == 'x86_64'",
-    # "torch @ https://download.pytorch.org/whl/cpu/torch-2.3.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl ; platform_system == 'Linux' and platform_machine == 'aarch64'",
-    # "torchvision @ https://download.pytorch.org/whl/cpu/torchvision-0.18.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl ; platform_system == 'Linux' and platform_machine == 'aarch64'",
     "typer==0.15.1",
     "xarray==2025.1.2",
     "xesmf==0.8.8", # Requires ESMF to be installed
