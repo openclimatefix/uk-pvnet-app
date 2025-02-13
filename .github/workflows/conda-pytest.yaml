@@ -25,7 +25,7 @@ jobs:
           python-version-file: "pyproject.toml"
           python-version: '3.12' 
       
-      - name: Install ESMF
+      - name: Install ESMF and GDAL
         run: conda create --quiet --yes -p .venv python=3.12 esmpy gdal
 
       - name: Install editable package and required dependencies
