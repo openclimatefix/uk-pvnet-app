@@ -1,15 +1,16 @@
-"""App to run inference for PVNet models
-"""
+"""App to run inference for PVNet models."""
 
 import logging
 import os
 import tempfile
 import warnings
 from datetime import timedelta
+from importlib.metadata import PackageNotFoundError, version
+
 import dask
-import pandas as pd
-import pvnet
 import fsspec
+import pandas as pd
+import sentry_sdk
 import torch
 import typer
 from nowcasting_datamodel.connection import DatabaseConnection
@@ -17,28 +18,30 @@ from nowcasting_datamodel.models.base import Base_Forecast
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 from ocf_datapipes.batch import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
-import sentry_sdk
 
-import pvnet_app
-from pvnet_app.config import get_union_of_configs, load_yaml_config, save_yaml_config
+from pvnet_app.config import get_union_of_configs, save_yaml_config
 from pvnet_app.data.nwp import download_all_nwp_data, preprocess_nwp_data
 from pvnet_app.data.satellite import (
+    check_model_satellite_inputs_available,
     download_all_sat_data,
     preprocess_sat_data,
-    check_model_satellite_inputs_available,
 )
-from pvnet_app.dataloader import get_legacy_dataloader, get_dataloader
+from pvnet_app.dataloader import get_dataloader, get_legacy_dataloader
 from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
+try:
+    __version__ = version("pvnet-app")
+except PackageNotFoundError:
+    __version__ = "v?"
 
 # sentry
 sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"), environment=os.getenv("ENVIRONMENT", "local"), traces_sample_rate=1
+    dsn=os.getenv("SENTRY_DSN"), environment=os.getenv("ENVIRONMENT", "local"), traces_sample_rate=1,
 )
 
 sentry_sdk.set_tag("app_name", "pvnet_app")
-sentry_sdk.set_tag("version", pvnet_app.__version__)
+sentry_sdk.set_tag("version", __version__)
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
@@ -69,7 +72,7 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 # Get rid of the verbose sqlalchemy logs
-logging.getLogger('sqlalchemy').setLevel(logging.ERROR)
+logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +113,6 @@ def app(
         num_workers (int): Number of workers to use to load batches of data. When set to default
             value of -1, it will use one less than the number of CPU cores workers.
     """
-
     if num_workers == -1:
         num_workers = os.cpu_count() - 1
     if num_workers > 0:
@@ -122,8 +124,8 @@ def app(
     run_extra_models = os.getenv("RUN_EXTRA_MODELS", "false").lower() == "true"
     use_ocf_data_sampler = os.getenv("USE_OCF_DATA_SAMPLER", "true").lower() == "true"
 
-    logger.info(f"Using `pvnet` library version: {pvnet.__version__}")
-    logger.info(f"Using `pvnet_app` library version: {pvnet_app.__version__}")
+    logger.info(f"Using `pvnet` library version: {__version__}")
+    logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using day ahead model: {use_day_ahead_model}")
     logger.info(f"Using ecmwf only: {use_ecmwf_only}")
@@ -165,7 +167,7 @@ def app(
     with db_connection.get_session() as session:
         #  Pandas series of most recent GSP capacities
         gsp_capacities = get_latest_gsp_capacities(
-            session=session, gsp_ids=gsp_ids, datetime_utc=t0 - timedelta(days=2)
+            session=session, gsp_ids=gsp_ids, datetime_utc=t0 - timedelta(days=2),
         )
 
         # National capacity is needed if using summation model
@@ -221,7 +223,7 @@ def app(
             warnings.warn(f"The model {model_config.name} cannot be run with input data available")
 
     if len(forecast_compilers) == 0:
-        raise Exception(f"No models were compatible with the available input data.")
+        raise Exception("No models were compatible with the available input data.")
 
     # Find the config with values suitable for running all models
     common_config = get_union_of_configs(data_config_paths)
@@ -274,13 +276,13 @@ def app(
                     fs = fsspec.open(s3_directory).fs
                     fs.put(save_batch, f"{s3_directory}/{save_batch}")
                     logger.info(
-                        f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}"
+                        f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}",
                         )
                     os.remove(save_batch)
-                    logger.info(f"Removed local copy of batch")
+                    logger.info("Removed local copy of batch")
                 except Exception as e:
                     logger.error(
-                        f"Failed to save batch to {s3_directory}/{save_batch} with error {e}"
+                        f"Failed to save batch to {s3_directory}/{save_batch} with error {e}",
                         )
 
             for forecast_compiler in forecast_compilers.values():
@@ -314,6 +316,8 @@ def app(
     temp_dir.cleanup()
     logger.info("Finished forecast")
 
+def main():
+    typer.run(app)
 
 if __name__ == "__main__":
-    typer.run(app)
+    main()

@@ -1,13 +1,14 @@
+import os
+import tempfile
 from datetime import timedelta
-import tempfile, os
 
 import pandas as pd
+from ocf_data_sampler.config import load_yaml_configuration
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
+from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.dataloader import get_legacy_dataloader
 from pvnet_app.model_configs.pydantic_models import get_all_models
-from ocf_data_sampler.config import load_yaml_configuration
-from pvnet_app.config import modify_data_config_for_production
 
 
 def test_data_config():

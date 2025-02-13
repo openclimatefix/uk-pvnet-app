@@ -1,6 +1,8 @@
 import logging
 import warnings
-from datetime import timezone, datetime
+from collections.abc import Callable
+from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
 import pandas as pd
@@ -15,14 +17,15 @@ from ocf_datapipes.utils.consts import ELEVATION_MEAN, ELEVATION_STD
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
-from typing import Callable
 
-from ocf_data_sampler.numpy_sample.gsp import GSPSampleKey
-
-import pvnet_app
 from pvnet_app.model_configs.pydantic_models import Model
 
 logger = logging.getLogger(__name__)
+
+try:
+    __version__ = version("pvnet-app")
+except PackageNotFoundError:
+    __version__ = "v?"
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -41,8 +44,7 @@ def validate_forecast(
     national_capacity: float,
     logger_func: Callable[[str], None],
 ) -> None:
-    """
-    Checks various conditions using the full forecast values (in MW).
+    """Checks various conditions using the full forecast values (in MW).
 
     Args:
         national_forecast_values: All the forecast values for the nation (in MW).
@@ -53,7 +55,6 @@ def validate_forecast(
     Raises:
         Exception: if above certain critical thresholds.
     """
-
     # Compute the maximum from the entire forecast array
     max_forecast_mw = float(np.max(national_forecast_values))
 
@@ -61,20 +62,20 @@ def validate_forecast(
     if max_forecast_mw > 1.1 * national_capacity:
         raise Exception(
             f"The maximum of the national forecast is {max_forecast_mw} which is "
-            f"greater than 10% above the national capacity ({national_capacity})."
+            f"greater than 10% above the national capacity ({national_capacity}).",
         )
 
     # Warn if forecast > 30 GW
     if max_forecast_mw > 30_000:  # 30 GW in MW
         logger_func(
-            f"WARNING: National forecast exceeds 30 GW ({max_forecast_mw / 1e3:.2f} GW)."
+            f"WARNING: National forecast exceeds 30 GW ({max_forecast_mw / 1e3:.2f} GW).",
         )
 
     # Hard fail if forecast > 100 GW
     if max_forecast_mw > 100_000:  # 100 GW in MW
         raise Exception(
             f"Hard FAIL: The maximum of the forecast is above 100 GW! "
-            f"Forecast is {max_forecast_mw / 1e3:.2f} GW."
+            f"Forecast is {max_forecast_mw / 1e3:.2f} GW.",
         )
 
     # New Validation: Detect Sudden Fluctuations
@@ -87,11 +88,11 @@ def validate_forecast(
 
     if np.any(large_jumps):
         logger_func(
-            f"WARNING: Forecast has sudden fluctuations (≥250 MW up and down).")
+            "WARNING: Forecast has sudden fluctuations (≥250 MW up and down).")
 
     if np.any(critical_jumps):
         raise Exception(
-            f"FAIL: Forecast has critical fluctuations (≥500 MW up and down).")
+            "FAIL: Forecast has critical fluctuations (≥500 MW up and down).")
 
 
 class ForecastCompiler:
@@ -116,7 +117,6 @@ class ForecastCompiler:
             national_capacity: The national solar capacity at t0
             use_legacy: Whether to run legacy dataloader
         """
-
         model_name = model_config.pvnet.repo
         model_version = model_config.pvnet.version
 
@@ -151,7 +151,7 @@ class ForecastCompiler:
 
         # These are the valid times this forecast will predict for
         self.valid_times = t0 + pd.timedelta_range(
-            start="30min", freq="30min", periods=self.model.forecast_len
+            start="30min", freq="30min", periods=self.model.forecast_len,
         )
 
     @staticmethod
@@ -163,7 +163,6 @@ class ForecastCompiler:
         device: torch.device,
     ):
         """Load the GSP and summation models"""
-
         # Load the GSP level model
         model = PVNetBaseModel.from_pretrained(
             model_id=model_name,
@@ -197,7 +196,6 @@ class ForecastCompiler:
 
     def predict_batch(self, batch: NumpyBatch) -> None:
         """Make predictions for a batch and store results internally"""
-
         self.log_info(
             f"Predicting for model: {self.model_name}-{self.model_version}")
 
@@ -257,7 +255,6 @@ class ForecastCompiler:
         - Make national forecast
         - Compile all forecasts into a DataArray stored inside the object as `da_abs_all`
         """
-
         # Compile results from all batches
         normed_preds = np.concatenate(self.normed_preds)
         sun_down_masks = np.concatenate(self.sun_down_masks)
@@ -272,7 +269,7 @@ class ForecastCompiler:
 
         # Merge batch results to xarray DataArray
         da_normed = self.preds_to_dataarray(
-            normed_preds, self.model.output_quantiles, gsp_ids_all_batches
+            normed_preds, self.model.output_quantiles, gsp_ids_all_batches,
         )
 
         da_sundown_mask = xr.DataArray(
@@ -338,7 +335,7 @@ class ForecastCompiler:
                 ~da_sundown_mask.all(dim="gsp_id")).fillna(0.0)
 
         self.log_info(
-            f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}"
+            f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}",
         )
 
         # Pass the entire national forecast array (for potential extra checks in future).
@@ -347,7 +344,7 @@ class ForecastCompiler:
         validate_forecast(
             national_forecast_values=national_forecast_values,
             national_capacity=self.national_capacity,
-            logger_func=self.log_info
+            logger_func=self.log_info,
         )
 
         # Store the compiled predictions internally
@@ -360,7 +357,6 @@ class ForecastCompiler:
         gsp_ids: list[int],
     ) -> xr.DataArray:
         """Put numpy array of predictions into a dataarray"""
-
         if output_quantiles is not None:
             output_labels = [
                 f"forecast_mw_plevel_{int(q*100):02}" for q in output_quantiles]
@@ -383,14 +379,13 @@ class ForecastCompiler:
 
     def log_forecast_to_database(self, session: Session) -> None:
         """Log the compiled forecast to the database"""
-
         self.log_info("Converting DataArray to list of ForecastSQL")
 
         sql_forecasts = self.convert_dataarray_to_forecasts(
             self.da_abs_all,
             session,
             model_tag=self.model_tag,
-            version=pvnet_app.__version__,
+            version=__version__,
         )
 
         self.log_info("Saving ForecastSQL to database")
@@ -444,7 +439,7 @@ class ForecastCompiler:
                 da_abs_sum_gsps,
                 session,
                 model_tag=f"{self.model_tag}_gsp_sum",
-                version=pvnet_app.__version__,
+                version=__version__,
             )
 
             save_sql_forecasts(
@@ -458,10 +453,9 @@ class ForecastCompiler:
 
     @staticmethod
     def convert_dataarray_to_forecasts(
-        da_preds: xr.DataArray, session: Session, model_tag: str, version: str
+        da_preds: xr.DataArray, session: Session, model_tag: str, version: str,
     ) -> list[ForecastSQL]:
-        """
-        Make a ForecastSQL object from a DataArray.
+        """Make a ForecastSQL object from a DataArray.
 
         Args:
             da_preds: DataArray of forecasted values
@@ -471,7 +465,6 @@ class ForecastCompiler:
         Return:
             List of ForecastSQL objects
         """
-
         assert "target_datetime_utc" in da_preds.coords
         assert "gsp_id" in da_preds.coords
         assert "forecast_mw" in da_preds.output_label
@@ -499,7 +492,7 @@ class ForecastCompiler:
                 da_gsp_time = da_gsp.sel(target_datetime_utc=target_time)
 
                 forecast_value_sql = ForecastValue(
-                    target_time=target_time.replace(tzinfo=timezone.utc),
+                    target_time=target_time.replace(tzinfo=UTC),
                     expected_power_generation_megawatts=(
                         da_gsp_time.sel(output_label="forecast_mw").item()
                     ),
@@ -530,7 +523,7 @@ class ForecastCompiler:
             # make forecast object
             forecast = ForecastSQL(
                 model=model,
-                forecast_creation_time=datetime.now(tz=timezone.utc),
+                forecast_creation_time=datetime.now(tz=UTC),
                 location=location,
                 input_data_last_updated=input_data_last_updated,
                 forecast_values=forecast_values,
@@ -543,8 +536,7 @@ class ForecastCompiler:
 
 
 def change_keys_to_ocf_datapipes_keys(batch):
-    """
-    Change string keys from ocf-data-sampler to BatchKey from ocf-datapipes
+    """Change string keys from ocf-data-sampler to BatchKey from ocf-datapipes
 
     Until PVNet is merged from dev-data-sampler, we need to do this.
     After this, we might need to change the other way around, for the legacy models.

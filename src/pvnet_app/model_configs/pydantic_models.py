@@ -1,8 +1,7 @@
-""" A pydantic model for the ML models"""
-import os
+"""A pydantic model for the ML models"""
 import logging
-
-from typing import List, Optional
+import os
+from importlib.resources import files
 
 import fsspec
 from pyaml_env import parse_config
@@ -23,33 +22,33 @@ class Model(BaseModel):
     pvnet: ModelHF = Field(..., title="PVNet", description="The PVNet model")
     summation: ModelHF = Field(..., title="Summation", description="The Summation model")
 
-    use_adjuster: Optional[bool] = Field(
-        False, title="Use Adjuster", description="Whether to use the adjuster model"
+    use_adjuster: bool | None = Field(
+        False, title="Use Adjuster", description="Whether to use the adjuster model",
     )
-    save_gsp_sum: Optional[bool] = Field(
-        False, title="Save GSP Sum", description="Whether to save the GSP sum"
+    save_gsp_sum: bool | None = Field(
+        False, title="Save GSP Sum", description="Whether to save the GSP sum",
     )
-    verbose: Optional[bool] = Field(
-        False, title="Verbose", description="Whether to print verbose output"
+    verbose: bool | None = Field(
+        False, title="Verbose", description="Whether to print verbose output",
     )
-    save_gsp_to_recent: Optional[bool] = Field(
+    save_gsp_to_recent: bool | None = Field(
         False,
         title="Save GSP to Forecast Value Last Seven Days",
         description="Whether to save the GSP to Forecast Value Last Seven Days",
     )
-    day_ahead: Optional[bool] = Field(
-        False, title="Day Ahead", description="If this model is day ahead or not"
+    day_ahead: bool | None = Field(
+        False, title="Day Ahead", description="If this model is day ahead or not",
     )
 
-    ecmwf_only: Optional[bool] = Field(
-        False, title="ECMWF ONly", description="If this model is only using ecmwf data"
+    ecmwf_only: bool | None = Field(
+        False, title="ECMWF ONly", description="If this model is only using ecmwf data",
     )
 
-    uses_satellite_data: Optional[bool] = Field(
-        True, title="Uses Satellite Data", description="If this model uses satellite data"
+    uses_satellite_data: bool | None = Field(
+        True, title="Uses Satellite Data", description="If this model uses satellite data",
     )
 
-    uses_ocf_data_sampler: Optional[bool] = Field(
+    uses_ocf_data_sampler: bool | None = Field(
         True,
         title="Uses OCF Data Sampler",
         description="If this model uses data sampler, old one uses ocf_datapipes",
@@ -59,13 +58,13 @@ class Model(BaseModel):
 class Models(BaseModel):
     """A group of ml models"""
 
-    models: List[Model] = Field(
-        ..., title="Models", description="A list of models to use for the forecast"
+    models: list[Model] = Field(
+        ..., title="Models", description="A list of models to use for the forecast",
     )
 
     @field_validator("models")
     @classmethod
-    def name_must_be_unique(cls, v: List[Model]) -> List[Model]:
+    def name_must_be_unique(cls, v: list[Model]) -> list[Model]:
         """Ensure that all model names are unique, respect to using ocf_data_sampler or not"""
         names = [(model.name, model.uses_ocf_data_sampler) for model in v]
         unique_names = set(names)
@@ -76,13 +75,12 @@ class Models(BaseModel):
 
 
 def get_all_models(
-    get_ecmwf_only: Optional[bool] = False,
-    get_day_ahead_only: Optional[bool] = False,
-    run_extra_models: Optional[bool] = False,
-    use_ocf_data_sampler: Optional[bool] = True,
-) -> List[Model]:
-    """
-    Returns all the models for a given client
+    get_ecmwf_only: bool | None = False,
+    get_day_ahead_only: bool | None = False,
+    run_extra_models: bool | None = False,
+    use_ocf_data_sampler: bool | None = True,
+) -> list[Model]:
+    """Returns all the models for a given client
 
     Args:
         get_ecmwf_only: If only the ECMWF model should be returned
@@ -90,10 +88,9 @@ def get_all_models(
         run_extra_models: If extra models should be run
         use_ocf_data_sampler: If the OCF Data Sampler should be used
     """
-
     try:
         # load models from yaml file
-        filename = os.path.dirname(os.path.abspath(__file__)) + "/all_models.yaml"
+        filename = files("pvnet_app.model_configs").joinpath("all_models.yaml")
 
         with fsspec.open(filename, mode="r") as stream:
             try:
@@ -131,7 +128,7 @@ def get_all_models(
             filtered_models = [model for model in filtered_models if not model.uses_ocf_data_sampler]
 
         selected_model_info = [
-            (model.name, f'uses_ocf_data_sampler={model.uses_ocf_data_sampler}') 
+            (model.name, f"uses_ocf_data_sampler={model.uses_ocf_data_sampler}")
             for model in filtered_models
         ]
         log.info(f"Selected models: {selected_model_info}")

@@ -1,22 +1,19 @@
 import os
+from datetime import UTC, timedelta
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 import xarray as xr
-import torch
 from nowcasting_datamodel.connection import DatabaseConnection
-from nowcasting_datamodel.models.base import Base_Forecast, Base_PV
-from nowcasting_datamodel.read.read import get_location
 from nowcasting_datamodel.fake import make_fake_me_latest
 from nowcasting_datamodel.models import (
     GSPYield,
     LocationSQL,
 )
-
+from nowcasting_datamodel.models.base import Base_Forecast, Base_PV
+from nowcasting_datamodel.read.read import get_location
 from testcontainers.postgres import PostgresContainer
-from datetime import timedelta, timezone
-
 
 xr.set_options(keep_attrs=True)
 
@@ -101,7 +98,7 @@ def make_nwp_data(shell_path, varname, test_t0):
     for v in list(ds.variables.keys()):
         if ds[v].dtype == object:
             ds[v].encoding.clear()
-    
+
     # Add data to dataset
     ds[varname] = xr.DataArray(
         np.zeros([len(ds[c]) for c in ds.xindexes]),
@@ -113,7 +110,7 @@ def make_nwp_data(shell_path, varname, test_t0):
     del ds.attrs["_data_attrs"]
 
     return ds
-        
+
 
 @pytest.fixture
 def nwp_ukv_data(test_t0):
@@ -140,7 +137,7 @@ def config_filename():
 def make_sat_data(test_t0, delay_mins, freq_mins, small=False):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(
-        f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr"
+        f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr",
     )
 
     if small:
@@ -210,7 +207,7 @@ def gsp_yields_and_systems(db_session, test_t0):
             installed_capacity_mw = 17000
         else:
             installed_capacity_mw = 17000/318
-        
+
         location_sql: LocationSQL = get_location(
             session=db_session,
             gsp_id=i,
@@ -220,7 +217,7 @@ def gsp_yields_and_systems(db_session, test_t0):
         # From 3 hours ago to 8.5 hours into future
         for minute in range(-3 * 60, 9 * 60, 30):
             gsp_yield_sql = GSPYield(
-                datetime_utc=(t0_datetime_utc + timedelta(minutes=minute)).replace(tzinfo=timezone.utc),
+                datetime_utc=(t0_datetime_utc + timedelta(minutes=minute)).replace(tzinfo=UTC),
                 solar_generation_kw=np.random.randint(low=0, high=1000),
                 capacity_mwp=installed_capacity_mw,
             ).to_orm()

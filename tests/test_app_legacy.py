@@ -1,7 +1,7 @@
-import tempfile
-import zarr
 import os
+import tempfile
 
+import zarr
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
     ForecastValueLatestSQL,
@@ -10,6 +10,7 @@ from nowcasting_datamodel.models.forecast import (
 )
 
 from pvnet_app.model_configs.pydantic_models import get_all_models
+
 
 # Its nice to have this here, so we can run the latest version in production, but still use the old models
 # Once we have re trained PVnet summation models we can remove this
@@ -78,7 +79,7 @@ def test_app_ecwmf_only(db_session, nwp_ecmwf_data, gsp_yields_and_systems, me_l
 # Its nice to have this here, so we can run the latest version in production, but still use the old models
 # Once we have re trained PVnet summation models we can remove this
 def test_app_ocf_datapipes(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest,
 ):
     """Test the app running the day ahead model"""
 
@@ -144,7 +145,7 @@ def test_app_ocf_datapipes(
 
 
 def test_app_day_ahead_model(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest,
 ):
     """Test the app running the day ahead model"""
 

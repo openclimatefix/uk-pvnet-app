@@ -1,7 +1,7 @@
-import tempfile
-import zarr
 import os
+import tempfile
 
+import zarr
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
     ForecastValueLatestSQL,
@@ -13,7 +13,7 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
 def test_app(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest,
 ):
 
     """Test the app running the intraday models"""
@@ -82,7 +82,7 @@ def test_app(
 
 
 def test_app_no_sat(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest,
 ):
     """Test the app for the case when no satellite data is available"""
 
@@ -149,7 +149,7 @@ def test_app_no_sat(
 # Test for new DA model with data sampler utilisation
 # To note - Satellite omitted
 def test_app_day_ahead_data_sampler(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, gsp_yields_and_systems, me_latest
+    db_session, nwp_ukv_data, nwp_ecmwf_data, gsp_yields_and_systems, me_latest,
 ):
     """Test the app running the day ahead model"""
 

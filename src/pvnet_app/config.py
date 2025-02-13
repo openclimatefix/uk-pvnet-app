@@ -1,6 +1,6 @@
 import yaml
 
-from pvnet_app.consts import sat_path, nwp_ukv_path, nwp_ecmwf_path
+from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path, sat_path
 
 
 def load_yaml_config(path: str) -> dict:
@@ -23,7 +23,6 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
         config: The data config
         gsp_path: For lagacy usage only
     """
-
     production_paths = {
         "gsp": gsp_path,
         "nwp": {"ukv": nwp_ukv_path, "ecmwf": nwp_ecmwf_path},
@@ -56,15 +55,14 @@ def overwrite_config_dropouts(config: dict) -> dict:
         config: The data config
 
     """
-
     # Replace data sources
     if "satellite" in config["input_data"]:
 
         satellite_config = config["input_data"]["satellite"]
 
-        if satellite_config[f"satellite_zarr_path"] != "":
-            satellite_config[f"dropout_timedeltas_minutes"] = None
-            satellite_config[f"dropout_fraction"] = 0
+        if satellite_config["satellite_zarr_path"] != "":
+            satellite_config["dropout_timedeltas_minutes"] = None
+            satellite_config["dropout_fraction"] = 0
 
     # NWP is nested so must be treated separately
     if "nwp" in config["input_data"]:
@@ -87,13 +85,12 @@ def reformat_config_data_sampler(config: dict) -> dict:
         config: The data config
 
     """
-
     # Replace satellite
     if "satellite" in config["input_data"]:
 
         satellite_config = config["input_data"]["satellite"]
 
-        if satellite_config[f"satellite_zarr_path"] != "":
+        if satellite_config["satellite_zarr_path"] != "":
 
             rename_pairs = [
                 ("satellite_image_size_pixels_width", "image_size_pixels_width"),
@@ -145,8 +142,7 @@ def reformat_config_data_sampler(config: dict) -> dict:
 
 
 def update_config(rename_pairs: list, config: dict, change_history_minutes: bool = True, remove_keys=None):
-    """
-    Update the config with rename pairs, and remove keys if they exist
+    """Update the config with rename pairs, and remove keys if they exist
 
     1. Rename keys in the config
     2. Change history minutes to interval start minutes, with a negative value
@@ -158,7 +154,6 @@ def update_config(rename_pairs: list, config: dict, change_history_minutes: bool
         change_history_minutes: option to change history minutes to interval start minutes
         remove_keys: list of key to remove
     """
-
     for old, new in rename_pairs:
         if old in config:
             config[new] = config[old]
@@ -176,7 +171,7 @@ def update_config(rename_pairs: list, config: dict, change_history_minutes: bool
 
 
 def modify_data_config_for_production(
-    input_path: str, output_path: str, gsp_path: str = "", reformat_config: bool = False
+    input_path: str, output_path: str, gsp_path: str = "", reformat_config: bool = False,
 ) -> None:
     """Resave the data config with the data source filepaths and dropouts overwritten
 
@@ -204,7 +199,6 @@ def get_union_of_configs(config_paths: list[str]) -> dict:
     are the same in the different configs, or whether the NWP time slices are the same. Many more
     limitations not mentioned apply
     """
-
     # Load all the configs
     configs = [load_yaml_config(config_path) for config_path in config_paths]
 
