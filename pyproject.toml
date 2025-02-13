@@ -10,7 +10,7 @@ name = "pvnet_app"
 description = "Packaged version of OCF's PVNet model"
 version = "2.4.40"
 readme = {file = "README.md", content-type = "text/markdown"}
-requires-python = ">=3.12.0"
+requires-python = "==3.12.0"
 license = {file = "LICENSE"}
 authors = [
     { name = "James Fulton", email = "info@openclimatefix.org"},
