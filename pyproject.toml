@@ -68,9 +68,11 @@ pvnet-app = "pvnet_app.app:main"
 [project.urls]
 repository = "https://github.com/openclimatefix/uk-pvnet-app"
 
-[tool.setuptools]
-include-package-data = false
-packages = ["pvnet_app"]
+[tool.setuptools.package-data]
+"*" = ["*.nc"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools-git-versioning]
 enabled = true

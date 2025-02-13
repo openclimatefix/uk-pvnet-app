@@ -17,15 +17,11 @@ WORKDIR /app
 COPY pyproject.toml /app/pyproject.toml
 
 # Install only requirements
-RUN uv sync --no-dev --no-install-project --compile-bytecode --inexact
+RUN mkdir src && uv sync --no-dev --no-install-project --compile-bytecode --inexact
 
 FROM build-deps AS build-app
 
-COPY pvnet_app /app/pvnet_app
-COPY scripts /app/scripts
-# is this data just for testing?
-COPY data /app/data
-
+COPY src /app/src
 RUN uv sync --no-editable --no-dev --compile-bytecode --inexact
 
 FROM python:3.12-slim

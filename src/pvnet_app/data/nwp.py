@@ -6,12 +6,11 @@ import shutil
 from typing import Optional
 import os
 import fsspec
+from importlib.resources import files
 
 from pvnet_app.consts import nwp_ukv_path, nwp_ecmwf_path
 
 logger = logging.getLogger(__name__)
-
-this_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 def _download_nwp_data(source, destination):
@@ -145,7 +144,7 @@ def preprocess_nwp_data(use_ukv: Optional[bool] = True, use_ecmwf: Optional[bool
         # Regrid the UKV data
         regrid_nwp_data(
             nwp_zarr=nwp_ukv_path,
-            target_coords_path=f"{this_dir}/../../data/nwp_ukv_target_coords.nc",
+            target_coords_path=files('pvnet_app.data').joinpath('nwp_ukv_target_coords.nc'),
             method="bilinear",
         )
 
@@ -162,7 +161,7 @@ def preprocess_nwp_data(use_ukv: Optional[bool] = True, use_ecmwf: Optional[bool
         # Regrid the ECMWF data
         regrid_nwp_data(
             nwp_zarr=nwp_ecmwf_path,
-            target_coords_path=f"{this_dir}/../../data/nwp_ecmwf_target_coords.nc",
+            target_coords_path=files('pvnet_app.data').joinpath('nwp_ecmwf_target_coords.nc'),
             method="conservative",  # this is needed to avoid zeros around edges of ECMWF data
         )
 
