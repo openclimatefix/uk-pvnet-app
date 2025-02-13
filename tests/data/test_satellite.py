@@ -25,6 +25,7 @@ from pvnet_app.data.satellite import (
     download_all_sat_data,
     extend_satellite_data_with_nans,
     preprocess_sat_data,
+    interpolate_missing_satellite_timestamps,
     sat_5_path,
     sat_15_path,
     sat_path,
@@ -188,13 +189,17 @@ def test_preprocess_old_sat_5_data(sat_5_data_delayed, sat_15_data, test_t0):
 def test_check_model_satellite_inputs_available(config_filename):
 
     t0 = datetime(2023,1,1)
-    sat_datetime_1 = pd.date_range(t0 - timedelta(minutes=120), t0- timedelta(minutes=5), freq="5min")
+    sat_datetime_1 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=5), freq="5min")
     sat_datetime_2 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=15), freq="5min")
     sat_datetime_3 = pd.date_range(t0 - timedelta(minutes=120), t0 - timedelta(minutes=35), freq="5min")
+    sat_datetime_4 = pd.to_datetime([t for t in sat_datetime_1 if t!=t0-timedelta(minutes=30)])
+    sat_datetime_5 = pd.to_datetime([t for t in sat_datetime_1 if t!=t0-timedelta(minutes=60)])
 
     assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_1)
     assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_2)
     assert not check_model_satellite_inputs_available(config_filename, t0, sat_datetime_3)
+    assert not check_model_satellite_inputs_available(config_filename, t0, sat_datetime_4)
+    assert not check_model_satellite_inputs_available(config_filename, t0, sat_datetime_5)
 
 
 def test_extend_satellite_data_with_nans(sat_5_data, test_t0):
@@ -282,3 +287,36 @@ def test_remove_satellite_data(sat_15_data_small, test_t0):
         # check an error is made
         with pytest.raises(Exception):
             preprocess_sat_data(test_t0)
+
+
+def test_interpolate_missing_satellite_timestamps(tmp_path):
+    """Test that missing timestamps are interpolated"""
+
+    # Create a 15 minutely dataset with missing timestamp
+    t_start = "2023-01-01T00:00"
+    t_end = "2023-01-01T03:00"
+    times = np.delete(pd.date_range(start=t_start, end=t_end, freq="15min"), 1)
+
+    ds = xr.DataArray(
+        data=np.ones(times.shape),
+        dims=["time"],
+        coords=dict(time=times),
+    ).to_dataset(name="data")
+    ds.to_zarr(tmp_path)
+    
+    # This function loads data from sat_path, interpolates it adn saves it back to sat_path
+    interpolate_missing_satellite_timestamps(max_gap=pd.Timedelta("15min"), zarr_path=tmp_path)
+
+    # Reload the interpolated dataset
+    ds_interp = xr.open_zarr(tmp_path)
+
+    # The function interpolates to 5 minute intervals but will only interpolate between 
+    # timestamps if there is less than 15 minutes between them. In this case, the 5 minute
+    # intervals between the first two timestamps should not have been interpolated because
+    # there is a 30 minute gap
+    expected_times = pd.date_range(start=t_start, end=t_end, freq="5min")
+    expected_times = [t for t in expected_times if not (times[0] < t < times[1])]
+
+    assert (pd.to_datetime(ds_interp.time)==pd.to_datetime(expected_times)).all().item()
+
+    assert (ds_interp.data.values==1).all().item()

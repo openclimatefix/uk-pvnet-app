@@ -158,9 +158,9 @@ def fill_1d_bool_gaps(x, max_gap):
     return np.logical_or(should_fill, x)
 
 
-def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
+def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta, zarr_path: str = sat_path) -> None:
     """Interpolate missing satellite timestamps"""
-    ds_sat = xr.open_zarr(sat_path)
+    ds_sat = xr.open_zarr(zarr_path)
 
     # If any of these times are missing, we will try to interpolate them
     dense_times = pd.date_range(
@@ -198,7 +198,7 @@ def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
         # Mask the timestamps outside the max gap size
         valid_fill_times_xr = xr.zeros_like(ds_interp.time, dtype=bool)
         valid_fill_times_xr.values[:] = valid_fill_times
-        ds_sat = ds_interp.where(valid_fill_times_xr)
+        ds_sat_filtered = ds_interp.where(valid_fill_times_xr, drop=True)
 
         time_was_filled = np.logical_and(valid_fill_times_xr, ~timestamp_available)
 
@@ -217,8 +217,8 @@ def interpolate_missing_satellite_timestamps(max_gap: pd.Timedelta) -> None:
             )
 
         # Save the interpolated data
-        shutil.rmtree(sat_path)
-        ds_sat.to_zarr(sat_path)
+        shutil.rmtree(zarr_path)
+        ds_sat_filtered.to_zarr(zarr_path)
 
 
 def extend_satellite_data_with_nans(
