@@ -7,6 +7,7 @@ from typing import List, Optional
 import fsspec
 from pyaml_env import parse_config
 from pydantic import BaseModel, Field, field_validator
+from importlib.resources import files
 
 log = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ def get_all_models(
 
     try:
         # load models from yaml file
-        filename = os.path.dirname(os.path.abspath(__file__)) + "/all_models.yaml"
+        filename = files('pvnet_app.model_configs').joinpath("all_models.yaml")
 
         with fsspec.open(filename, mode="r") as stream:
             try:
