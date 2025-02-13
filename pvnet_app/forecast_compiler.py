@@ -35,6 +35,7 @@ _model_mismatch_msg = (
     "may lead to unreliable results even if the shapes match."
 )
 
+
 def validate_forecast(
     national_forecast_values: np.ndarray,
     national_capacity: float,
@@ -48,7 +49,7 @@ def validate_forecast(
         national_capacity: The national PV capacity (in MW).
         logger_func: A function that takes a string and logs it 
                      (e.g. self.log_info or logging.info).
-    
+
     Raises:
         Exception: if above certain critical thresholds.
     """
@@ -75,6 +76,22 @@ def validate_forecast(
             f"Hard FAIL: The maximum of the forecast is above 100 GW! "
             f"Forecast is {max_forecast_mw / 1e3:.2f} GW."
         )
+
+    # New Validation: Detect Sudden Fluctuations
+    # Compute differences between consecutive timestamps
+    diff = np.diff(national_forecast_values)
+    large_jumps = (diff[:-1] > 250) & (diff[1:]
+                                       < -250)  # Up then down by 250 MW
+    critical_jumps = (diff[:-1] > 500) & (diff[1:]
+                                          < -500)  # Up then down by 500 MW
+
+    if np.any(large_jumps):
+        logger_func(
+            f"WARNING: Forecast has sudden fluctuations (≥250 MW up and down).")
+
+    if np.any(critical_jumps):
+        raise Exception(
+            f"FAIL: Forecast has critical fluctuations (≥500 MW up and down).")
 
 
 class ForecastCompiler:
@@ -164,10 +181,12 @@ class ForecastCompiler:
 
             # Compare the current GSP model with the one the summation model was trained on
             this_gsp_model = (model_name, model_version)
-            sum_expected_gsp_model = (sum_model.pvnet_model_name, sum_model.pvnet_model_version)
+            sum_expected_gsp_model = (
+                sum_model.pvnet_model_name, sum_model.pvnet_model_version)
 
             if sum_expected_gsp_model != this_gsp_model:
-                warnings.warn(_model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model))
+                warnings.warn(_model_mismatch_msg.format(
+                    *this_gsp_model, *sum_expected_gsp_model))
 
         return model, sum_model
 
@@ -179,11 +198,12 @@ class ForecastCompiler:
     def predict_batch(self, batch: NumpyBatch) -> None:
         """Make predictions for a batch and store results internally"""
 
-        self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
+        self.log_info(
+            f"Predicting for model: {self.model_name}-{self.model_version}")
 
         if not self.use_legacy:
             change_keys_to_ocf_datapipes_keys(batch)
-            
+
         # Store GSP IDs for this batch for reordering later
         these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
 
@@ -209,14 +229,16 @@ class ForecastCompiler:
         if self.use_legacy:
             # The old dataloader standardises the data
             elevation = (
-                batch[BatchKey.gsp_solar_elevation].cpu().numpy() * ELEVATION_STD + ELEVATION_MEAN
+                batch[BatchKey.gsp_solar_elevation].cpu().numpy() *
+                ELEVATION_STD + ELEVATION_MEAN
             )
         else:
             # The new dataloader normalises the data to [0, 1]
-            elevation = (batch[BatchKey.gsp_solar_elevation].cpu().numpy() - 0.5) * 180
+            elevation = (
+                batch[BatchKey.gsp_solar_elevation].cpu().numpy() - 0.5) * 180
 
         # We only need elevation mask for forecasted values, not history
-        elevation = elevation[:, -preds.shape[1] :]
+        elevation = elevation[:, -preds.shape[1]:]
         sun_down_mask = elevation < MIN_DAY_ELEVATION
 
         # Store predictions internally
@@ -268,8 +290,10 @@ class ForecastCompiler:
 
         # Multiply normalised forecasts by capacities and clip negatives
         self.log_info(f"Converting to absolute MW using {self.gsp_capacities}")
-        da_abs = da_normed.clip(0, None) * self.gsp_capacities.values[:, None, None]
-        max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
+        da_abs = da_normed.clip(0, None) * \
+            self.gsp_capacities.values[:, None, None]
+        max_preds = da_abs.sel(output_label="forecast_mw").max(
+            dim="target_datetime_utc")
         self.log_info(f"Maximum predictions: {max_preds}")
 
         # Apply sundown mask
@@ -278,7 +302,8 @@ class ForecastCompiler:
         if self.summation_model is None:
             self.log_info("Summing across GSPs to produce national forecast")
             da_abs_national = (
-                da_abs.sum(dim="gsp_id").expand_dims(dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
+                da_abs.sum(dim="gsp_id").expand_dims(
+                    dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
             )
         else:
             self.log_info("Using summation model to produce national forecast")
@@ -287,13 +312,15 @@ class ForecastCompiler:
             inputs = {
                 "pvnet_outputs": torch.Tensor(normed_preds[np.newaxis]).to(self.device),
                 "effective_capacity": (
-                    torch.Tensor(self.gsp_capacities.values / self.national_capacity)
+                    torch.Tensor(self.gsp_capacities.values /
+                                 self.national_capacity)
                     .to(self.device)
                     .unsqueeze(0)
                     .unsqueeze(-1)
                 ),
             }
-            normed_national = self.summation_model(inputs).detach().squeeze().cpu().numpy()
+            normed_national = self.summation_model(
+                inputs).detach().squeeze().cpu().numpy()
 
             # Convert national predictions to DataArray
             da_normed_national = self.preds_to_dataarray(
@@ -303,17 +330,20 @@ class ForecastCompiler:
             )
 
             # Multiply normalised forecasts by capacity, clip negatives
-            da_abs_national = da_normed_national.clip(0, None) * self.national_capacity
+            da_abs_national = da_normed_national.clip(
+                0, None) * self.national_capacity
 
             # Apply sundown mask - All GSPs must be masked to mask national
-            da_abs_national = da_abs_national.where(~da_sundown_mask.all(dim="gsp_id")).fillna(0.0)
+            da_abs_national = da_abs_national.where(
+                ~da_sundown_mask.all(dim="gsp_id")).fillna(0.0)
 
         self.log_info(
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}"
         )
 
         # Pass the entire national forecast array (for potential extra checks in future).
-        national_forecast_values = da_abs_national.sel(output_label="forecast_mw").values
+        national_forecast_values = da_abs_national.sel(
+            output_label="forecast_mw").values
         validate_forecast(
             national_forecast_values=national_forecast_values,
             national_capacity=self.national_capacity,
@@ -332,8 +362,10 @@ class ForecastCompiler:
         """Put numpy array of predictions into a dataarray"""
 
         if output_quantiles is not None:
-            output_labels = [f"forecast_mw_plevel_{int(q*100):02}" for q in output_quantiles]
-            output_labels[output_labels.index("forecast_mw_plevel_50")] = "forecast_mw"
+            output_labels = [
+                f"forecast_mw_plevel_{int(q*100):02}" for q in output_quantiles]
+            output_labels[output_labels.index(
+                "forecast_mw_plevel_50")] = "forecast_mw"
         else:
             output_labels = ["forecast_mw"]
             preds = preds[..., np.newaxis]
@@ -445,7 +477,8 @@ class ForecastCompiler:
         assert "forecast_mw" in da_preds.output_label
 
         # get last input data
-        input_data_last_updated = get_latest_input_data_last_updated(session=session)
+        input_data_last_updated = get_latest_input_data_last_updated(
+            session=session)
 
         # get model name
         model = get_model(name=model_tag, version=version, session=session)
@@ -475,14 +508,16 @@ class ForecastCompiler:
                 properties = {}
 
                 if "forecast_mw_plevel_10" in da_gsp_time.output_label:
-                    p10 = da_gsp_time.sel(output_label="forecast_mw_plevel_10").item()
+                    p10 = da_gsp_time.sel(
+                        output_label="forecast_mw_plevel_10").item()
                     # `p10` can be NaN if PVNet has probabilistic outputs and PVNet_summation
                     # doesn't, or vice versa. Do not log the value if NaN
                     if not np.isnan(p10):
                         properties["10"] = p10
 
                 if "forecast_mw_plevel_90" in da_gsp_time.output_label:
-                    p90 = da_gsp_time.sel(output_label="forecast_mw_plevel_90").item()
+                    p90 = da_gsp_time.sel(
+                        output_label="forecast_mw_plevel_90").item()
 
                     if not np.isnan(p90):
                         properties["90"] = p90
