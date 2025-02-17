@@ -23,6 +23,7 @@ from pvnet_app.config import get_union_of_configs, save_yaml_config
 from pvnet_app.data.nwp import (
     download_all_nwp_data, preprocess_nwp_data, check_model_nwp_inputs_available
 )
+from pvnet_app.data.gsp import get_gsp_and_national_capacities
 from pvnet_app.data.satellite import (
     check_model_satellite_inputs_available,
     download_all_sat_data,
@@ -166,15 +167,11 @@ def app(
     logger.info("Loading capacities from the database")
 
     db_connection = DatabaseConnection(url=os.getenv("DB_URL"), base=Base_Forecast, echo=False)
-    with db_connection.get_session() as session:
-        #  Pandas series of most recent GSP capacities
-        gsp_capacities = get_latest_gsp_capacities(
-            session=session, gsp_ids=gsp_ids, datetime_utc=t0 - timedelta(days=2),
-        )
-
-        # National capacity is needed if using summation model
-        national_capacity = get_latest_gsp_capacities(session, [0])[0]
-
+    gsp_capacities, national_capacity = get_gsp_and_national_capacities(
+        db_connection=db_connection,
+        gsp_ids=gsp_ids,
+        t0=t0,
+    )
     # Download satellite data
     logger.info("Downloading satellite data")
     sat_available = download_all_sat_data()
