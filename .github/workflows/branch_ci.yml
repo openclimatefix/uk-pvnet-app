@@ -12,5 +12,5 @@ jobs:
       enable_linting: false # TODO: Lint whole package
       enable_typechecking: false
       tests_folder: tests
-      tests_conda_deps: "esmpy=8.8.0 gdal=3.10.2 hdf5=1.14.4"
+      tests_conda_deps: "esmpy gdal hdf5=1.14.4"
 
