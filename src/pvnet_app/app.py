@@ -20,7 +20,9 @@ from ocf_datapipes.batch import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.config import get_union_of_configs, save_yaml_config
-from pvnet_app.data.nwp import download_all_nwp_data, preprocess_nwp_data
+from pvnet_app.data.nwp import (
+    download_all_nwp_data, preprocess_nwp_data, check_model_nwp_inputs_available
+)
 from pvnet_app.data.satellite import (
     check_model_satellite_inputs_available,
     download_all_sat_data,
@@ -185,10 +187,10 @@ def app(
 
     # Download NWP data
     logger.info("Downloading NWP data")
-    download_all_nwp_data(download_ukv=not use_ecmwf_only)
+    download_all_nwp_data()
 
     # Preprocess the NWP data
-    preprocess_nwp_data(use_ukv=not use_ecmwf_only)
+    preprocess_nwp_data()
 
     # ---------------------------------------------------------------------------
     # 2. Set up models
@@ -204,8 +206,12 @@ def app(
         )
 
         # Check if the data available will allow the model to run
-        model_can_run = check_model_satellite_inputs_available(data_config_path, t0, sat_datetimes)
-
+        model_can_run = (
+            check_model_satellite_inputs_available(data_config_path, t0, sat_datetimes)
+            and 
+            check_model_nwp_inputs_available(data_config_path, t0)
+        )
+        
         if model_can_run:
             # Set up a forecast compiler for the model
             forecast_compilers[model_config.name] = ForecastCompiler(
