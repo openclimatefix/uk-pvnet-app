@@ -13,7 +13,7 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
 def test_app(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest,
+    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, gsp_yields_and_systems, me_latest,
 ):
 
     """Test the app running the intraday models"""
