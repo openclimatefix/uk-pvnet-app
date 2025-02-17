@@ -22,7 +22,7 @@ It is possbile to run the app locally by setting the required environment variab
 
 # Machine Learning Models and Inputs
 
-This document outlines the machine learning (ML) models used in the `uk-pvnet-app` and their required inputs. Understanding these inputs is crucial for effective model utilization. This document is automatically kept up-to-date with the code base, to keep the documentation correct.
+This document outlines the machine learning (ML) models used in the `uk-pvnet-app` and their required inputs. This document is automatically kept up-to-date with the code base, to keep the documentation correct.
 
 ## Models and Their Inputs
 
@@ -52,10 +52,6 @@ This document outlines the machine learning (ML) models used in the `uk-pvnet-ap
 *   **`uses_satellite_data`:** Uses satellite data as input.
 *   **`day_ahead`:** Designed for day-ahead forecasting.
 *   **`uses_ocf_data_sampler`:** Uses the newer `ocf_data_sampler` (otherwise, uses `ocf_datapipes`).
-
-## Notes
-
-*   The model configurations are critical for forecast accuracy.
 
 ## Contributing
 
