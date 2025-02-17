@@ -9,7 +9,7 @@ Internal OCF application to run [PVNet](https://github.com/openclimatefix/PVNet)
 
 The app supports multiple model versions being deployed to live environments and these can be ran with specific configurations which are set via environment variables.
 
-## Development
+# Development
 
 ### Running tests locally
 
@@ -19,6 +19,47 @@ To be able to run the tests locally it is recommended to use conda & pip and fol
 
 It is possbile to run the app locally by setting the required environment variables listed at the top of the [app](pvnet_app/app.py), these should point to the relevant data sources and DBs for the environment you want to run the app in. You will need to make sure you have opened a connection to the DB, as well as authenticating against any cloud providers where data may be stored (e.g if using AWS S3 then can do this via the AWS CLI command `aws configure`), a simple [notebook](scripts/run_app_local_example.ipynb) has been created as an example.  
 
+
+# Machine Learning Models and Inputs
+
+This document outlines the machine learning (ML) models used in the `uk-pvnet-app` and their required inputs. Understanding these inputs is crucial for effective model utilization. This document is automatically kept up-to-date with the code base, to keep the documentation correct.
+
+## Models and Their Inputs
+
+| Model Name                     | Inputs                                                                 | Configuration Flags                                                                                                                                                   |
+|--------------------------------|------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `pvnet_v2`                     | Satellite data, weather data, PV metadata                              | `use_adjuster`: Yes, `uses_satellite_data`: True, `uses_ocf_data_sampler`: True                                                                                               |
+| `pvnet_v2-sat0-samples-v1`     | Satellite data                                                        | `uses_satellite_data`: True, `uses_ocf_data_sampler`: True                                                                                                                   |
+| `pvnet_v2-sat0-only-samples-v1`| Satellite data                                                        | `uses_satellite_data`: True, `uses_ocf_data_sampler`: True                                                                                                                     |
+| `pvnet_v2-ukv-only-samples-v1` | UKV weather data                                                      | `uses_satellite_data`: False, `uses_ocf_data_sampler`: True                                                                                                                 |
+| `pvnet_ecmwf`                  | ECMWF weather data                                                    | `ecmwf_only`: True, `uses_satellite_data`: False,  `uses_ocf_data_sampler`: True                                                                                                                |
+| `pvnet_day_ahead`              | Weather data, satellite data, time-series data                        | `day_ahead`: True, `use_adjuster`: Yes, `uses_satellite_data`: True, `uses_ocf_data_sampler`: True                                                                                              |
+| `pvnet_v2`                     | Satellite data, weather data, PV metadata                              | `use_adjuster`: Yes, `uses_satellite_data`: True, `uses_ocf_data_sampler`: False                                                                                                |
+| `pvnet_ecmwf`                  | ECMWF weather data                                                    | `ecmwf_only`: True, `uses_satellite_data`: False, `uses_ocf_data_sampler`: False                                                                                                                  |
+| `pvnet_day_ahead`              | Weather data, satellite data, time-series data                        | `day_ahead`: True, `use_adjuster`: Yes,  `uses_satellite_data`: True, `uses_ocf_data_sampler`: False                                                                                             |
+
+### Input Data Sources:
+
+*   **Satellite Data:** Real-time cloud cover and atmospheric information.
+*   **Weather Data:** NWP from ECMWF and UKV.
+*   **PV Metadata:** PV system characteristics.
+*   **Time-Series Data:** Historical PV generation data.
+
+### Configuration Flags Explained:
+
+*   **`use_adjuster`:** Uses an adjuster model.
+*   **`ecmwf_only`:** Relies solely on ECMWF weather data.
+*   **`uses_satellite_data`:** Uses satellite data as input.
+*   **`day_ahead`:** Designed for day-ahead forecasting.
+*   **`uses_ocf_data_sampler`:** Uses the newer `ocf_data_sampler` (otherwise, uses `ocf_datapipes`).
+
+## Notes
+
+*   The model configurations are critical for forecast accuracy.
+
+## Contributing
+
+Please submit a pull request for discrepancies or improvements. All model changes should include documentation updates.
 
 ## Contributors ✨
 
