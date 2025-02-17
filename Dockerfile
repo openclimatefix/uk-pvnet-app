@@ -3,7 +3,7 @@ FROM quay.io/condaforge/miniforge3:latest AS build-venv
 
 RUN apt-get update && \
     echo "Creating virtualenv at /app/.venv" && \
-    conda create --quiet --yes -p /app/.venv python=3.12 esmpy=8.8.0 gdal=3.10.2 hdf5=1.14.4
+    conda create --quiet --yes -p /app/.venv python=3.12 esmpy gdal hdf5=1.14.4
 
 
 # --- Build dependencies in own layer --- #
