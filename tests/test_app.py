@@ -36,7 +36,7 @@ def test_app(
         temp_sat_path = "temp_sat.zarr.zip"
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
         with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
-            sat_5_data.to_zarr(store)
+            sat_5_data_zero_delay.to_zarr(store)
 
         # Set environmental variables
         os.environ["RUN_EXTRA_MODELS"] = "True"
