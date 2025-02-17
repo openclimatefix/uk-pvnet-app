@@ -78,6 +78,30 @@ logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
 # ---------------------------------------------------------------------------
 # APP MAIN
 
+def save_batch_to_s3(batch, model_name, s3_directory):
+    """Saves a batch to a local file and uploads it to S3.
+
+    Args:
+        batch: The data batch to save (torch.Tensor).
+        model_name: The name of the model (str).
+        s3_directory: The S3 directory to save the batch to (str).
+    """
+    save_batch = f"{model_name}_latest_batch.pt"
+    torch.save(batch,save_batch)
+
+    try:
+        fs = fsspec.open(s3_directory).fs
+        fs.put(save_batch, f"{s3_directory}/{save_batch}")
+        logger.info(
+            f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}",
+            )
+        os.remove(save_batch)
+        logger.info("Removed local copy of batch")
+    except Exception as e:
+        logger.error(
+            f"Failed to save batch to {s3_directory}/{save_batch} with error {e}",
+            )
+
 
 def app(
     t0=None,
@@ -269,21 +293,8 @@ def app(
 
             if s3_directory and i == 0:
                 model_name = list(forecast_compilers.keys())[0]
-                save_batch = f"{model_name}_latest_batch.pt"
-                torch.save(batch,save_batch)
-
-                try:
-                    fs = fsspec.open(s3_directory).fs
-                    fs.put(save_batch, f"{s3_directory}/{save_batch}")
-                    logger.info(
-                        f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}",
-                        )
-                    os.remove(save_batch)
-                    logger.info("Removed local copy of batch")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to save batch to {s3_directory}/{save_batch} with error {e}",
-                        )
+                
+                save_batch_to_s3(batch, model_name, s3_directory) #Replaced with this function call
 
             for forecast_compiler in forecast_compilers.values():
                 # need to do copy the batch for each model, as a model might change the batch
