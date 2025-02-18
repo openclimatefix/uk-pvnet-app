@@ -294,7 +294,7 @@ def app(
             if s3_directory and i == 0:
                 model_name = list(forecast_compilers.keys())[0]
                 
-                save_batch_to_s3(batch, model_name, s3_directory) #Replaced with this function call
+                save_batch_to_s3(batch, model_name, s3_directory) 
 
             for forecast_compiler in forecast_compilers.values():
                 # need to do copy the batch for each model, as a model might change the batch
