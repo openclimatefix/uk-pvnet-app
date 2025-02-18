@@ -9,6 +9,36 @@ Internal OCF application to run [PVNet](https://github.com/openclimatefix/PVNet)
 
 The app supports multiple model versions being deployed to live environments and these can be ran with specific configurations which are set via environment variables.
 
+## Validation Checks
+
+We run a number of different validation checks on the data and the forecasts that are made. 
+These are in place to ensure quality forecasts are made and saved to the database.
+
+### Satellite data
+
+We check
+- Either the 5 minute or 15 minute satellite data is present
+- We check if there is <15 minute gap in the satellite data. The gap is infilled with a limit. 
+- We check that there arent more than 10% zeros in the satellite data
+
+### NWP data
+
+TODO, these are current in https://github.com/openclimatefix/uk-pvnet-app/issues/196
+
+### ML batch checks
+
+Just before the batch data goes into the ML models, we check that 
+- All the NWP is not zeros
+- TODO: https://github.com/openclimatefix/PVNet/issues/324
+
+### Forecast checks
+
+After the ML models has run, we check the following
+- The forecast is not above 110% of the national capacity. 
+- The forecast is not above 100 GW, anything above 30 GW we get a warning
+- If the forecast goes up and then down more than 500 MW we get an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
+- TODO: Check postive values in day: https://github.com/openclimatefix/uk-pvnet-app/issues/200
+
 ## Development
 
 ### Running tests locally
