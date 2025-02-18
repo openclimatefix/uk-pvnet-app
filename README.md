@@ -18,8 +18,8 @@ These are in place to ensure quality forecasts are made and saved to the databas
 
 We check
 - Either the 5 minute or 15 minute satellite data is present
-- We check if there is <15 minute gap in the satellite data. The gap is infilled with a limit. 
-- We check that there arent more than 10% zeros in the satellite data
+- We check there is less than a 15 minute gap in the satellite data. The gap is infilled with a limit. 
+- We check that there aren't more than 10% zeros in the satellite data
 
 ### NWP data
 
@@ -28,7 +28,7 @@ TODO, these are current in https://github.com/openclimatefix/uk-pvnet-app/issues
 ### ML batch checks
 
 Just before the batch data goes into the ML models, we check that 
-- All the NWP is not zeros
+- All the NWP are not zeros
 - TODO: https://github.com/openclimatefix/PVNet/issues/324
 
 ### Forecast checks
