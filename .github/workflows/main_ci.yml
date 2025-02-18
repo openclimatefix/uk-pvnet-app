@@ -1,8 +1,7 @@
-name: Default Branch PR Merged CI
+name: Default Branch Push CI
 
 on:
-  pull_request:
-    types: ["closed"]
+  push:
     branches: [ "main" ]
 
 jobs:
