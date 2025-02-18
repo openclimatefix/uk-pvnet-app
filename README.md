@@ -13,13 +13,16 @@ The app supports multiple model versions being deployed to live environments and
 
 We run a number of different validation checks on the data and the forecasts that are made. 
 These are in place to ensure quality forecasts are made and saved to the database.
+If any of these checks fail, the forecast is stopped and an error is raised. 
+The API (and UI) will still load the most recent forecast made. 
 
 ### Satellite data
 
 We check
-- Either the 5 minute or 15 minute satellite data is present
-- We check there is less than a 15 minute gap in the satellite data. The gap is infilled with a limit. 
-- We check that there aren't more than 10% zeros in the satellite data
+- Either the 5 minute or 15 minute satellite data is present. If both are not present, we raise an error. 
+- We check that there is less than a 15 minute gap in the satellite data. If the gap is larger than 15 minutes, an error is raised. 
+If the gap is less than 15 minutes, the data infilled with a limit. 
+- We check that there aren't more than 10% zeros in the satellite data, if there is, an error is raised. 
 
 ### NWP data
 
@@ -28,15 +31,15 @@ TODO, these are current in https://github.com/openclimatefix/uk-pvnet-app/issues
 ### ML batch checks
 
 Just before the batch data goes into the ML models, we check that 
-- All the NWP are not zeros
+- All the NWP are not zeros. We raise an error if, for any nwp provider, all the NWP data is zero. 
 - TODO: https://github.com/openclimatefix/PVNet/issues/324
 
 ### Forecast checks
 
 After the ML models have run, we check the following
-- The forecast is not above 110% of the national capacity. 
-- The forecast is not above 100 GW, anything above 30 GW we get a warning
-- If the forecast goes up and then down more than 500 MW we get an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
+- The forecast is not above 110% of the national capacity. An error is raised if any forecast value is above 110% of the national capacity.
+- The forecast is not above 100 GW, any forecast value above 30 GW we get a warning but any forecast value above 100 GW we raise an error. 
+- If the forecast goes up and then down more than 500 MW we raise an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
 - TODO: Check positive values in day: https://github.com/openclimatefix/uk-pvnet-app/issues/200
 
 ## Development
