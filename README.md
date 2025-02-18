@@ -33,7 +33,7 @@ Just before the batch data goes into the ML models, we check that
 
 ### Forecast checks
 
-After the ML models has run, we check the following
+After the ML models have run, we check the following
 - The forecast is not above 110% of the national capacity. 
 - The forecast is not above 100 GW, anything above 30 GW we get a warning
 - If the forecast goes up and then down more than 500 MW we get an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
