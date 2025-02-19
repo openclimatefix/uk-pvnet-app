@@ -340,7 +340,8 @@ class ForecastCompiler:
 
         # Pass the entire national forecast array (for potential extra checks in future).
         national_forecast_values = da_abs_national.sel(
-            output_label="forecast_mw").values
+            output_label="forecast_mw", gsp_id=0).values
+
         validate_forecast(
             national_forecast_values=national_forecast_values,
             national_capacity=self.national_capacity,
