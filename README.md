@@ -13,20 +13,25 @@ The app supports multiple model versions being deployed to live environments and
 
 We run a number of different validation checks on the data and the forecasts that are made. 
 These are in place to ensure quality forecasts are made and saved to the database.
-If any of these checks fail, the forecast is stopped and an error is raised. 
-The API (and UI) will still load the most recent forecast made. 
+
+Before feeding data into the model(s) we check whether the data avilable is compatible with the 
+data that the model expects.
 
 ### Satellite data
 
-We check
-- Either the 5 minute or 15 minute satellite data is present. If both are not present, we raise an error. 
-- We check that there is less than a 15 minute gap in the satellite data. If the gap is larger than 15 minutes, an error is raised. 
-If the gap is less than 15 minutes, the data infilled with a limit. 
-- We check that there aren't more than 10% zeros in the satellite data, if there is, an error is raised. 
+We check:
+- Whether 5 minute and/or 15 minute satellite data is available
+- We check if there are any NaNs in the satellite data, if there are, an error is raised
+- We check if there are more that 10% zeros in the satellite data, if there are, an error is raised
+- We check whether there are any missing timestamps in the satellite data. We linearly interpolate
+any gaps less that 15 minutes.
+- We check whether the exact timestamps that the model expects are all available after infilling
 
 ### NWP data
 
-TODO, these are current in https://github.com/openclimatefix/uk-pvnet-app/issues/196
+We check:
+- Whether the exact timestamps that the model expects from each NWP are available
+
 
 ### ML batch checks
 
