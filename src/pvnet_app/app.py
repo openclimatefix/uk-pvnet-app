@@ -203,6 +203,7 @@ def app(
         )
 
         # Check if the data available will allow the model to run
+        logger.info(f"Checking that the input data for model '{model_config.name}' exists")
         model_can_run = (
             check_model_satellite_inputs_available(data_config_path, t0, sat_datetimes)
             and 
