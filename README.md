@@ -9,6 +9,49 @@ Internal OCF application to run [PVNet](https://github.com/openclimatefix/PVNet)
 
 The app supports multiple model versions being deployed to live environments and these can be ran with specific configurations which are set via environment variables.
 
+## Environment Variables
+
+The following environment variables are used in the app:
+
+### Required Environment Variables
+
+- `DB_URL`: The URL for the database connection.
+- `NWP_UKV_ZARR_PATH`: The path to the UKV NWP data in Zarr format.
+- `NWP_ECMWF_ZARR_PATH`: The path to the ECMWF NWP data in Zarr format.
+- `SATELLITE_ZARR_PATH`: The path to the satellite data in Zarr format.
+
+### Optional Environment Variables
+
+- `PVNET_V2_VERSION`: The version of the PVNet V2 model to use. Default is a version above.
+- `USE_ADJUSTER`: Option to use adjuster. Defaults to true.
+- `SAVE_GSP_SUM`: Option to save GSP sum for PVNet V2. Defaults to false.
+- `RUN_EXTRA_MODELS`: Option to run extra models. Defaults to false.
+- `DAY_AHEAD_MODEL`: Option to use day ahead model. Defaults to false.
+- `SENTRY_DSN`: Optional link to Sentry.
+- `ENVIRONMENT`: The environment this is running in. Defaults to local.
+- `USE_ECMWF_ONLY`: Option to use ECMWF only model. Defaults to false.
+- `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
+
+### Examples
+
+Here are some examples of how to set these environment variables:
+
+```sh
+export DB_URL="postgresql://user:password@localhost:5432/dbname"
+export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
+export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
+export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
+export PVNET_V2_VERSION="v2.0.0"
+export USE_ADJUSTER="true"
+export SAVE_GSP_SUM="false"
+export RUN_EXTRA_MODELS="false"
+export DAY_AHEAD_MODEL="false"
+export SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
+export ENVIRONMENT="production"
+export USE_ECMWF_ONLY="false"
+export USE_OCF_DATA_SAMPLER="true"
+```
+
 ## Validation Checks
 
 We run a number of different validation checks on the data and the forecasts that are made. 
