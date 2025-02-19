@@ -7,6 +7,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
 import pandas as pd
+import pvlib
 import torch
 import xarray as xr
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
@@ -41,7 +42,7 @@ _model_mismatch_msg = (
 
 
 def validate_forecast(
-    national_forecast_values: np.ndarray,
+    national_forecast_values: pd.Series, # Now a pandas Series with datetime index
     national_capacity: float,
     logger_func: Callable[[str], None],
 ) -> None:
@@ -57,7 +58,7 @@ def validate_forecast(
         Exception: if above certain critical thresholds.
     """
     # Compute the maximum from the entire forecast array
-    max_forecast_mw = float(np.max(national_forecast_values))
+    max_forecast_mw = float(national_forecast_values.max())
 
     # Check it doesn't exceed 10% above national capacity
     if max_forecast_mw > 1.1 * national_capacity:
@@ -83,7 +84,11 @@ def validate_forecast(
     # Compute differences between consecutive timestamps
     zig_zag_gap_warning = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
     zig_zag_gap_error = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
-    diff = np.diff(national_forecast_values)
+
+    # Calculate differences between consecutive timestamps using pandas' diff method
+    diff = national_forecast_values.diff()
+
+    # Detect large and critical jumps
     large_jumps = (diff[:-1] > zig_zag_gap_warning) & (diff[1:]
                                        < -zig_zag_gap_warning)  # Up then down by 250 MW
     critical_jumps = (diff[:-1] > zig_zag_gap_error) & (diff[1:]
@@ -97,6 +102,18 @@ def validate_forecast(
         raise Exception(
             "FAIL: Forecast has critical fluctuations (≥500 MW up and down).")
 
+    # Validate based on sun elevation > 10 degrees
+    solpos = pvlib.solarposition.get_solarposition(
+        time=national_forecast_values.index,
+        latitude=55.3781,  # UK central latitude
+        longitude=-3.4360,  # UK central longitude
+        method='nrel_numpy'
+    )
+
+    # Check if forecast values are > 0 when sun elevation > 10 degrees
+    elevation_above_10 = solpos["elevation"] > 10
+    if (national_forecast_values[elevation_above_10] <= 0).any():
+        raise Exception("Forecast values must be > 0 when sun elevation > 10°.")
 
 class ForecastCompiler:
     """Class for making and compiling solar forecasts from for all GB GSPsn and national total"""
@@ -341,10 +358,23 @@ class ForecastCompiler:
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}",
         )
 
-        # Pass the entire national forecast array (for potential extra checks in future).
-        national_forecast_values = da_abs_national.sel(
-            output_label="forecast_mw", gsp_id=0).values
+        try:
+            # Attempt to extract 'time' from the dataset and convert to datetime index
+            datetime_index = pd.to_datetime(da_abs_national['time'].values)
+        except KeyError:
+            # Handle the case when 'time' is missing
+            logger.warning("Warning: 'time' column not found in the dataset. Falling back to default datetime index.")
+            # Handle the missing 'time' by using another method or generating default times
+            datetime_index = pd.date_range(start="2025-01-01", periods=da_abs_national.shape[0], freq='H') # Example fallback
+            logger.warning(f"Using default datetime range: {datetime_index[0]} to {datetime_index[-1]}")
 
+        # Select the forecast values and convert to a pandas Series with datetime index
+        national_forecast_values = pd.Series(
+            da_abs_national.sel(output_label="forecast_mw").values.flatten(),
+            index=datetime_index
+        )
+
+        # Now call the validate_forecast function with the updated 'national_forecast_values' (which is a pd.Series)
         validate_forecast(
             national_forecast_values=national_forecast_values,
             national_capacity=self.national_capacity,
