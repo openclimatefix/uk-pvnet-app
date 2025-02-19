@@ -42,6 +42,7 @@ def test_app(
         os.environ["RUN_EXTRA_MODELS"] = "True"
         os.environ["SAVE_GSP_SUM"] = "True"
         os.environ["DAY_AHEAD_MODEL"] = "False"
+        os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = 100000
 
         # Run prediction
         # These imports need to come after the environ vars have been set
