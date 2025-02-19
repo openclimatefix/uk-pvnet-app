@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+import os
 import pytest
 
 from pvnet_app.forecast_compiler import validate_forecast
@@ -83,6 +84,7 @@ def test_validate_forecast_no_fluctuations():
     def logger_func(message):
         logged_messages.append(message)
 
+    os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
     national_forecast_values = np.array([1000, 1100, 1050, 1200, 1150])
     national_capacity = 2000
 
@@ -99,6 +101,7 @@ def test_validate_forecast_with_warning():
     def logger_func(message):
         logged_messages.append(message)
 
+    os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
     national_forecast_values = np.array([1000, 1300, 800, 1200, 500])
     national_capacity = 2000
 
@@ -115,6 +118,7 @@ def test_validate_forecast_with_exception():
     def logger_func(message):
         logged_messages.append(message)
 
+    os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
     national_forecast_values = np.array([1000, 1600, 800, 1300, 500])
     national_capacity = 2000
 
