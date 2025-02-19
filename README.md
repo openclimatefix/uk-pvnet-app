@@ -31,6 +31,8 @@ The following environment variables are used in the app:
 - `ENVIRONMENT`: The environment this is running in. Defaults to local.
 - `USE_ECMWF_ONLY`: Option to use ECMWF only model. Defaults to false.
 - `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
+- `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250 MW.
+- `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500 MW.
 
 ### Examples
 
