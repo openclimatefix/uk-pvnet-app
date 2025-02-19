@@ -327,7 +327,7 @@ def preprocess_sat_data(t0: pd.Timestamp, use_legacy: bool = False) -> pd.Dateti
     combine_5_and_15_sat_data()
 
     # Check for nans in the satellite data
-    check_for_constant_values(value=np.nan, threshold=0)
+    check_for_constant_values(value=np.nan, threshold=0.1)
 
     # Interpolate missing satellite timestamps
     interpolate_missing_satellite_timestamps(pd.Timedelta("15min"))
@@ -365,7 +365,15 @@ def check_for_constant_values(value: float | None = 0, threshold: float | None =
     n_time_steps = shape[0]
     for i in range(n_time_steps):
         data = ds_sat.data[i].values
-        if (data == value).sum() / n_data_points_per_timestep > threshold:
+
+        # we have to treat value=np.nan differently,
+        # this is because np.nan == np.nan is False
+        if np.isnan(value):
+            total_true_values = np.isnan(data).sum()
+        else:
+            total_true_values = (data == value).sum()
+
+        if total_true_values / n_data_points_per_timestep > threshold:
             time = ds_sat.time[i].values
             message = (
                 f"Satellite data contains zeros (greater than {threshold}), "
