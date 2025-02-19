@@ -265,8 +265,8 @@ def rename_ukv_variables():
         d = d.assign_coords(variable=variable_coords)
 
         # this is all taken from the metoffice website, apart from the x and y values
-        lat = xr.open_dataset(files("pvnet_app.data").joinpath("nwp-consumer-lat.nc"))
-        lon = xr.open_dataset(files("pvnet_app.data").joinpath("nwp-consumer-lon.nc"))
+        lat = xr.open_dataset(files("pvnet_app.data").joinpath("nwp-consumer-mo-ukv-lat.nc"))
+        lon = xr.open_dataset(files("pvnet_app.data").joinpath("nwp-consumer-mo-ukv-lon.nc"))
 
         # combine with d
         d = d.assign_coords(latitude=lat.latitude)
