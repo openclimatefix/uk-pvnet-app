@@ -1,4 +1,5 @@
 import logging
+import os
 import warnings
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -80,11 +81,13 @@ def validate_forecast(
 
     # New Validation: Detect Sudden Fluctuations
     # Compute differences between consecutive timestamps
+    zig_zag_gap_warning = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
+    zig_zag_gap_error = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
     diff = np.diff(national_forecast_values)
-    large_jumps = (diff[:-1] > 250) & (diff[1:]
-                                       < -250)  # Up then down by 250 MW
-    critical_jumps = (diff[:-1] > 500) & (diff[1:]
-                                          < -500)  # Up then down by 500 MW
+    large_jumps = (diff[:-1] > zig_zag_gap_warning) & (diff[1:]
+                                       < -zig_zag_gap_warning)  # Up then down by 250 MW
+    critical_jumps = (diff[:-1] > zig_zag_gap_error) & (diff[1:]
+                                          < -zig_zag_gap_error)  # Up then down by 500 MW
 
     if np.any(large_jumps):
         logger_func(
@@ -340,7 +343,8 @@ class ForecastCompiler:
 
         # Pass the entire national forecast array (for potential extra checks in future).
         national_forecast_values = da_abs_national.sel(
-            output_label="forecast_mw").values
+            output_label="forecast_mw", gsp_id=0).values
+
         validate_forecast(
             national_forecast_values=national_forecast_values,
             national_capacity=self.national_capacity,
