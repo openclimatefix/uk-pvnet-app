@@ -32,6 +32,8 @@ except PackageNotFoundError:
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
 
+# Set default value for sun elevation Lower Limit
+SUN_ELEVATION_LOWER_LIMIT = float(os.getenv('FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT', 10))
 
 _model_mismatch_msg = (
     "The PVNet version running in this app is {}/{}. The summation model running in this app was "
@@ -111,9 +113,9 @@ def validate_forecast(
     )
 
     # Check if forecast values are > 0 when sun elevation > 10 degrees
-    elevation_above_10 = solpos["elevation"] > 10
-    if (national_forecast_values[elevation_above_10] <= 0).any():
-        raise Exception("Forecast values must be > 0 when sun elevation > 10°.")
+    elevation_above_limit = solpos["elevation"] > SUN_ELEVATION_LOWER_LIMIT
+    if (national_forecast_values[elevation_above_limit] <= 0).any():
+        raise Exception("Forecast values must be > 0 when sun elevation > {SUN_ELEVATION_LOWER_LIMIT}°.")
 
 class ForecastCompiler:
     """Class for making and compiling solar forecasts from for all GB GSPsn and national total"""
@@ -358,20 +360,10 @@ class ForecastCompiler:
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}",
         )
 
-        try:
-            # Attempt to extract 'time' from the dataset and convert to datetime index
-            datetime_index = pd.to_datetime(da_abs_national['time'].values)
-        except KeyError:
-            # Handle the case when 'time' is missing
-            logger.warning("Warning: 'time' column not found in the dataset. Falling back to default datetime index.")
-            # Handle the missing 'time' by using another method or generating default times
-            datetime_index = pd.date_range(start="2025-01-01", periods=da_abs_national.shape[0], freq='H') # Example fallback
-            logger.warning(f"Using default datetime range: {datetime_index[0]} to {datetime_index[-1]}")
-
-        # Select the forecast values and convert to a pandas Series with datetime index
+        # Select the forecast values and convert to a pandas Series with the existing target_datetime_utc
         national_forecast_values = pd.Series(
             da_abs_national.sel(output_label="forecast_mw").values.flatten(),
-            index=datetime_index
+            index=self.valid_times  # Use target_datetime_utc as the datetime index
         )
 
         # Now call the validate_forecast function with the updated 'national_forecast_values' (which is a pd.Series)

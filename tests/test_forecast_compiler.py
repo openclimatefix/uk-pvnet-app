@@ -1,9 +1,10 @@
 import logging
-
 import numpy as np
 import os
 import pytest
-
+import pandas as pd
+import pvlib
+from unittest.mock import Mock
 from pvnet_app.forecast_compiler import validate_forecast
 
 
@@ -125,3 +126,26 @@ def test_validate_forecast_with_exception():
     with pytest.raises(Exception, match="FAIL: Forecast has critical fluctuations"):
         validate_forecast(national_forecast_values,
                           national_capacity, logger_func)
+
+
+def test_validate_forecast_sun_elevation_check():
+    """Test that forecast values are > 0 when sun elevation > SUN_ELEVATION_LOWER_LIMIT."""
+    logged_messages = []
+
+    def logger_func(message):
+        logged_messages.append(message)
+
+    # Get Sun Elevation Limit value from the environment variable (default 10)
+    sun_elevation_limit = float(os.getenv("SUN_ELEVATION_LOWER_LIMIT", 10))
+
+    time_range = pd.date_range("2025-01-01 06:00", "2025-01-01 18:00", freq="30T", tz="UTC")
+    sun_elevations = np.linspace(-5, 20, len(time_range))  # elevation varies from -5 to 20
+
+    forecast_values =pd.Series([0 if elev < sun_elevation_limit else 50 for elev in sun_elevations], index=time_range)
+
+    # Mocking pvlib.solarposition.get_solarposition()
+    solos_mock = pd.DataFrame({"elevation": sun_elevations}, index=time_range)
+    pvlib.solarposition.get_solarposition = Mock(return_value=solos_mock)
+
+    with pytest.raises(Exception, match=f"Forecast values must be > 0 when sun elevation > {sun_elevation_limit}°"):
+        validate_forecast(forecast_values, national_capacity=1000, logger_func=logger_func)
