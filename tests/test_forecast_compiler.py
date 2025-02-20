@@ -4,7 +4,7 @@ import numpy as np
 import os
 import pytest
 
-from pvnet_app.forecast_compiler import validate_forecast
+from pvnet_app.validate_forecast import validate_forecast
 
 
 def test_validate_forecast_ok():
