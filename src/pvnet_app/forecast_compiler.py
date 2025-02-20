@@ -33,7 +33,7 @@ except PackageNotFoundError:
 MIN_DAY_ELEVATION = 0
 
 # Set default value for sun elevation Lower Limit
-SUN_ELEVATION_LOWER_LIMIT = float(os.getenv('FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT', 10))
+SUN_ELEVATION_LOWER_LIMIT = float(os.getenv('SUN_ELEVATION_LOWER_LIMIT', 10))
 
 _model_mismatch_msg = (
     "The PVNet version running in this app is {}/{}. The summation model running in this app was "
@@ -90,19 +90,18 @@ def validate_forecast(
     # Calculate differences between consecutive timestamps using pandas' diff method
     diff = national_forecast_values.diff()
 
-    # Detect large and critical jumps
-    large_jumps = (diff[:-1] > zig_zag_gap_warning) & (diff[1:]
-                                       < -zig_zag_gap_warning)  # Up then down by 250 MW
-    critical_jumps = (diff[:-1] > zig_zag_gap_error) & (diff[1:]
-                                          < -zig_zag_gap_error)  # Up then down by 500 MW
+    # Detect large fluctuations (either up or down by 250 MW)
+    large_jumps = (diff.abs() > zig_zag_gap_warning)
+    critical_jumps = (diff.abs() > zig_zag_gap_error)
 
     if np.any(large_jumps):
         logger_func(
-            "WARNING: Forecast has sudden fluctuations (≥250 MW up and down).")
+            "WARNING: Forecast has sudden fluctuations (>=250 MW up and down)."
+        )
 
     if np.any(critical_jumps):
         raise Exception(
-            "FAIL: Forecast has critical fluctuations (≥500 MW up and down).")
+            "FAIL: Forecast has critical fluctuations (>=500 MW up and down).")
 
     # Validate based on sun elevation > 10 degrees
     solpos = pvlib.solarposition.get_solarposition(
@@ -114,8 +113,12 @@ def validate_forecast(
 
     # Check if forecast values are > 0 when sun elevation > 10 degrees
     elevation_above_limit = solpos["elevation"] > SUN_ELEVATION_LOWER_LIMIT
+
+    # Ensure the index of elevation_above_limit matches the index of national_forecast_values
+    elevation_above_limit = elevation_above_limit.reindex(national_forecast_values.index, fill_value=False)
+
     if (national_forecast_values[elevation_above_limit] <= 0).any():
-        raise Exception("Forecast values must be > 0 when sun elevation > {SUN_ELEVATION_LOWER_LIMIT}°.")
+        raise Exception(f"Forecast values must be > 0 when sun elevation > {SUN_ELEVATION_LOWER_LIMIT}°.")    
 
 class ForecastCompiler:
     """Class for making and compiling solar forecasts from for all GB GSPsn and national total"""
