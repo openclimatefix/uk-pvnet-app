@@ -27,8 +27,17 @@ def _download_nwp_data(source, destination):
 
 def download_all_nwp_data():
     """Download the NWP data"""
-    _download_nwp_data(os.environ["NWP_UKV_ZARR_PATH"], nwp_ukv_path)
-    _download_nwp_data(os.environ["NWP_ECMWF_ZARR_PATH"], nwp_ecmwf_path)
+
+    providers = {"ECMWF": {"from": os.getenv("NWP_ECMWF_ZARR_PATH"), "to": nwp_ecmwf_path},
+                 "UKV": {"from": os.getenv("NWP_UKV_ZARR_PATH"), "to": nwp_ukv_path}}
+
+    for k, v in providers.items():
+        if v["from"] is None:
+            _download_nwp_data(source=v["from"], destination=v["to"])
+        else:
+            logger.warning(f"NWP {k} not set in environment variables - skipping download step."
+                           f"If you need to fix this, please set the environment variable "
+                           f"NWP_{k}_ZARR_PATH to the correct path.")
 
 
 def regrid_nwp_data(nwp_zarr, target_coords_path, method):
