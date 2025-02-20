@@ -235,6 +235,8 @@ def rename_ukv_variables():
     # load in lat and lon, ready for regridding later.
     if 'um-ukv' in d.data_vars:
 
+        logger.info("Renaming the UKV variables")
+
         # rename to UKV
         d = d.rename({"um-ukv": "UKV"})
 
