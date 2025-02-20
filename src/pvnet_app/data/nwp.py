@@ -5,34 +5,38 @@ from importlib.resources import files
 
 import fsspec
 import numpy as np
+import pandas as pd
 import xarray as xr
 import xesmf as xe
+
+from ocf_datapipes.config.load import load_yaml_configuration
 
 from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path
 
 logger = logging.getLogger(__name__)
 
 
-def _download_nwp_data(source, destination):
+def _download_nwp_data(source: str, destination: str, provider: str):
+    logger.info(f"Downloading NWP data from {source} to {destination}, for {provider}")
 
-    logger.info(f"Downloading NWP data from {source} to {destination}")
+    if source is None:
+        logger.warning(f"Source file for NWP provider {provider} is not set. "
+                       f"Skipping download. One possible way to fix this is to "
+                       f"set the environment variable NWP_{provider}_ZARR_PATH")
+        return
 
     fs = fsspec.open(source).fs
-    fs.get(source, destination, recursive=True)
+    if fs.exists(source):
+        fs.get(source, destination, recursive=True)
+    else:
+        logger.warning(f"NWP data from {source} does not exist")
 
 
-def download_all_nwp_data(
-    download_ukv: bool | None = True, download_ecmwf: bool | None = True,
-):
+def download_all_nwp_data():
     """Download the NWP data"""
-    if download_ukv:
-        _download_nwp_data(os.environ["NWP_UKV_ZARR_PATH"], nwp_ukv_path)
-    else:
-        logger.info("Skipping download of UKV data")
-    if download_ecmwf:
-        _download_nwp_data(os.environ["NWP_ECMWF_ZARR_PATH"], nwp_ecmwf_path)
-    else:
-        logger.info("Skipping download of ECMWF data")
+
+    _download_nwp_data(os.getenv("NWP_UKV_ZARR_PATH"), nwp_ukv_path, 'UKV')
+    _download_nwp_data(os.getenv("NWP_ECMWF_ZARR_PATH"), nwp_ecmwf_path, 'ECMWF')
 
 
 def regrid_nwp_data(nwp_zarr, target_coords_path, method):
@@ -136,9 +140,9 @@ def fix_ukv_data():
     ds.to_zarr(nwp_ukv_path)
 
 
-def preprocess_nwp_data(use_ukv: bool | None = True, use_ecmwf: bool | None = True):
+def preprocess_nwp_data():
 
-    if use_ukv:
+    if os.path.exists(nwp_ukv_path):
 
         rename_ukv_variables()
 
@@ -151,10 +155,9 @@ def preprocess_nwp_data(use_ukv: bool | None = True, use_ecmwf: bool | None = Tr
 
         # UKV data must be float16 to allow overflow to inf like in training
         fix_ukv_data()
-    else:
-        logger.info("Skipping UKV data preprocessing")
 
-    if use_ecmwf:
+
+    if os.path.exists(nwp_ecmwf_path):
 
         # rename dataset variable from  HRES-IFS_uk to ECMWF_UK
         rename_ecmwf_variables()
@@ -168,8 +171,6 @@ def preprocess_nwp_data(use_ukv: bool | None = True, use_ecmwf: bool | None = Tr
 
         # Names need to be aligned between training and prod, and we need to infill the shetlands
         fix_ecmwf_data()
-    else:
-        logger.info("Skipping ECMWF data preprocessing")
 
 
 def rename_ecmwf_variables():
@@ -276,4 +277,81 @@ def rename_ukv_variables():
         # save back to path
         shutil.rmtree(nwp_ukv_path, ignore_errors=True)
         d.to_zarr(nwp_ukv_path)
+
+
+def check_model_nwp_inputs_available(
+    data_config_filename: str,
+    t0: pd.Timestamp,
+) -> bool:
+    """Checks whether the model can be run given the available NWP data
+
+    Args:
+        data_config_filename: Path to the data configuration file
+        t0: The init-time of the forecast
+
+    Returns:
+        bool: Whether the NWP timestamps satisfy that specified in the config
+    """
+    input_config = load_yaml_configuration(data_config_filename).input_data
+
+    available = True
+
+    # check satellite if using
+    if hasattr(input_config, "nwp") and (input_config.nwp is not None):
+
+        for nwp_source, nwp_zarr_path in zip(["ukv", "ecmwf"], [nwp_ukv_path, nwp_ecmwf_path]):
+
+            if nwp_source in input_config.nwp:
+
+                if not os.path.exists(nwp_zarr_path):
+                    available = False
+                
+                else:
+
+                    ds_nwp = xr.open_zarr(nwp_zarr_path)
+
+                    nwp_config = input_config.nwp[nwp_source]
+
+                    # Find the available valid times of the NWP data
+                    assert len(ds_nwp.init_time) == 1, "These checks assume a single init_time"
+                    available_nwp_times = (
+                        pd.to_datetime(ds_nwp.init_time.values[0]) + pd.to_timedelta(ds_nwp.step)
+                    )
+
+                    # Get the NWP valid times required by the model
+                    freq = pd.Timedelta(f"{nwp_config.time_resolution_minutes}min")
+
+                    req_start_time = (
+                        t0 - pd.Timedelta(f"{nwp_config.history_minutes}min")
+                    ).ceil(freq)
+
+                    req_end_time = (
+                        t0 + pd.Timedelta(f"{nwp_config.forecast_minutes}min")
+                    ).ceil(freq) 
+                    
+                    # If we diff accumulated channels in time we'll need one more timestamp
+                    if len(nwp_config.nwp_accum_channels)>0:
+                        req_end_time = req_end_time + freq
+
+                    required_nwp_times = pd.date_range(
+                        start=req_start_time, 
+                        end=req_end_time, 
+                        freq=freq,
+                    )
+
+                    # Check if any of the expected datetimes are missing
+                    missing_time_steps = np.setdiff1d(
+                        required_nwp_times, 
+                        available_nwp_times, 
+                        assume_unique=True
+                    )
+
+                    available = available and (len(missing_time_steps)==0)
+
+                    if len(missing_time_steps) > 0:
+                        logger.warning(
+                            f"Some {nwp_source} timesteps for {t0=} missing: \n{missing_time_steps}"
+                        )
+
+    return available
 
