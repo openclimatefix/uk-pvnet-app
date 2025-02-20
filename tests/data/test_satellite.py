@@ -21,6 +21,7 @@ import xarray as xr
 import zarr
 
 from pvnet_app.data.satellite import (
+    check_for_constant_values,
     check_model_satellite_inputs_available,
     download_all_sat_data,
     extend_satellite_data_with_nans,
@@ -320,3 +321,52 @@ def test_interpolate_missing_satellite_timestamps(tmp_path):
     assert (pd.to_datetime(ds_interp.time)==pd.to_datetime(expected_times)).all().item()
 
     assert (ds_interp.data.values==1).all().item()
+
+
+def test_check_for_constant_values(sat_5_data):
+    """Test check_for_constant_values"""
+
+    # make temporary directory
+    with tempfile.TemporaryDirectory() as tmpdirname:
+
+        # Change to temporary working directory
+        os.chdir(tmpdirname)
+
+        # Make 5-minutely satellite data available
+        sat_5_data.to_zarr("sat.zarr")
+
+        check_for_constant_values()
+
+
+def test_check_for_constant_values_zeros(sat_5_data):
+    """Test check_for_constant_values error with lots of zeros"""
+
+    sat_5_data['data'].values[:] = 0
+
+    # make temporary directory
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        # Change to temporary working directory
+        os.chdir(tmpdirname)
+
+        # Make 5-minutely satellite data available
+        sat_5_data.to_zarr("sat.zarr")
+
+        with pytest.raises(Exception):
+            check_for_constant_values()
+
+
+def test_check_for_constant_values_nans(sat_5_data):
+    """Test check_for_constant_values, error with nans"""
+
+    sat_5_data['data'].values[:] = np.nan
+
+    # make temporary directory
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        # Change to temporary working directory
+        os.chdir(tmpdirname)
+
+        # Make 5-minutely satellite data available
+        sat_5_data.to_zarr("sat.zarr")
+
+        with pytest.raises(Exception):
+            check_for_constant_values(value=np.nan)
