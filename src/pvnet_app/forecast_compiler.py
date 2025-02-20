@@ -44,7 +44,7 @@ _model_mismatch_msg = (
 
 
 def validate_forecast(
-    national_forecast_values: pd.Series, # Now a pandas Series with datetime index
+    national_forecast_values: np.ndarray,
     national_capacity: float,
     logger_func: Callable[[str], None],
 ) -> None:
@@ -60,7 +60,7 @@ def validate_forecast(
         Exception: if above certain critical thresholds.
     """
     # Compute the maximum from the entire forecast array
-    max_forecast_mw = float(national_forecast_values.max())
+    max_forecast_mw = float(np.max(national_forecast_values))
 
     # Check it doesn't exceed 10% above national capacity
     if max_forecast_mw > 1.1 * national_capacity:
@@ -86,39 +86,38 @@ def validate_forecast(
     # Compute differences between consecutive timestamps
     zig_zag_gap_warning = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
     zig_zag_gap_error = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
-
-    # Calculate differences between consecutive timestamps using pandas' diff method
-    diff = national_forecast_values.diff()
-
-    # Detect large fluctuations (either up or down by 250 MW)
-    large_jumps = (diff.abs() > zig_zag_gap_warning)
-    critical_jumps = (diff.abs() > zig_zag_gap_error)
+    diff = np.diff(national_forecast_values)
+    large_jumps = (diff[:-1] > zig_zag_gap_warning) & (diff[1:]
+                                       < -zig_zag_gap_warning)  # Up then down by 250 MW
+    critical_jumps = (diff[:-1] > zig_zag_gap_error) & (diff[1:]
+                                          < -zig_zag_gap_error)  # Up then down by 500 MW
 
     if np.any(large_jumps):
         logger_func(
-            "WARNING: Forecast has sudden fluctuations (>=250 MW up and down)."
-        )
+            "WARNING: Forecast has sudden fluctuations (≥250 MW up and down).")
 
     if np.any(critical_jumps):
         raise Exception(
-            "FAIL: Forecast has critical fluctuations (>=500 MW up and down).")
+            "FAIL: Forecast has critical fluctuations (≥500 MW up and down).")
+
 
     # Validate based on sun elevation > 10 degrees
-    solpos = pvlib.solarposition.get_solarposition(
-        time=national_forecast_values.index,
-        latitude=55.3781,  # UK central latitude
-        longitude=-3.4360,  # UK central longitude
-        method='nrel_numpy'
-    )
+    if isinstance(national_forecast_values, pd.Series):
+        solpos = pvlib.solarposition.get_solarposition(
+            time=national_forecast_values.index,
+            latitude=55.3781,  # UK central latitude
+            longitude=-3.4360,  # UK central longitude
+            method='nrel_numpy'
+        )
 
-    # Check if forecast values are > 0 when sun elevation > 10 degrees
-    elevation_above_limit = solpos["elevation"] > SUN_ELEVATION_LOWER_LIMIT
+        # Check if forecast values are > 0 when sun elevation > 10 degrees
+        elevation_above_limit = solpos["elevation"] > SUN_ELEVATION_LOWER_LIMIT
 
-    # Ensure the index of elevation_above_limit matches the index of national_forecast_values
-    elevation_above_limit = elevation_above_limit.reindex(national_forecast_values.index, fill_value=False)
+        # Ensure the index of elevation_above_limit matches the index of national_forecast_values
+        elevation_above_limit = elevation_above_limit.reindex(national_forecast_values.index, fill_value=False)
 
-    if (national_forecast_values[elevation_above_limit] <= 0).any():
-        raise Exception(f"Forecast values must be > 0 when sun elevation > {SUN_ELEVATION_LOWER_LIMIT}°.")    
+        if (national_forecast_values[elevation_above_limit] <= 0).any():
+            raise Exception(f"Forecast values must be > 0 when sun elevation > {SUN_ELEVATION_LOWER_LIMIT}°.")    
 
 class ForecastCompiler:
     """Class for making and compiling solar forecasts from for all GB GSPsn and national total"""

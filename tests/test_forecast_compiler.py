@@ -18,7 +18,7 @@ def test_validate_forecast_ok():
     def dummy_logger(msg: str): logs.append(msg)
 
     # Forecast is significantly below capacity => no warnings or errors
-    national_forecast_values = pd.Series([10, 20, 30])  # MW
+    national_forecast_values = np.array([10, 20, 30])  # MW
     national_capacity = 50  # MW
 
     validate_forecast(
@@ -39,7 +39,7 @@ def test_validate_forecast_above_110percent_raises():
     # 60 MW > 1.1 * 50 MW => should raise an Exception
     with pytest.raises(Exception) as excinfo:
         validate_forecast(
-            national_forecast_values=pd.Series([60]),
+            national_forecast_values=np.array([60]),
             national_capacity=50,
             logger_func=lambda x: None,  # We don't care about logs here
         )
@@ -54,7 +54,7 @@ def test_validate_forecast_warns_when_over_30gw(caplog):
     # 31,000 MW is above 30 GW => Should generate a warning log
     with caplog.at_level(logging.INFO):
         validate_forecast(
-            national_forecast_values=pd.Series([31_000]),
+            national_forecast_values=np.array([31_000]),
             national_capacity=100_000,
             logger_func=logging.info,
         )
@@ -69,7 +69,7 @@ def test_validate_forecast_above_100_gw_raises():
     # 101,000 MW is above 100 GW => Should raise an Exception
     with pytest.raises(Exception) as excinfo:
         validate_forecast(
-            national_forecast_values=pd.Series([101_000]),
+            national_forecast_values=np.array([101_000]),
             national_capacity=200_000,
             logger_func=lambda x: None,
         )
@@ -85,7 +85,7 @@ def test_validate_forecast_no_fluctuations():
         logged_messages.append(message)
 
     os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
-    national_forecast_values = pd.Series([1000, 1100, 1050, 1200, 1150])
+    national_forecast_values = np.array([1000, 1100, 1050, 1200, 1150])
     national_capacity = 2000
 
     # No warnings or exceptions expected
@@ -101,19 +101,12 @@ def test_validate_forecast_with_warning():
     def logger_func(message):
         logged_messages.append(message)
 
-    # Set environment variable for zig-zag warning threshold (250 MW)
-    os.environ["FORECAST_VALIDATE_ZIG_ZAG_WARNING"] = "250"  # Set to the threshold for warnings    
-    # Set environment variable for zig-zag error threshold (500 MW)
-    os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"  # Set to the threshold for critical errors
-
-    # Define forecast values with fluctuations that should trigger the warning
-    national_forecast_values = pd.Series([1000, 1300, 1150, 1200, 900])
+    os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
+    national_forecast_values = np.array([1000, 1300, 800, 1200, 500])
     national_capacity = 2000
 
-    # Call the function under test
     validate_forecast(national_forecast_values, national_capacity, logger_func)
 
-    # Verify that the warning message is logged
     assert any("WARNING: Forecast has sudden fluctuations" in msg for msg in logged_messages), \
         "Expected warning not found!"
 
@@ -125,23 +118,13 @@ def test_validate_forecast_with_exception():
     def logger_func(message):
         logged_messages.append(message)
 
-    # Set environment variable for critical zig-zag error threshold
-    os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"  # Threshold for critical fluctuations
-
-    # Define forecast values that will cause a fluctuation ≥500 MW
-    national_forecast_values = pd.Series([1000, 1600, 800, 1300, 500])
+    os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
+    national_forecast_values = np.array([1000, 1600, 800, 1300, 500])
     national_capacity = 2000
 
-    with pytest.raises(Exception) as excinfo:
-        # Call the function that raises an exception
-        validate_forecast(
-            national_forecast_values=national_forecast_values,
-            national_capacity=national_capacity,
-            logger_func=lambda x: None,  # Don't check logs here
-        )
-
-    # Make sure the message includes the "critical fluctuations" message
-    assert "FAIL: Forecast has critical fluctuations" in str(excinfo.value)
+    with pytest.raises(Exception, match="FAIL: Forecast has critical fluctuations"):
+        validate_forecast(national_forecast_values,
+                          national_capacity, logger_func)
 
 
 def test_validate_forecast_sun_elevation_check():
