@@ -114,6 +114,15 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "mukiralad",
+      "name": "Dheeraj Mukirala",
+      "avatar_url": "https://avatars.githubusercontent.com/u/67241568?v=4",
+      "profile": "https://github.com/mukiralad",
+      "contributions": [
+        "doc"
+      ]
     }
   ],
   "contributorsPerLine": 7,

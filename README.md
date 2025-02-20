@@ -1,6 +1,6 @@
 # pvnet_app
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-12-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-13-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 [![ease of contribution: hard](https://img.shields.io/badge/ease%20of%20contribution:%20hard-bb2629)](https://github.com/openclimatefix#how-easy-is-it-to-get-involved)
@@ -8,6 +8,51 @@
 Internal OCF application to run [PVNet](https://github.com/openclimatefix/PVNet) models and (optionally) [PVNet summation](https://github.com/openclimatefix/PVNet-summation) models for the UK in a live environment. This involves accessing weather data stored in AWS S3 buckets, processing and loading this data using either our `ocf-data-sampler` or `ocf_datapipes` libraries, pulling pre-trained models from HuggingFace and then producing solar PV power forecasts for the UK by feeding the processed weather data into the model. 
 
 The app supports multiple model versions being deployed to live environments and these can be ran with specific configurations which are set via environment variables.
+
+## Environment Variables
+
+The following environment variables are used in the app:
+
+### Required Environment Variables
+
+- `DB_URL`: The URL for the database connection.
+- `NWP_UKV_ZARR_PATH`: The path to the UKV NWP data in Zarr format.
+- `NWP_ECMWF_ZARR_PATH`: The path to the ECMWF NWP data in Zarr format.
+- `SATELLITE_ZARR_PATH`: The path to the satellite data in Zarr format.
+
+### Optional Environment Variables
+
+- `PVNET_V2_VERSION`: The version of the PVNet V2 model to use. Default is a version above.
+- `USE_ADJUSTER`: Option to use adjuster. Defaults to true.
+- `SAVE_GSP_SUM`: Option to save GSP sum for PVNet V2. Defaults to false.
+- `RUN_EXTRA_MODELS`: Option to run extra models. Defaults to false.
+- `DAY_AHEAD_MODEL`: Option to use day ahead model. Defaults to false.
+- `SENTRY_DSN`: Optional link to Sentry.
+- `ENVIRONMENT`: The environment this is running in. Defaults to local.
+- `USE_ECMWF_ONLY`: Option to use ECMWF only model. Defaults to false.
+- `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
+- `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250 MW.
+- `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500 MW.
+
+### Examples
+
+Here are some examples of how to set these environment variables:
+
+```sh
+export DB_URL="postgresql://user:password@localhost:5432/dbname"
+export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
+export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
+export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
+export PVNET_V2_VERSION="v2.0.0"
+export USE_ADJUSTER="true"
+export SAVE_GSP_SUM="false"
+export RUN_EXTRA_MODELS="false"
+export DAY_AHEAD_MODEL="false"
+export SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
+export ENVIRONMENT="production"
+export USE_ECMWF_ONLY="false"
+export USE_OCF_DATA_SAMPLER="true"
+```
 
 ## Validation Checks
 
@@ -82,6 +127,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/alirashidAR"><img src="https://avatars.githubusercontent.com/u/110668489?v=4?s=100" width="100px;" alt="Ali Rashid"/><br /><sub><b>Ali Rashid</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=alirashidAR" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/mahmoud-40"><img src="https://avatars.githubusercontent.com/u/116794637?v=4?s=100" width="100px;" alt="Mahmoud Abdulmawlaa"/><br /><sub><b>Mahmoud Abdulmawlaa</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=mahmoud-40" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/meghana-0211"><img src="https://avatars.githubusercontent.com/u/136890863?v=4?s=100" width="100px;" alt="Meghana Sancheti"/><br /><sub><b>Meghana Sancheti</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=meghana-0211" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mukiralad"><img src="https://avatars.githubusercontent.com/u/67241568?v=4?s=100" width="100px;" alt="Dheeraj Mukirala"/><br /><sub><b>Dheeraj Mukirala</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=mukiralad" title="Documentation">📖</a></td>
     </tr>
   </tbody>
 </table>
