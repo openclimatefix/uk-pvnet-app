@@ -16,7 +16,7 @@ from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path
 logger = logging.getLogger(__name__)
 
 
-def _download_nwp_data(source, destination, provider: str):
+def _download_nwp_data(source: str, destination: str, provider: str):
     logger.info(f"Downloading NWP data from {source} to {destination}, for {provider}")
 
     if source is None:
