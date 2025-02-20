@@ -4,7 +4,6 @@ import os
 import pytest
 import pandas as pd
 import pvlib
-from unittest.mock import Mock
 from pvnet_app.forecast_compiler import validate_forecast
 
 
@@ -129,23 +128,32 @@ def test_validate_forecast_with_exception():
 
 
 def test_validate_forecast_sun_elevation_check():
-    """Test that forecast values are > 0 when sun elevation > SUN_ELEVATION_LOWER_LIMIT."""
-    logged_messages = []
-
-    def logger_func(message):
-        logged_messages.append(message)
-
+    """
+    Test that validate_forecast raises an Exception when forecast values 
+    are ≤ 0 while sun elevation is above SUN_ELEVATION_LOWER_LIMIT.
+    """
     # Get Sun Elevation Limit value from the environment variable (default 10)
     sun_elevation_limit = float(os.getenv("SUN_ELEVATION_LOWER_LIMIT", 10))
 
     time_range = pd.date_range("2025-01-01 06:00", "2025-01-01 18:00", freq="30T", tz="UTC")
-    sun_elevations = np.linspace(-5, 20, len(time_range))  # elevation varies from -5 to 20
 
-    forecast_values =pd.Series([0 if elev < sun_elevation_limit else 50 for elev in sun_elevations], index=time_range)
+    # Calculate Elevation using pvlib
+    solpos = pvlib.solarposition.get_solarposition(
+        time=time_range,
+        latitude=55.3781,  #UK central latitude
+        longitude=-3.4360,  # UK central longitude
+        method="nrel_numpy"
+    )
 
-    # Mocking pvlib.solarposition.get_solarposition()
-    solos_mock = pd.DataFrame({"elevation": sun_elevations}, index=time_range)
-    pvlib.solarposition.get_solarposition = Mock(return_value=solos_mock)
+    forecast_values = pd.Series(
+        [0, 50, 100, -1, 75, 0, 20, 0, 90, -5, 60, 10, 0, 85, 100, -3, 50, 30, 40, 70, 0, -2, 55, 60],  
+        index=time_range)
 
-    with pytest.raises(Exception, match=f"Forecast values must be > 0 when sun elevation > {sun_elevation_limit}°"):
-        validate_forecast(forecast_values, national_capacity=1000, logger_func=logger_func)
+    with pytest.raises(Exception) as excinfo:
+        validate_forecast(
+            national_forecast_values=forecast_values,
+            national_capacity=1000,
+            logger_func=lambda x: None,  # Don't check logs here
+        )
+
+    assert f"Forecast values must be > 0 when sun elevation > {sun_elevation_limit}°" in str(excinfo.value)
