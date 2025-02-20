@@ -16,11 +16,13 @@ from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path
 logger = logging.getLogger(__name__)
 
 
-def _download_nwp_data(source, destination):
-    logger.info(f"Downloading NWP data from {source} to {destination}")
+def _download_nwp_data(source, destination, provider: str):
+    logger.info(f"Downloading NWP data from {source} to {destination}, for {provider}")
 
     if source is None:
-        logger.warning(f"NWP data from {source} does not exist, won't download to {destination}")
+        logger.warning(f"Source file for NWP provider {provider} is not set. "
+                       f"Skipping download. One possible way to fix this is to "
+                       f"set the environment variable NWP_{provider}_ZARR_PATH")
         return
 
     fs = fsspec.open(source).fs
@@ -33,8 +35,8 @@ def _download_nwp_data(source, destination):
 def download_all_nwp_data():
     """Download the NWP data"""
 
-    _download_nwp_data(os.getenv("NWP_UKV_ZARR_PATH"), nwp_ukv_path)
-    _download_nwp_data(os.getenv("NWP_ECMWF_ZARR_PATH"), nwp_ecmwf_path)
+    _download_nwp_data(os.getenv("NWP_UKV_ZARR_PATH"), nwp_ukv_path, 'UKV')
+    _download_nwp_data(os.getenv("NWP_ECMWF_ZARR_PATH"), nwp_ecmwf_path, 'ECMWF')
 
 
 def regrid_nwp_data(nwp_zarr, target_coords_path, method):
