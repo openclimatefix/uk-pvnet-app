@@ -36,7 +36,7 @@ models:
         version: 4009df82e63e30546e2000728bff34b9c0520617
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 9002baf1e9dc1ec141f3c4a1fa8447b6316a4558
+        version: 70891d30aad0ea783ae4356e14e1eec30b720604
     uses_satellite_data: False
 
   - name: pvnet_ecmwf # this name is important as it used for blending
