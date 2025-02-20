@@ -32,7 +32,7 @@ def download_all_nwp_data():
                  "UKV": {"from": os.getenv("NWP_UKV_ZARR_PATH"), "to": nwp_ukv_path}}
 
     for k, v in providers.items():
-        if v["from"] is None:
+        if v["from"] is not None:
             _download_nwp_data(source=v["from"], destination=v["to"])
         else:
             logger.warning(f"NWP {k} not set in environment variables - skipping download step."
