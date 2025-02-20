@@ -156,7 +156,6 @@ def preprocess_nwp_data():
         # UKV data must be float16 to allow overflow to inf like in training
         fix_ukv_data()
 
-
     if os.path.exists(nwp_ecmwf_path):
 
         # rename dataset variable from  HRES-IFS_uk to ECMWF_UK
@@ -249,15 +248,14 @@ def rename_ukv_variables():
                   "downward_longwave_radiation_flux_gl": "dlwrf",
                   "downward_shortwave_radiation_flux_gl": "dswrf",
                   "downward_ultraviolet_radiation_flux_gl": "duvrs",
+                  "relative_humidity_sl": "r",
                   "temperature_sl": "t",
                   "total_precipitation_rate_gl": "prate",
                   "visibility_sl": "vis",
-                  "wind_u_component_100m": "u100",
-                  "wind_u_component_10m": "u10",
-                  "wind_u_component_200m": "u200",
-                  "wind_v_component_100m": "v100",
+                  "wind_direction_10m": "wdir10",
+                  "wind_speed_10m": "si10",
                   "wind_v_component_10m": "v10",
-                  "wind_v_component_200m": "v200"}
+                  "wind_u_component_10m": "u10"}
 
         for k, v in rename.items():
             variable_coords[variable_coords == k] = v
