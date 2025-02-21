@@ -35,8 +35,10 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 
 try:
     __version__ = version("pvnet-app")
+    __pvnet_version__ = version("pvnet")
 except PackageNotFoundError:
     __version__ = "v?"
+    __pvnet_version__ = "v?"
 
 # sentry
 sentry_sdk.init(
@@ -80,6 +82,30 @@ logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
 
 # ---------------------------------------------------------------------------
 # APP MAIN
+
+def save_batch_to_s3(batch, model_name, s3_directory):
+    """Saves a batch to a local file and uploads it to S3.
+
+    Args:
+        batch: The data batch to save (torch.Tensor).
+        model_name: The name of the model (str).
+        s3_directory: The S3 directory to save the batch to (str).
+    """
+    save_batch = f"{model_name}_latest_batch.pt"
+    torch.save(batch,save_batch)
+
+    try:
+        fs = fsspec.open(s3_directory).fs
+        fs.put(save_batch, f"{s3_directory}/{save_batch}")
+        logger.info(
+            f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}",
+            )
+        os.remove(save_batch)
+        logger.info("Removed local copy of batch")
+    except Exception as e:
+        logger.error(
+            f"Failed to save batch to {s3_directory}/{save_batch} with error {e}",
+            )
 
 
 def app(
@@ -127,7 +153,7 @@ def app(
     run_extra_models = os.getenv("RUN_EXTRA_MODELS", "false").lower() == "true"
     use_ocf_data_sampler = os.getenv("USE_OCF_DATA_SAMPLER", "true").lower() == "true"
 
-    logger.info(f"Using `pvnet` library version: {__version__}")
+    logger.info(f"Using `pvnet` library version: {__pvnet_version__}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using day ahead model: {use_day_ahead_model}")
@@ -273,21 +299,8 @@ def app(
 
             if s3_directory and i == 0:
                 model_name = list(forecast_compilers.keys())[0]
-                save_batch = f"{model_name}_latest_batch.pt"
-                torch.save(batch,save_batch)
-
-                try:
-                    fs = fsspec.open(s3_directory).fs
-                    fs.put(save_batch, f"{s3_directory}/{save_batch}")
-                    logger.info(
-                        f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}",
-                        )
-                    os.remove(save_batch)
-                    logger.info("Removed local copy of batch")
-                except Exception as e:
-                    logger.error(
-                        f"Failed to save batch to {s3_directory}/{save_batch} with error {e}",
-                        )
+                
+                save_batch_to_s3(batch, model_name, s3_directory) 
 
             for forecast_compiler in forecast_compilers.values():
                 # need to do copy the batch for each model, as a model might change the batch
