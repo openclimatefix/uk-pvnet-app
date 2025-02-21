@@ -14,12 +14,14 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 
 # Its nice to have this here, so we can run the latest version in production, but still use the old models
 # Once we have re trained PVnet summation models we can remove this
-def test_app_ecwmf_only(db_session, nwp_ecmwf_data, gsp_yields_and_systems, me_latest):
+def test_app_ecwmf_only(db_session, nwp_ecmwf_data, db_url):
     """Test the app for the case running model just on ecmwf"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
 
         os.chdir(tmpdirname)
+
+        os.environ["DB_URL"] = db_url
 
         temp_nwp_path = "temp_nwp_ecmwf.zarr"
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
@@ -79,13 +81,13 @@ def test_app_ecwmf_only(db_session, nwp_ecmwf_data, gsp_yields_and_systems, me_l
 # test legacy models
 # Its nice to have this here, so we can run the latest version in production, but still use the old models
 # Once we have re trained PVnet summation models we can remove this
-def test_app_ocf_datapipes(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest,
-):
+def test_app_ocf_datapipes(db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, db_url):
     """Test the app running the day ahead model"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.chdir(tmpdirname)
+
+        os.environ["DB_URL"] = db_url
 
         temp_nwp_path = "temp_nwp_ukv.zarr"
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
@@ -146,14 +148,14 @@ def test_app_ocf_datapipes(
     )
 
 
-def test_app_day_ahead_model(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest,
-):
+def test_app_day_ahead_model(db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, db_url):
     """Test the app running the day ahead model"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
 
         os.chdir(tmpdirname)
+
+        os.environ["DB_URL"] = db_url
 
         temp_nwp_path = "temp_nwp_ukv.zarr"
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
