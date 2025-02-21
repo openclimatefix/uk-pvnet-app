@@ -10,7 +10,7 @@ on:
 
 jobs:
   branch-ci:
-    uses: openclimatefix/.github/.github/workflows/nondefault_branch_push_ci_python.yml@update-branch-ci
+    uses: openclimatefix/.github/.github/workflows/nondefault_branch_push_ci_python.yml@main
     secrets: inherit
     with:
       enable_linting: false # TODO: Lint whole package
