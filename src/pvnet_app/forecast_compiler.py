@@ -7,6 +7,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
 import pandas as pd
+import pvlib
 import torch
 import xarray as xr
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
@@ -31,6 +32,8 @@ except PackageNotFoundError:
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
 
+# Set default value for sun elevation Lower Limit
+SUN_ELEVATION_LOWER_LIMIT = float(os.getenv('SUN_ELEVATION_LOWER_LIMIT', 10))
 
 _model_mismatch_msg = (
     "The PVNet version running in this app is {}/{}. The summation model running in this app was "
@@ -97,6 +100,24 @@ def validate_forecast(
         raise Exception(
             "FAIL: Forecast has critical fluctuations (≥500 MW up and down).")
 
+
+    # Validate based on sun elevation > 10 degrees
+    if isinstance(national_forecast_values, pd.Series):
+        solpos = pvlib.solarposition.get_solarposition(
+            time=national_forecast_values.index,
+            latitude=55.3781,  # UK central latitude
+            longitude=-3.4360,  # UK central longitude
+            method='nrel_numpy'
+        )
+
+        # Check if forecast values are > 0 when sun elevation > 10 degrees
+        elevation_above_limit = solpos["elevation"] > SUN_ELEVATION_LOWER_LIMIT
+
+        # Ensure the index of elevation_above_limit matches the index of national_forecast_values
+        elevation_above_limit = elevation_above_limit.reindex(national_forecast_values.index, fill_value=False)
+
+        if (national_forecast_values[elevation_above_limit] <= 0).any():
+            raise Exception(f"Forecast values must be > 0 when sun elevation > {SUN_ELEVATION_LOWER_LIMIT}°.")    
 
 class ForecastCompiler:
     """Class for making and compiling solar forecasts from for all GB GSPsn and national total"""
@@ -341,10 +362,13 @@ class ForecastCompiler:
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}",
         )
 
-        # Pass the entire national forecast array (for potential extra checks in future).
-        national_forecast_values = da_abs_national.sel(
-            output_label="forecast_mw", gsp_id=0).values
+        # Select the forecast values and convert to a pandas Series with the existing target_datetime_utc
+        national_forecast_values = pd.Series(
+            da_abs_national.sel(output_label="forecast_mw").values.flatten(),
+            index=self.valid_times  # Use target_datetime_utc as the datetime index
+        )
 
+        # Now call the validate_forecast function with the updated 'national_forecast_values' (which is a pd.Series)
         validate_forecast(
             national_forecast_values=national_forecast_values,
             national_capacity=self.national_capacity,
