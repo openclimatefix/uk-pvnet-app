@@ -78,7 +78,8 @@ logger = logging.getLogger()
 
 # Get rid of the verbose sqlalchemy logs
 logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
-
+# Turn off logs from aiobotocore
+logging.getLogger("aiobotocore").setLevel(logging.ERROR)  
 
 # ---------------------------------------------------------------------------
 # APP MAIN
