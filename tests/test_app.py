@@ -12,15 +12,15 @@ from nowcasting_datamodel.models.forecast import (
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
-def test_app(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, gsp_yields_and_systems, me_latest,
-):
 
+def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, db_url):
     """Test the app running the intraday models"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
 
         os.chdir(tmpdirname)
+
+        os.environ["DB_URL"] = db_url
 
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables
@@ -48,7 +48,7 @@ def test_app(
         # These imports need to come after the environ vars have been set
         from pvnet_app.app import app
 
-        app(gsp_ids=list(range(1, 318)), num_workers=2)
+        app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
 
     all_models = get_all_models(run_extra_models=True)
 
@@ -82,14 +82,14 @@ def test_app(
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
 
-def test_app_no_sat(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, gsp_yields_and_systems, me_latest,
-):
+def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     """Test the app for the case when no satellite data is available"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
 
         os.chdir(tmpdirname)
+
+        os.environ["DB_URL"] = db_url
 
         temp_nwp_path = "temp_nwp_ukv.zarr"
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
@@ -112,7 +112,7 @@ def test_app_no_sat(
         # Thes import needs to come after the environ vars have been set
         from pvnet_app.app import app
 
-        app(gsp_ids=list(range(1, 318)), num_workers=2)
+        app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
 
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run
@@ -148,16 +148,17 @@ def test_app_no_sat(
 
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
+
 # Test for new DA model with data sampler utilisation
 # To note - Satellite omitted
-def test_app_day_ahead_data_sampler(
-    db_session, nwp_ukv_data, nwp_ecmwf_data, gsp_yields_and_systems, me_latest,
-):
+def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     """Test the app running the day ahead model"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
 
         os.chdir(tmpdirname)
+
+        os.environ["DB_URL"] = db_url
 
         temp_nwp_path = "temp_nwp_ukv.zarr"
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
@@ -175,7 +176,7 @@ def test_app_day_ahead_data_sampler(
 
         # Import at runtime to ensure environment variables are set
         from pvnet_app.app import app
-        app(gsp_ids=list(range(1, 318)), num_workers=2)
+        app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
 
     all_models = get_all_models(get_day_ahead_only=True, use_ocf_data_sampler=True)
 
