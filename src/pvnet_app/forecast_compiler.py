@@ -2,7 +2,6 @@ import logging
 import warnings
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
-from validate_forecast import validate_forecast
 
 import numpy as np
 import pandas as pd
@@ -19,6 +18,7 @@ from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 
 from pvnet_app.model_configs.pydantic_models import Model
+from pvnet_app.validate_forecast import validate_forecast
 
 logger = logging.getLogger(__name__)
 
