@@ -35,8 +35,10 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 
 try:
     __version__ = version("pvnet-app")
+    __pvnet_version__ = version("pvnet")
 except PackageNotFoundError:
     __version__ = "v?"
+    __pvnet_version__ = "v?"
 
 # sentry
 sentry_sdk.init(
@@ -151,7 +153,7 @@ def app(
     run_extra_models = os.getenv("RUN_EXTRA_MODELS", "false").lower() == "true"
     use_ocf_data_sampler = os.getenv("USE_OCF_DATA_SAMPLER", "true").lower() == "true"
 
-    logger.info(f"Using `pvnet` library version: {__version__}")
+    logger.info(f"Using `pvnet` library version: {__pvnet_version__}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using day ahead model: {use_day_ahead_model}")
