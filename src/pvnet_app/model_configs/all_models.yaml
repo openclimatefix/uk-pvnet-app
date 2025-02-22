@@ -13,10 +13,11 @@ models:
     save_gsp_sum: False
     verbose: True
     save_gsp_to_recent: true
+    
   - name: pvnet_v2-sat0-samples-v1
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        version: ffe120456b55be82ded2d5c654c9ede3f3df1c8f
+        version: d81a9cf8adca49739ea6a3d031e36510f44744a1
     summation:
         repo: openclimatefix/pvnet_v2_summation
         version: dcfdc17fda8e48c387122614bec8b284eaa868b9
