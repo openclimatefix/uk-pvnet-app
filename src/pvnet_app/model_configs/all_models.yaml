@@ -5,7 +5,7 @@ models:
   - name: pvnet_v2
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        version: 3852f4e3367fb18c0eaa1c9ca395d2ab81a44720
+        version: f3135c47eb0f21320dbd8c590bdd03dfafc39bca
     summation:
         repo: openclimatefix/pvnet_v2_summation
         version: ffac655f9650b81865d96023baa15839f3ce26ec
