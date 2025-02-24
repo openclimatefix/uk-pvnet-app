@@ -8,7 +8,7 @@ models:
         version: f3135c47eb0f21320dbd8c590bdd03dfafc39bca
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: ffac655f9650b81865d96023baa15839f3ce26ec
+        version: 12e1efff268f64313328438f0a8b533f4cd82be2
     use_adjuster: True
     save_gsp_sum: False
     verbose: True
