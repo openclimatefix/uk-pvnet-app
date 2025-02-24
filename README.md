@@ -89,7 +89,7 @@ Just before the batch data goes into the ML models, we check that
 After the ML models have run, we check the following
 - The forecast is not above 110% of the national capacity. An error is raised if any forecast value is above 110% of the national capacity.
 - The forecast is not above 100 GW, any forecast value above 30 GW we get a warning but any forecast value above 100 GW we raise an error. 
-- If the forecast goes up and then down more than 500 MW we raise an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
+- If the forecast goes up, then down, then up, more than 500 MW we raise an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
 - TODO: Check positive values in day: https://github.com/openclimatefix/uk-pvnet-app/issues/200
 
 ## Development
