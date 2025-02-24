@@ -20,7 +20,7 @@ models:
         version: d81a9cf8adca49739ea6a3d031e36510f44744a1
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: dcfdc17fda8e48c387122614bec8b284eaa868b9
+        version: c50f852c33d02322ef89135cdeb672a1544c0702
 
     # single source models
   - name: pvnet_v2-sat0-only-samples-v1"
