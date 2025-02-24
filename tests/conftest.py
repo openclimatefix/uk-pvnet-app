@@ -8,7 +8,7 @@ import xarray as xr
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_me_latest
 from nowcasting_datamodel.models import GSPYield, LocationSQL
-from nowcasting_datamodel.models.base import Base_Forecast, Base_PV
+from nowcasting_datamodel.models.base import Base_Forecast
 from nowcasting_datamodel.read.read import get_location
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
@@ -40,7 +40,6 @@ def db_connection(test_t0, db_url):
     engine = database_connection.engine
 
     database_connection.create_all()
-    Base_PV.metadata.create_all(engine)
 
     with database_connection.get_session() as s:
         populate_db_session_with_input_data(s, test_t0)
@@ -48,7 +47,6 @@ def db_connection(test_t0, db_url):
     yield database_connection
 
     # Tear down
-    Base_PV.metadata.drop_all(engine)
     Base_Forecast.metadata.drop_all(engine)
 
     engine.dispose()
