@@ -25,7 +25,7 @@ dependencies = [
     "huggingface-hub==0.28.1",
     "nowcasting_datamodel==1.5.62",
     "numpy==2.0.0",
-    "ocf_data_sampler==0.1.5",
+    "ocf_data_sampler==0.1.11",
     "ocf_datapipes==3.3.56",
     "pandas==2.2.3",
     "pvnet==4.0.1",
