@@ -36,7 +36,9 @@ def test_data_config():
             _ = load_yaml_configuration(temp_data_config_path)
 
 
-def test_dataloader_legacy(db_session):
+def test_dataloader_legacy(db_url):
+
+    os.environ["DB_URL"] = db_url
 
     models = get_all_models(run_extra_models=True, use_ocf_data_sampler=False)
     for model_config in models:
