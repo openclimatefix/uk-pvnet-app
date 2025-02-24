@@ -1,10 +1,12 @@
 import logging
+
 import numpy as np
-import os
-import pytest
 import pandas as pd
 import pvlib
-from pvnet_app.forecast_compiler import validate_forecast
+import os
+import pytest
+
+from pvnet_app.validate_forecast import validate_forecast
 
 
 def test_validate_forecast_ok():
@@ -119,7 +121,7 @@ def test_validate_forecast_with_exception():
         logged_messages.append(message)
 
     os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
-    national_forecast_values = np.array([1000, 1600, 800, 1300, 500])
+    national_forecast_values = np.array([1000, 1600, 800, 1301, 500])
     national_capacity = 2000
 
     with pytest.raises(Exception, match="FAIL: Forecast has critical fluctuations"):
@@ -133,7 +135,7 @@ def test_validate_forecast_sun_elevation_check():
     are ≤ 0 while sun elevation is above SUN_ELEVATION_LOWER_LIMIT.
     """
     # Set environment variable for sun elevation threshold
-    SUN_ELEVATION_LOWER_LIMIT = float(os.getenv('SUN_ELEVATION_LOWER_LIMIT', 10))
+    sun_elevation_lower_limit = float(os.getenv('SUN_ELEVATION_LOWER_LIMIT', 10))
 
     # Create a time range for the test
     time_range = pd.date_range("2025-01-01 06:00", "2025-01-01 18:00", freq="30T", tz="UTC")
@@ -159,5 +161,5 @@ def test_validate_forecast_sun_elevation_check():
         )
 
     # Ensure the exception message contains the correct string (with the sun elevation limit)
-    expected_message = f"Forecast values must be > 0 when sun elevation > {SUN_ELEVATION_LOWER_LIMIT}°"
+    expected_message = f"Forecast values must be > 0 when sun elevation > {sun_elevation_lower_limit}°"
     assert expected_message in str(excinfo.value), f"Expected message not found! Got: {str(excinfo.value)}"
