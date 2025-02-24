@@ -20,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "PVNet-summation==0.3.2",
+    "PVNet-summation==0.3.4",
     "fsspec[s3]==2025.2.0",
     "huggingface-hub==0.28.1",
     "nowcasting_datamodel==1.5.62",
