@@ -119,7 +119,7 @@ def test_validate_forecast_with_exception():
         logged_messages.append(message)
 
     os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
-    national_forecast_values = np.array([1000, 1600, 800, 1300, 500])
+    national_forecast_values = np.array([1000, 1600, 800, 1301, 500])
     national_capacity = 2000
 
     with pytest.raises(Exception, match="FAIL: Forecast has critical fluctuations"):
