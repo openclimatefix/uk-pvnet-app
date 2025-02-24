@@ -5,7 +5,7 @@ models:
   - name: pvnet_v2
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        version: 3852f4e3367fb18c0eaa1c9ca395d2ab81a44720
+        version: f3135c47eb0f21320dbd8c590bdd03dfafc39bca
     summation:
         repo: openclimatefix/pvnet_v2_summation
         version: ffac655f9650b81865d96023baa15839f3ce26ec
@@ -13,10 +13,11 @@ models:
     save_gsp_sum: False
     verbose: True
     save_gsp_to_recent: true
+    
   - name: pvnet_v2-sat0-samples-v1
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        version: ffe120456b55be82ded2d5c654c9ede3f3df1c8f
+        version: d81a9cf8adca49739ea6a3d031e36510f44744a1
     summation:
         repo: openclimatefix/pvnet_v2_summation
         version: dcfdc17fda8e48c387122614bec8b284eaa868b9
@@ -25,7 +26,7 @@ models:
   - name: pvnet_v2-sat0-only-samples-v1"
     pvnet:
       repo: openclimatefix/pvnet_uk_region
-      version: d489922788f9947bd8b064e880201aab6c551e50
+      version: 158f9aeb006dddc10ef67612a91e7175a87b8dd0
     summation:
       repo: openclimatefix/pvnet_v2_summation
       version: adbf9e7797fee9a5050beb8c13841696e72f99ef
@@ -36,7 +37,7 @@ models:
         version: 4009df82e63e30546e2000728bff34b9c0520617
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 9002baf1e9dc1ec141f3c4a1fa8447b6316a4558
+        version: 5fc3ea16be141df38b2fad8c11a524243e9b8555
     uses_satellite_data: False
 
   - name: pvnet_ecmwf # this name is important as it used for blending
@@ -45,7 +46,7 @@ models:
         version: 20b882bd4ceaee190a1c994d861f8e5d553ea843
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 4fe6b1441b6dd549292c201ed85eee156ecc220c
+        version: 9ddd4845cbb97b91e16de0c3370f666e1eab1c30
     ecmwf_only: True
     uses_satellite_data: False
 # This is the old model for pvnet and pvnet_ecmwf
@@ -92,7 +93,7 @@ models:
         version: 263741ebb6b71559d113d799c9a579a973cc24ba
     summation:
         repo: openclimatefix/pvnet_summation_uk_national_day_ahead
-        version: ed60c5d32a020242ca4739dcc6dbc8864f783a08
+        version: b3cd41ff08afde1fa9269d1ad0fbdf9c5b62df23
     use_adjuster: True
     save_gsp_sum: True
     verbose: True

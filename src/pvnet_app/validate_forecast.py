@@ -5,7 +5,7 @@ import pvlib
 from collections.abc import Callable
 
 def validate_forecast(
-    national_forecast_values: np.ndarray,
+    national_forecast_values: pd.Series,
     national_capacity: float,
     logger_func: Callable[[str], None],
 ) -> None:
@@ -21,7 +21,7 @@ def validate_forecast(
         Exception: if above certain critical thresholds.
     """
     # Compute the maximum from the entire forecast array
-    max_forecast_mw = float(np.max(national_forecast_values))
+    max_forecast_mw = national_forecast_values.max()
 
     # Check it doesn't exceed 10% above national capacity
     if max_forecast_mw > 1.1 * national_capacity:
@@ -47,7 +47,7 @@ def validate_forecast(
     # Compute differences between consecutive timestamps
     zig_zag_gap_warning = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
     zig_zag_gap_error = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
-    diff = np.diff(national_forecast_values)
+    diff = national_forecast_values.diff().values
     large_jumps = \
         (diff[0:-2] > zig_zag_gap_warning) & \
         (diff[1:-1] < -zig_zag_gap_warning) & \
@@ -66,22 +66,21 @@ def validate_forecast(
             "FAIL: Forecast has critical fluctuations (≥500 MW up and down).")
     
     # Set default value for sun elevation lowr limit
-    sun_elevation_lower_limit = float(os.getenv('SUN_ELEVATION_LOWER_LIMIT', 10))
+    sun_elevation_lower_limit = float(os.getenv('FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT', 10))
 
     # Validate based on sun elevation > 10 degrees
-    if isinstance(national_forecast_values, pd.Series):
-        solpos = pvlib.solarposition.get_solarposition(
-            time=national_forecast_values.index,
-            latitude=55.3781,  # UK central latitude
-            longitude=-3.4360,  # UK central longtitude
-            method='nrel_numpy'
-        )
+    solpos = pvlib.solarposition.get_solarposition(
+        time=national_forecast_values.index,
+        latitude=55.3781,  # UK central latitude
+        longitude=-3.4360,  # UK central longtitude
+        method='nrel_numpy'
+    )
 
-        # Check if forecast values are > 0 when sun elevation > 10 degrees
-        elevation_above_limit = solpos["elevation"] > sun_elevation_lower_limit
+    # Check if forecast values are > 0 when sun elevation > 10 degrees
+    elevation_above_limit = solpos["elevation"] > sun_elevation_lower_limit
 
-        # Ensure the index of elevation_above_limit matches the index of national_forecast_values
-        elevation_above_limit = elevation_above_limit.reindex(national_forecast_values.index, fill_value=False)
+    # Ensure the index of elevation_above_limit matches the index of national_forecast_values
+    elevation_above_limit = elevation_above_limit.reindex(national_forecast_values.index, fill_value=False)
 
-        if (national_forecast_values[elevation_above_limit] <= 0).any():
-            raise Exception(f"Forecast values must be > 0 when sun elevation > {sun_elevation_lower_limit} degree.")
+    if (national_forecast_values[elevation_above_limit] <= 0).any():
+        raise Exception(f"Forecast values must be > 0 when sun elevation > {sun_elevation_lower_limit} degree.")
