@@ -203,7 +203,7 @@ def test_check_model_satellite_inputs_available(config_filename):
     assert not check_model_satellite_inputs_available(config_filename, t0, sat_datetime_5)
 
 
-def test_extend_satellite_data_with_nans(sat_5_data, test_t0):
+def test_extend_satellite_data_with_nans(sat_5_data):
 
     # make temporary directory
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -224,7 +224,7 @@ def test_extend_satellite_data_with_nans(sat_5_data, test_t0):
         assert (ds.time.values == time).all()
 
 
-def test_extend_satellite_data_with_nans_over_3_hours(sat_5_data, test_t0):
+def test_extend_satellite_data_with_nans_over_3_hours(sat_5_data):
 
     # make temporary directory
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -277,6 +277,7 @@ def test_remove_satellite_data(sat_15_data_small, test_t0):
         os.chdir(tmpdirname)
 
         # make half the values zeros
+        sat_15_data_small = sat_15_data_small.copy(deep=True)
         sat_15_data_small.data[::2] = np.nan
 
         # Make 15-minutely satellite data available
@@ -341,6 +342,8 @@ def test_check_for_constant_values(sat_5_data):
 def test_check_for_constant_values_zeros(sat_5_data):
     """Test check_for_constant_values error with lots of zeros"""
 
+    sat_5_data = sat_5_data.copy(deep=True)
+
     sat_5_data['data'].values[:] = 0
 
     # make temporary directory
@@ -358,6 +361,7 @@ def test_check_for_constant_values_zeros(sat_5_data):
 def test_check_for_constant_values_nans(sat_5_data):
     """Test check_for_constant_values, error with nans"""
 
+    sat_5_data = sat_5_data.copy(deep=True)
     sat_5_data['data'].values[:] = np.nan
 
     # make temporary directory
