@@ -27,7 +27,7 @@ def test_t0():
 
 
 @pytest.fixture(scope="session")
-def db_url(test_t0):
+def db_url():
     with PostgresContainer("postgres:16.1") as postgres:
         yield postgres.get_connection_url()
 
