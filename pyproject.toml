@@ -28,7 +28,7 @@ dependencies = [
     "ocf_data_sampler==0.1.5",
     "ocf_datapipes==3.3.56",
     "pandas==2.2.3",
-    "pvnet==3.0.50",
+    "pvnet>=4.0.0",
     "pydantic==2.5.3",
     "pytorch-lightning==2.3.3",
     "requests==2.32.3",
