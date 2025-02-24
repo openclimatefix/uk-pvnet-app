@@ -480,29 +480,6 @@ class ForecastCompiler:
         return forecasts
 
 
-# def change_keys_to_ocf_datapipes_keys(batch):
-#     """Change string keys from ocf-data-sampler to BatchKey from ocf-datapipes
-
-#     Until PVNet is merged from dev-data-sampler, we need to do this.
-#     After this, we might need to change the other way around, for the legacy models.
-#     """
-#     keys_to_rename = [BatchKey.satellite_actual,
-#                       BatchKey.nwp,
-#                       BatchKey.gsp_solar_elevation,
-#                       BatchKey.gsp_solar_azimuth,
-#                       BatchKey.gsp_id]
-
-#     for key in keys_to_rename:
-#         if key.name in batch:
-#             batch[key] = batch[key.name]
-#             del batch[key.name]
-
-#     if BatchKey.nwp in batch.keys():
-#         nwp_config = batch[BatchKey.nwp]
-#         for nwp_source in nwp_config.keys():
-#             batch[BatchKey.nwp][nwp_source][NWPBatchKey.nwp] = batch[BatchKey.nwp][nwp_source]["nwp"]
-#             del batch[BatchKey.nwp][nwp_source]["nwp"]
-
 def change_keys_to_ocf_datapipes_keys(batch):
     """Change string keys from ocf-data-sampler to BatchKey from ocf-datapipes
 
@@ -516,21 +493,12 @@ def change_keys_to_ocf_datapipes_keys(batch):
                       BatchKey.gsp_id]
 
     for key in keys_to_rename:
-        # Only try to rename if the key name actually exists in the batch
         if key.name in batch:
             batch[key] = batch[key.name]
             del batch[key.name]
 
-    # Only process NWP data if the key exists in the batch
     if BatchKey.nwp in batch.keys():
         nwp_config = batch[BatchKey.nwp]
         for nwp_source in nwp_config.keys():
-            # Check if "nwp" exists in the source dictionary before trying to access it
-            if "nwp" in batch[BatchKey.nwp][nwp_source]:
-                batch[BatchKey.nwp][nwp_source][NWPBatchKey.nwp] = batch[BatchKey.nwp][nwp_source]["nwp"]
-                del batch[BatchKey.nwp][nwp_source]["nwp"]
-
-
-
-
-
+            batch[BatchKey.nwp][nwp_source][NWPBatchKey.nwp] = batch[BatchKey.nwp][nwp_source]["nwp"]
+            del batch[BatchKey.nwp][nwp_source]["nwp"]
