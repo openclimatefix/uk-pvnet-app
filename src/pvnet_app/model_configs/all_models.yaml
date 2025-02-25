@@ -29,7 +29,7 @@ models:
       version: 158f9aeb006dddc10ef67612a91e7175a87b8dd0
     summation:
       repo: openclimatefix/pvnet_v2_summation
-      version: adbf9e7797fee9a5050beb8c13841696e72f99ef
+      version: 4745de8a855dec9048b835c82750caf16221c8e0
 
   - name: pvnet_v2-ukv-only-samples-v1
     pvnet:
