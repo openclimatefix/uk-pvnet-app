@@ -66,6 +66,7 @@ def db_session(db_connection):
         s.query(ForecastValueSQL).delete()
         s.query(ForecastSQL).delete()
         s.commit()
+        s.flush()
 
 
 def populate_db_session_with_input_data(session, test_t0):
