@@ -43,6 +43,7 @@ def test_app(
         os.environ["SAVE_GSP_SUM"] = "True"
         os.environ["DAY_AHEAD_MODEL"] = "False"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         # These imports need to come after the environ vars have been set
@@ -107,6 +108,7 @@ def test_app_no_sat(
         os.environ["DAY_AHEAD_MODEL"] = "False"
         os.environ["USE_OCF_DATA_SAMPLER"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
@@ -172,6 +174,7 @@ def test_app_day_ahead_data_sampler(
         os.environ["RUN_EXTRA_MODELS"] = "False"
         os.environ["USE_OCF_DATA_SAMPLER"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Import at runtime to ensure environment variables are set
         from pvnet_app.app import app
