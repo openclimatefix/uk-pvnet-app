@@ -157,6 +157,7 @@ def test_validate_forecast_sun_elevation_check():
     are ≤ 0 while sun elevation is above SUN_ELEVATION_LOWER_LIMIT.
     """
     # Set environment variable for sun elevation threshold
+    os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "10"
     sun_elevation_lower_limit = float(os.getenv("SUN_ELEVATION_LOWER_LIMIT", 10))
 
     # Create a time range for the test
