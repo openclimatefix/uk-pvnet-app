@@ -8,7 +8,7 @@ models:
         version: f3135c47eb0f21320dbd8c590bdd03dfafc39bca
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: ffac655f9650b81865d96023baa15839f3ce26ec
+        version: 8934ff871b39d528448040dca82722a6ab4680cd
     use_adjuster: True
     save_gsp_sum: False
     verbose: True
@@ -20,7 +20,7 @@ models:
         version: d81a9cf8adca49739ea6a3d031e36510f44744a1
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: dcfdc17fda8e48c387122614bec8b284eaa868b9
+        version: 74bd8005fe752946655ace879dda81d3c04093dc
 
     # single source models
   - name: pvnet_v2-sat0-only-samples-v1"
@@ -29,7 +29,7 @@ models:
       version: 158f9aeb006dddc10ef67612a91e7175a87b8dd0
     summation:
       repo: openclimatefix/pvnet_v2_summation
-      version: adbf9e7797fee9a5050beb8c13841696e72f99ef
+      version: 4745de8a855dec9048b835c82750caf16221c8e0
 
   - name: pvnet_v2-ukv-only-samples-v1
     pvnet:
@@ -46,7 +46,7 @@ models:
         version: 20b882bd4ceaee190a1c994d861f8e5d553ea843
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 9ddd4845cbb97b91e16de0c3370f666e1eab1c30
+        version: ce87d0f4d7c0d8def2d404fa079ee834ef527023
     ecmwf_only: True
     uses_satellite_data: False
 # This is the old model for pvnet and pvnet_ecmwf
