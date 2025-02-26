@@ -286,6 +286,7 @@ class ForecastCompiler:
         national_forecast_values = da_abs_national.sel(
             output_label="forecast_mw", gsp_id=0).values
 
+        national_forecast_values = pd.Series(data=national_forecast_values, index=self.valid_times)
         validate_forecast(
             national_forecast_values=national_forecast_values,
             national_capacity=self.national_capacity,

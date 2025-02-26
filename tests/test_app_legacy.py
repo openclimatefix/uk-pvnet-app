@@ -38,6 +38,7 @@ def test_app_ecwmf_only(test_t0, db_session, nwp_ecmwf_data, db_url):
         os.environ["USE_OCF_DATA_SAMPLER"] = "False"
         os.environ["USE_ECMWF_ONLY"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
@@ -106,6 +107,7 @@ def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, db_u
         os.environ["USE_OCF_DATA_SAMPLER"] = "False"
         os.environ["USE_ECMWF_ONLY"] = "False"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
@@ -173,6 +175,7 @@ def test_app_day_ahead_model(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, 
         os.environ["RUN_EXTRA_MODELS"] = "False"
         os.environ["USE_OCF_DATA_SAMPLER"] = "False"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
