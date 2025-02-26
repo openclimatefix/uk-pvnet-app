@@ -46,7 +46,7 @@ models:
         version: 20b882bd4ceaee190a1c994d861f8e5d553ea843
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 9ddd4845cbb97b91e16de0c3370f666e1eab1c30
+        version: ce87d0f4d7c0d8def2d404fa079ee834ef527023
     ecmwf_only: True
     uses_satellite_data: False
 # This is the old model for pvnet and pvnet_ecmwf
