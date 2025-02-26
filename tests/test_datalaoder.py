@@ -36,9 +36,7 @@ def test_data_config():
             _ = load_yaml_configuration(temp_data_config_path)
 
 
-def test_datapipes_dataloader(db_url):
-
-    os.environ["DB_URL"] = db_url
+def test_datapipes_dataloader(db_url, test_t0):
 
     models = get_all_models(run_extra_models=True, use_ocf_data_sampler=False)
     for model_config in models:
@@ -49,12 +47,11 @@ def test_datapipes_dataloader(db_url):
             revision=model_config.pvnet.version,
         )
 
-        t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor(timedelta(minutes=30))
-
         _ = get_datapipes_dataloader(
             config_filename=data_config_path,
-            t0=t0,
+            t0=test_t0,
             gsp_ids=list(range(1, 10)),
             batch_size=2,
             num_workers=1,
+            db_url=db_url,
         )
