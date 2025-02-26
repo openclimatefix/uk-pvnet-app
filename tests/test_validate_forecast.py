@@ -43,7 +43,7 @@ def test_validate_forecast_above_110percent_raises():
     """
 
     national_forecast_values = pd.Series(
-        [60], index=pd.date_range("2025-01-01", "2025-01-01 01:00", 1)
+        [60], index=pd.to_datetime(["2025-01-01 00:00"])
     )  # MW
 
     # 60 MW > 1.1 * 50 MW => should raise an Exception
@@ -105,7 +105,7 @@ def test_validate_forecast_no_fluctuations():
     os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
     national_capacity = 2000
     national_forecast_values = pd.Series(
-        [1000, 1100, 1050, 1200, 1150], index=pd.date_range("2025-01-01", "2025-01-01 01:00", 5)
+        [1000, 1100, 1050, 1200, 1150], index=pd.date_range(start="2025-01-01 00:00",  periods=5, freq="30mins") 
     )  # MW
 
     # No warnings or exceptions expected
