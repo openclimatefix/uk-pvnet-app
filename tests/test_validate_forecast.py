@@ -105,7 +105,7 @@ def test_validate_forecast_no_fluctuations():
     os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "500"
     national_capacity = 2000
     national_forecast_values = pd.Series(
-        [1000, 1100, 1050, 1200, 1150], index=pd.date_range(start="2025-01-01 00:00",  periods=5, freq="30mins") 
+        [1000, 1100, 1050, 1200, 1150], index=pd.date_range(start="2025-01-01 00:00",  periods=5, freq="30min")
     )  # MW
 
     # No warnings or exceptions expected
@@ -161,37 +161,11 @@ def test_validate_forecast_sun_elevation_check():
     sun_elevation_lower_limit = float(os.getenv("SUN_ELEVATION_LOWER_LIMIT", 10))
 
     # Create a time range for the test
-    time_range = pd.date_range("2025-01-01 06:00", "2025-01-01 18:00", freq="30T", tz="UTC")
+    time_range = pd.date_range("2025-01-01 06:00", "2025-01-01 18:00", freq="30min", tz="UTC")
 
     # Create forecast values (some values are ≤ 0 to trigger the exception)
     forecast_values = pd.Series(
-        [
-            0,
-            50,
-            100,
-            -1,
-            75,
-            0,
-            20,
-            0,
-            90,
-            -5,
-            60,
-            10,
-            0,
-            85,
-            100,
-            -3,
-            50,
-            30,
-            40,
-            70,
-            0,
-            -2,
-            55,
-            60,
-            70,
-        ],
+        [0, 50, 100, -1, 75] * 5,
         index=time_range,
     )
 
