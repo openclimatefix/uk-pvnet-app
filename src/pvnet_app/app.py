@@ -4,7 +4,6 @@ import logging
 import os
 import tempfile
 import warnings
-from datetime import timedelta
 from importlib.metadata import PackageNotFoundError, version
 
 import dask
@@ -109,8 +108,25 @@ def save_batch_to_s3(batch, model_name, s3_directory):
             )
 
 
+
+def get_boolean_env_var(env_var: str, default: bool) -> bool:
+    """Get a boolean environment variable.
+
+    Args:
+        env_var: The name of the environment variable.
+        default: The default value to use if the environment variable is not set.
+
+    Returns:
+        The boolean value of the environment variable.
+    """
+    if env_var in os.environ:
+        return os.getenv(env_var).lower() == "true"
+    else:
+        return default
+
+
 def app(
-    t0=None,
+    t0=None | pd.Timestamp,
     gsp_ids: list[int] = all_gsp_ids,
     write_predictions: bool = True,
     num_workers: int = -1,
@@ -149,10 +165,14 @@ def app(
         # Without this line the dataloader will hang if multiple workers are used
         dask.config.set(scheduler="single-threaded")
 
-    use_day_ahead_model = os.getenv("DAY_AHEAD_MODEL", "false").lower() == "true"
-    use_ecmwf_only = os.getenv("USE_ECMWF_ONLY", "false").lower() == "true"
-    run_extra_models = os.getenv("RUN_EXTRA_MODELS", "false").lower() == "true"
-    use_ocf_data_sampler = os.getenv("USE_OCF_DATA_SAMPLER", "true").lower() == "true"
+    assert len(gsp_ids)>0, "No GSP IDs provided"
+
+    use_day_ahead_model = get_boolean_env_var("DAY_AHEAD_MODEL", default=False)
+    use_ecmwf_only = get_boolean_env_var("USE_ECMWF_ONLY", default=False)
+    run_extra_models = get_boolean_env_var("RUN_EXTRA_MODELS", default=False)
+    use_ocf_data_sampler = get_boolean_env_var("USE_OCF_DATA_SAMPLER", default=True)
+    use_adjuster = get_boolean_env_var("USE_ADJUSTER", default=True)
+    save_gsp_sum = get_boolean_env_var("SAVE_GSP_SUM", default=False)
 
     logger.info(f"Using `pvnet` library version: {__pvnet_version__}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
@@ -161,8 +181,9 @@ def app(
     logger.info(f"Using ecmwf only: {use_ecmwf_only}")
     logger.info(f"Running extra models: {run_extra_models}")
 
-    # load models
     model_configs = get_all_models(
+        allow_use_adjuster=use_adjuster,
+        allow_save_gsp_sum=save_gsp_sum,
         get_ecmwf_only=use_ecmwf_only,
         get_day_ahead_only=use_day_ahead_model,
         run_extra_models=run_extra_models,
@@ -177,12 +198,9 @@ def app(
     # ---------------------------------------------------------------------------
     # 0. If inference datetime is None, round down to last 30 minutes
     if t0 is None:
-        t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor(timedelta(minutes=30))
+        t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor("30min")
     else:
-        t0 = pd.to_datetime(t0).floor(timedelta(minutes=30))
-
-    if len(gsp_ids) == 0:
-        gsp_ids = all_gsp_ids
+        t0 = t0.floor("30min")
 
     logger.info(f"Making forecast for init time: {t0}")
     logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
@@ -319,9 +337,7 @@ def app(
     # Escape clause for making predictions locally
     if not write_predictions:
         temp_dir.cleanup()
-        if not use_day_ahead_model:
-            return forecast_compilers["pvnet_v2"].da_abs_all
-        return forecast_compilers["pvnet_day_ahead"].da_abs_all
+        return forecast_compilers[0].da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to database
@@ -333,9 +349,7 @@ def app(
 
     temp_dir.cleanup()
     logger.info("Finished forecast")
-
-def main():
-    typer.run(app)
+    
 
 if __name__ == "__main__":
-    main()
+    typer.run(app)
