@@ -46,7 +46,9 @@ def test_app_ecwmf_only(test_t0, db_session, nwp_ecmwf_data, db_url):
 
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run
-    all_models = get_all_models(get_ecmwf_only=True)
+    all_models = get_all_models(get_ecmwf_only=True, use_ocf_data_sampler=False)
+
+    assert len(all_models)==1
 
     # Check correct number of forecasts have been made
     # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
