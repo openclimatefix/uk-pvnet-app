@@ -5,17 +5,20 @@ from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
 import pandas as pd
-import torch
 import xarray as xr
+import torch
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
 from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
-from ocf_datapipes.batch import BatchKey, NumpyBatch, NWPBatchKey
+from ocf_datapipes.batch import (
+    BatchKey, NumpyBatch, NWPBatchKey, batch_to_tensor, copy_batch_to_device
+)
 from ocf_datapipes.utils.consts import ELEVATION_MEAN, ELEVATION_STD
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
+
 
 from pvnet_app.model_configs.pydantic_models import Model
 from pvnet_app.validate_forecast import validate_forecast
@@ -138,10 +141,12 @@ class ForecastCompiler:
         if self.verbose:
             logger.info(message)
 
+    @torch.no_grad
     def predict_batch(self, batch: NumpyBatch) -> None:
         """Make predictions for a batch and store results internally"""
-        self.log_info(
-            f"Predicting for model: {self.model_name}-{self.model_version}")
+        self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
+
+        batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
         if not self.use_legacy:
             change_keys_to_ocf_datapipes_keys(batch)
@@ -191,6 +196,7 @@ class ForecastCompiler:
         self.log_info(f"GSP IDs: {these_gsp_ids}")
         self.log_info(f"Max prediction: {np.max(preds, axis=1)}")
 
+    @torch.no_grad
     def compile_forecasts(self) -> None:
         """Compile all forecasts internally in a single DataArray
 

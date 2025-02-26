@@ -15,7 +15,6 @@ import typer
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
-from ocf_datapipes.batch import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.config import get_union_of_configs, save_yaml_config
@@ -28,7 +27,7 @@ from pvnet_app.data.satellite import (
     download_all_sat_data,
     preprocess_sat_data,
 )
-from pvnet_app.dataloader import get_dataloader, get_legacy_dataloader
+from pvnet_app.dataloader import get_dataloader
 from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
@@ -39,9 +38,26 @@ except PackageNotFoundError:
     __version__ = "v?"
     __pvnet_version__ = "v?"
 
-# sentry
+# ---------------------------------------------------------------------------
+# LOGGING AND SENTRY
+
+# Create a logger
+logging.basicConfig(
+    level=getattr(logging, os.getenv("LOGLEVEL", "DEBUG")),
+    format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
+)
+logger = logging.getLogger()
+
+# Get rid of the verbose sqlalchemy logs
+logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
+# Turn off logs from aiobotocore
+logging.getLogger("aiobotocore").setLevel(logging.ERROR)  
+
+# Sentry
 sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"), environment=os.getenv("ENVIRONMENT", "local"), traces_sample_rate=1,
+    dsn=os.getenv("SENTRY_DSN"), 
+    environment=os.getenv("ENVIRONMENT", "local"), 
+    traces_sample_rate=1,
 )
 
 sentry_sdk.set_tag("app_name", "pvnet_app")
@@ -58,27 +74,6 @@ all_gsp_ids = list(range(1, 318))
 
 # Batch size used to make forecasts for all GSPs
 batch_size = 10
-
-# ---------------------------------------------------------------------------
-# LOGGER
-
-
-class SQLAlchemyFilter(logging.Filter):
-    def filter(self, record):
-        return "sqlalchemy" not in record.pathname
-
-
-# Create a logger
-logging.basicConfig(
-    level=getattr(logging, os.getenv("LOGLEVEL", "DEBUG")),
-    format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
-)
-logger = logging.getLogger()
-
-# Get rid of the verbose sqlalchemy logs
-logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
-# Turn off logs from aiobotocore
-logging.getLogger("aiobotocore").setLevel(logging.ERROR)  
 
 # ---------------------------------------------------------------------------
 # APP MAIN
@@ -126,29 +121,12 @@ def get_boolean_env_var(env_var: str, default: bool) -> bool:
 
 
 def app(
-    t0=None | pd.Timestamp,
+    t0: None | pd.Timestamp = None,
     gsp_ids: list[int] = all_gsp_ids,
     write_predictions: bool = True,
     num_workers: int = -1,
 ):
-    """Inference function for production
-
-    This app expects these environmental variables to be available:
-        - DB_URL
-        - NWP_UKV_ZARR_PATH
-        - NWP_ECMWF_ZARR_PATH
-        - SATELLITE_ZARR_PATH
-    The following are options
-        - PVNET_V2_VERSION, pvnet version, default is a version above
-        - PVNET_V2_SUMMATION_VERSION, the pvnet version, default is above
-        - USE_ADJUSTER, option to use adjuster, defaults to true
-        - SAVE_GSP_SUM, option to save gsp sum for pvnet_v2, defaults to false
-        - RUN_EXTRA_MODELS, option to run extra models, defaults to false
-        - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
-        - SENTRY_DSN, optional link to sentry
-        - ENVIRONMENT, the environment this is running in, defaults to local
-        - USE_ECMWF_ONLY, option to use ecmwf only model, defaults to false
-        - USE_OCF_DATA_SAMPLER, option to use ocf_data_sampler, defaults to true
+    """Inference function to run PVNet.
 
     Args:
         t0 (datetime): Datetime at which forecast is made
@@ -158,29 +136,63 @@ def app(
             DataArray for local testing.
         num_workers (int): Number of workers to use to load batches of data. When set to default
             value of -1, it will use one less than the number of CPU cores workers.
+
+    This app expects these environmental variables to be available:
+        - DB_URL
+        - NWP_UKV_ZARR_PATH
+        - NWP_ECMWF_ZARR_PATH
+        - SATELLITE_ZARR_PATH
+    The following are options
+        - SENTRY_DSN, optional link to sentry
+        - ENVIRONMENT, the environment this is running in, defaults to local
+        - USE_ADJUSTER, option to use adjuster, defaults to true
+        - SAVE_GSP_SUM, option to save gsp sum for pvnet_v2, defaults to false
+        - RUN_EXTRA_MODELS, option to run extra models, defaults to false
+        - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
+        - USE_ECMWF_ONLY, option to use ecmwf only model, defaults to false
+        - USE_OCF_DATA_SAMPLER, option to use ocf_data_sampler, defaults to true
     """
+
+    # ---------------------------------------------------------------------------
+    # 0. Basic set up
+
+    # If inference datetime is None, round down to last 30 minutes
+    if t0 is None:
+        t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor("30min")
+    else:
+        t0 = t0.floor("30min")
+
+    assert len(gsp_ids)>0, "No GSP IDs provided"
+
     if num_workers == -1:
         num_workers = os.cpu_count() - 1
     if num_workers > 0:
         # Without this line the dataloader will hang if multiple workers are used
         dask.config.set(scheduler="single-threaded")
 
-    assert len(gsp_ids)>0, "No GSP IDs provided"
-
+    # Unpack the environment variables
     use_day_ahead_model = get_boolean_env_var("DAY_AHEAD_MODEL", default=False)
     use_ecmwf_only = get_boolean_env_var("USE_ECMWF_ONLY", default=False)
     run_extra_models = get_boolean_env_var("RUN_EXTRA_MODELS", default=False)
     use_ocf_data_sampler = get_boolean_env_var("USE_OCF_DATA_SAMPLER", default=True)
     use_adjuster = get_boolean_env_var("USE_ADJUSTER", default=True)
     save_gsp_sum = get_boolean_env_var("SAVE_GSP_SUM", default=False)
+    db_url = os.getenv("DB_URL")
+    batch_s3_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
 
+    # Log version and variables
     logger.info(f"Using `pvnet` library version: {__pvnet_version__}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
+    logger.info(f"Making forecast for init time: {t0}")
+    logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using day ahead model: {use_day_ahead_model}")
     logger.info(f"Using ecmwf only: {use_ecmwf_only}")
     logger.info(f"Running extra models: {run_extra_models}")
+    logger.info(f"Using adjuster: {use_adjuster}")
+    logger.info(f"Saving GSP sum: {save_gsp_sum}")
 
+    # Get the model configurations
     model_configs = get_all_models(
         allow_use_adjuster=use_adjuster,
         allow_save_gsp_sum=save_gsp_sum,
@@ -190,33 +202,22 @@ def app(
         use_ocf_data_sampler=use_ocf_data_sampler,
     )
 
-    logger.info(f"Using adjuster: {model_configs[0].use_adjuster}")
-    logger.info(f"Saving GSP sum: {model_configs[0].save_gsp_sum}")
+    # Open connection to the database - used for pulling GSP capacitites and writing forecasts
+    db_connection = DatabaseConnection(url=db_url, base=Base_Forecast, echo=False)
 
     temp_dir = tempfile.TemporaryDirectory()
-
-    # ---------------------------------------------------------------------------
-    # 0. If inference datetime is None, round down to last 30 minutes
-    if t0 is None:
-        t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor("30min")
-    else:
-        t0 = t0.floor("30min")
-
-    logger.info(f"Making forecast for init time: {t0}")
-    logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
 
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
     # Get capacities from the database
     logger.info("Loading capacities from the database")
-
-    db_connection = DatabaseConnection(url=os.getenv("DB_URL"), base=Base_Forecast, echo=False)
     gsp_capacities, national_capacity = get_gsp_and_national_capacities(
         db_connection=db_connection,
         gsp_ids=gsp_ids,
         t0=t0,
     )
+
     # Download satellite data
     logger.info("Downloading satellite data")
     sat_available = download_all_sat_data()
@@ -285,46 +286,29 @@ def app(
     # Set up data loader
     logger.info("Creating DataLoader")
 
-    if not use_ocf_data_sampler:
-        logger.info("Making OCF datapipes dataloader")
-        # The current day ahead model uses the legacy dataloader
-        dataloader = get_legacy_dataloader(
-            config_filename=common_config_path,
-            t0=t0,
-            gsp_ids=gsp_ids,
-            batch_size=batch_size,
-            num_workers=num_workers,
-        )
-
-    else:
-        logger.info("Making OCF Data Sampler dataloader")
-        dataloader = get_dataloader(
-            config_filename=common_config_path,
-            t0=t0,
-            gsp_ids=gsp_ids,
-            batch_size=batch_size,
-            num_workers=num_workers,
-        )
+    dataloader = get_dataloader(
+        config_filename=common_config_path,
+        t0=t0,
+        gsp_ids=gsp_ids,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        db_url=db_url,
+        use_data_sampler=use_ocf_data_sampler,
+    )
 
     # ---------------------------------------------------------------------------
     # Make predictions
     logger.info("Processing batches")
 
-    s3_directory = os.getenv("SAVE_BATCHES_DIR", None)
+    for i, batch in enumerate(dataloader):
+        logger.info(f"Predicting for batch: {i}")
 
-    with torch.no_grad():
-        for i, batch in enumerate(dataloader):
-            logger.info(f"Predicting for batch: {i}")
+        if (batch_s3_save_dir is not None) and i == 0:
+            model_name = next(iter(forecast_compilers))
+            save_batch_to_s3(batch, model_name, s3_directory) 
 
-            if s3_directory and i == 0:
-                model_name = list(forecast_compilers.keys())[0]
-                
-                save_batch_to_s3(batch, model_name, s3_directory) 
-
-            for forecast_compiler in forecast_compilers.values():
-                # need to do copy the batch for each model, as a model might change the batch
-                device_batch = copy_batch_to_device(batch_to_tensor(batch), device)
-                forecast_compiler.predict_batch(device_batch)
+        for forecast_compiler in forecast_compilers.values():
+            forecast_compiler.predict_batch(batch)
 
     # ---------------------------------------------------------------------------
     # Merge batch results to xarray DataArray
@@ -336,8 +320,7 @@ def app(
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
-        temp_dir.cleanup()
-        return forecast_compilers[0].da_abs_all
+        return next(iter(forecast_compilers.values())).da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to database
@@ -347,7 +330,6 @@ def app(
         for forecast_compiler in forecast_compilers.values():
             forecast_compiler.log_forecast_to_database(session=session)
 
-    temp_dir.cleanup()
     logger.info("Finished forecast")
     
 

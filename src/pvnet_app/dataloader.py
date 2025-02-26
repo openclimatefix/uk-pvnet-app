@@ -17,7 +17,7 @@ from torch.utils.data.datapipes.iter import IterableWrapper
 from pvnet_app.config import modify_data_config_for_production
 
 
-def get_dataloader(
+def get_data_sampler_dataloader(
     config_filename: str,
     t0: pd.Timestamp,
     gsp_ids: list[int],
@@ -28,9 +28,11 @@ def get_dataloader(
     # Populate the data config with production data paths
     modified_data_config_filename = Path(config_filename).parent / "data_config.yaml"
 
-    modify_data_config_for_production(input_path=config_filename,
-                                      output_path=modified_data_config_filename,
-                                      reformat_config=True)
+    modify_data_config_for_production(
+        input_path=config_filename,
+        output_path=modified_data_config_filename,
+        reformat_config=True
+    )
 
     dataset = PVNetUKRegionalDataset(
         config_filename=modified_data_config_filename,
@@ -62,12 +64,13 @@ def legacy_squeeze(batch):
     return batch
 
 
-def get_legacy_dataloader(
+def get_datapipes_dataloader(
     config_filename: str,
     t0: pd.Timestamp,
     gsp_ids: list[int],
     batch_size: int,
     num_workers: int,
+    db_url: str,
 ):
 
     # Populate the data config with production data paths
@@ -76,7 +79,7 @@ def get_legacy_dataloader(
     modify_data_config_for_production(
         config_filename,
         populated_data_config_filename,
-        gsp_path=os.environ["DB_URL"],
+        gsp_path=db_url,
     )
 
     # Get gsp shape file, go get the osgb coorindates
@@ -130,3 +133,33 @@ def get_legacy_dataloader(
     )
 
     return DataLoader(batch_datapipe, **dataloader_kwargs)
+
+
+def get_dataloader(
+    config_filename: str,
+    t0: pd.Timestamp,
+    gsp_ids: list[int],
+    batch_size: int,
+    num_workers: int,
+    db_url: str | None,
+    use_data_sampler: bool,
+):
+    
+
+    if use_data_sampler:
+        return get_data_sampler_dataloader(
+            config_filename=config_filename, 
+            t0=t0, 
+            gsp_ids=gsp_ids, 
+            batch_size=batch_size, 
+            num_workers=num_workers
+        )
+    else:
+        return get_datapipes_dataloader(
+            config_filename=config_filename, 
+            t0=t0, 
+            gsp_ids=gsp_ids, 
+            batch_size=batch_size, 
+            num_workers=num_workers,
+            db_url=db_url,
+        )
