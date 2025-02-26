@@ -22,13 +22,12 @@ The following environment variables are used in the app:
 
 ### Optional Environment Variables
 
-- `PVNET_V2_VERSION`: The version of the PVNet V2 model to use. Default is a version above.
+- `SENTRY_DSN`: Optional link to Sentry.
+- `ENVIRONMENT`: The environment this is running in. Defaults to local.
 - `USE_ADJUSTER`: Option to use adjuster. Defaults to true.
 - `SAVE_GSP_SUM`: Option to save GSP sum for PVNet V2. Defaults to false.
 - `RUN_EXTRA_MODELS`: Option to run extra models. Defaults to false.
 - `DAY_AHEAD_MODEL`: Option to use day ahead model. Defaults to false.
-- `SENTRY_DSN`: Optional link to Sentry.
-- `ENVIRONMENT`: The environment this is running in. Defaults to local.
 - `USE_ECMWF_ONLY`: Option to use ECMWF only model. Defaults to false.
 - `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
 - `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250 MW.
@@ -43,7 +42,6 @@ export DB_URL="postgresql://user:password@localhost:5432/dbname"
 export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
 export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
 export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
-export PVNET_V2_VERSION="v2.0.0"
 export USE_ADJUSTER="true"
 export SAVE_GSP_SUM="false"
 export RUN_EXTRA_MODELS="false"

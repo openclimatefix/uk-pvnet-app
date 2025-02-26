@@ -142,7 +142,7 @@ def app(
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
         - SATELLITE_ZARR_PATH
-    The following are options
+    The following are optional:
         - SENTRY_DSN, optional link to sentry
         - ENVIRONMENT, the environment this is running in, defaults to local
         - USE_ADJUSTER, option to use adjuster, defaults to true
@@ -151,6 +151,10 @@ def app(
         - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
         - USE_ECMWF_ONLY, option to use ecmwf only model, defaults to false
         - USE_OCF_DATA_SAMPLER, option to use ocf_data_sampler, defaults to true
+        - FORECAST_VALIDATE_ZIG_ZAG_WARNING, threshold for forecast zig-zag warning,
+          defaults to 250 MW.
+        - FORECAST_VALIDATE_ZIG_ZAG_ERROR, threshold for forecast zig-zag error on,
+          defaults to 500 MW.
     """
 
     # ---------------------------------------------------------------------------
@@ -177,7 +181,8 @@ def app(
     use_ocf_data_sampler = get_boolean_env_var("USE_OCF_DATA_SAMPLER", default=True)
     use_adjuster = get_boolean_env_var("USE_ADJUSTER", default=True)
     save_gsp_sum = get_boolean_env_var("SAVE_GSP_SUM", default=False)
-    db_url = os.getenv("DB_URL")
+    
+    db_url = os.environ["DB_URL"] # Will raise KeyError if not set
     batch_s3_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
 
     # Log version and variables
@@ -320,7 +325,7 @@ def app(
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
-        return next(iter(forecast_compilers.values())).da_abs_all
+        return forecast_compilers[0].da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to database
