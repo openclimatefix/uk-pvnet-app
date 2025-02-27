@@ -143,6 +143,9 @@ def fix_ukv_data():
 def preprocess_nwp_data():
 
     if os.path.exists(nwp_ukv_path):
+
+        rename_ukv_variables()
+
         # Regrid the UKV data
         regrid_nwp_data(
             nwp_zarr=nwp_ukv_path,
@@ -152,7 +155,6 @@ def preprocess_nwp_data():
 
         # UKV data must be float16 to allow overflow to inf like in training
         fix_ukv_data()
-
 
     if os.path.exists(nwp_ecmwf_path):
 
@@ -223,6 +225,58 @@ def rename_ecmwf_variables():
         # save back to path
         shutil.rmtree(nwp_ecmwf_path, ignore_errors=True)
         d.to_zarr(nwp_ecmwf_path)
+
+
+def rename_ukv_variables():
+    d = xr.open_zarr(nwp_ukv_path)
+
+    # if um-ukv is in the datavars, then this comes from the new new-consuerm
+    # We need to rename the data variables, and
+    # load in lat and lon, ready for regridding later.
+    if 'um-ukv' in d.data_vars:
+
+        logger.info("Renaming the UKV variables")
+
+        # rename to UKV
+        d = d.rename({"um-ukv": "UKV"})
+
+        variable_coords = d.variable.values
+        rename = {"cloud_cover_high": "hcc",
+                  "cloud_cover_low": "lcc",
+                  "cloud_cover_medium": "mcc",
+                  "cloud_cover_total": "tcc",
+                  "snow_depth_gl": "sde",
+                  "direct_shortwave_radiation_flux_gl": "sr",
+                  "downward_longwave_radiation_flux_gl": "dlwrf",
+                  "downward_shortwave_radiation_flux_gl": "dswrf",
+                  "downward_ultraviolet_radiation_flux_gl": "duvrs",
+                  "relative_humidity_sl": "r",
+                  "temperature_sl": "t",
+                  "total_precipitation_rate_gl": "prate",
+                  "visibility_sl": "vis",
+                  "wind_direction_10m": "wdir10",
+                  "wind_speed_10m": "si10",
+                  "wind_v_component_10m": "v10",
+                  "wind_u_component_10m": "u10"}
+
+        for k, v in rename.items():
+            variable_coords[variable_coords == k] = v
+
+        # assign the new variable names
+        d = d.assign_coords(variable=variable_coords)
+
+        # this is all taken from the metoffice website, apart from the x and y values
+        lat = xr.open_dataset(files("pvnet_app.data").joinpath("nwp-consumer-mo-ukv-lat.nc"))
+        lon = xr.open_dataset(files("pvnet_app.data").joinpath("nwp-consumer-mo-ukv-lon.nc"))
+
+        # combine with d
+        d = d.assign_coords(latitude=lat.latitude)
+        d = d.assign_coords(longitude=lon.longitude)
+        d = d.compute()
+
+        # save back to path
+        shutil.rmtree(nwp_ukv_path, ignore_errors=True)
+        d.to_zarr(nwp_ukv_path)
 
 
 def check_model_nwp_inputs_available(
@@ -300,3 +354,4 @@ def check_model_nwp_inputs_available(
                         )
 
     return available
+
