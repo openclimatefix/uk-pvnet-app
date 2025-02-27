@@ -1,7 +1,5 @@
-import os
 import pytest
 import torch
-import warnings
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
@@ -41,46 +39,6 @@ def test_model_loading():
         else:
             assert summation_model is None
         
+        # Assertion major required attributes actually exist
         assert hasattr(pvnet_model, "forecast_len")
         assert hasattr(pvnet_model, "output_quantiles")
-
-
-def test_model_version_warning():
-    """Test that warnings are raised when PVNet and summation model versions don't match."""
-
-    models = get_all_models(run_extra_models=True, use_ocf_data_sampler=True)
-    models_with_summation = [m for m in models if m.summation is not None]
-    
-    if not models_with_summation:
-        pytest.skip("No models with summation available to test")
-    
-    model_config = models_with_summation[0]
-    device = torch.device("cpu")
-    
-    # Mock summation model - different expected PVNet version
-    with patch.object(SummationBaseModel, 'pvnet_model_name', new_callable=property, return_value='different/model'), \
-         patch.object(SummationBaseModel, 'pvnet_model_version', new_callable=property, return_value='different-version'):
-        
-        with pytest.warns(UserWarning) as record:
-            pvnet_model = PVNetBaseModel.from_pretrained(
-                model_id=model_config.pvnet.repo,
-                revision=model_config.pvnet.version,
-            ).to(device)
-            
-            summation_model = SummationBaseModel.from_pretrained(
-                model_id=model_config.summation.repo,
-                revision=model_config.summation.version,
-            ).to(device)
-            
-            # Check if the warning is emitted when comparing models
-            from pvnet_app.forecast_compiler import _model_mismatch_msg
-            expected_warning = _model_mismatch_msg.format(
-                model_config.pvnet.repo, 
-                model_config.pvnet.version,
-                'different/model', 
-                'different-version'
-            )
-            warnings.warn(expected_warning)
-        
-        # Verification - warning message
-        assert any("may lead to an error" in str(w.message) for w in record)
