@@ -1,8 +1,6 @@
 import os
 import tempfile
-from datetime import timedelta
 
-import pandas as pd
 from ocf_data_sampler.config import load_yaml_configuration
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 

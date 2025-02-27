@@ -24,17 +24,14 @@ def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_
 
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables
-        temp_nwp_path = "temp_nwp_ukv.zarr"
-        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path =  "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = "temp_nwp_ecmwf.zarr"
-        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         # In production sat zarr is zipped
-        temp_sat_path = "temp_sat.zarr.zip"
-        os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
+        os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path = "temp_sat.zarr.zip"
         with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
             sat_5_data_zero_delay.to_zarr(store)
 

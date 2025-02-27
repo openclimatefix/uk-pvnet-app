@@ -112,7 +112,7 @@ def populate_db_session_with_input_data(session, test_t0):
 
 def make_nwp_data(shell_path, varname, test_t0):
     # Load dataset which only contains coordinates, but no data
-    ds = xr.open_zarr(shell_path)
+    ds = xr.open_zarr(shell_path).compute()
 
     # Last init time was at least 8 hours ago and floor to 3-hour interval
     t0_datetime_utc = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
@@ -170,7 +170,7 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(
         f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr",
-    )
+    ).compute()
 
     # Remove time dim and expand time dim to be len 36 = 3 hours of 5 minute data
     ds = ds.drop_vars("time")
