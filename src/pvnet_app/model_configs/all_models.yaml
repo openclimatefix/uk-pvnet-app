@@ -8,7 +8,7 @@ models:
         version: f3135c47eb0f21320dbd8c590bdd03dfafc39bca
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 8934ff871b39d528448040dca82722a6ab4680cd
+        version: 01ca2b6e37a71deb446bb90471b44a1851d3e43f
     use_adjuster: True
     save_gsp_sum: False
     verbose: True
@@ -20,7 +20,7 @@ models:
         version: d81a9cf8adca49739ea6a3d031e36510f44744a1
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 74bd8005fe752946655ace879dda81d3c04093dc
+        version: 7057e8c2baa065aa4024dd6b6381b71ac4879c87
 
     # single source models
   - name: pvnet_v2-sat0-only-samples-v1"
@@ -29,7 +29,7 @@ models:
       version: 158f9aeb006dddc10ef67612a91e7175a87b8dd0
     summation:
       repo: openclimatefix/pvnet_v2_summation
-      version: 4745de8a855dec9048b835c82750caf16221c8e0
+      version: c5371880120503646327dc2df2da2698de82982e
 
   - name: pvnet_v2-ukv-only-samples-v1
     pvnet:
@@ -37,7 +37,7 @@ models:
         version: 4009df82e63e30546e2000728bff34b9c0520617
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 5fc3ea16be141df38b2fad8c11a524243e9b8555
+        version: 1789cd9bdaded3896587efd54d3e9a257762fb63
     uses_satellite_data: False
 
   - name: pvnet_ecmwf # this name is important as it used for blending
@@ -46,7 +46,7 @@ models:
         version: 20b882bd4ceaee190a1c994d861f8e5d553ea843
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: ce87d0f4d7c0d8def2d404fa079ee834ef527023
+        version: b40867abbc2e5163c9a665daf511cbf372cc5ac9
     ecmwf_only: True
     uses_satellite_data: False
 # This is the old model for pvnet and pvnet_ecmwf
@@ -93,7 +93,7 @@ models:
         version: 263741ebb6b71559d113d799c9a579a973cc24ba
     summation:
         repo: openclimatefix/pvnet_summation_uk_national_day_ahead
-        version: b3cd41ff08afde1fa9269d1ad0fbdf9c5b62df23
+        version: eb90059f46fa78f9aa726407c6fcefc5d82b6ab7
     use_adjuster: True
     save_gsp_sum: True
     verbose: True
