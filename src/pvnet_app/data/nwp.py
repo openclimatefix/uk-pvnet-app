@@ -290,7 +290,7 @@ class ECMWFDownloader(NWPDownloader):
                 "wind_v_component_100m": "v100",
                 "wind_v_component_10m": "v10",
                 "wind_v_component_200m": "v200"
-                }
+            }
 
             for k, v in rename.items():
                 variable_coords[variable_coords == k] = v

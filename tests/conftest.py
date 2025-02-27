@@ -157,7 +157,7 @@ def nwp_ukv_data(test_t0):
 def nwp_ecmwf_data(test_t0):
     return make_nwp_data(
         shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ecmwf_shell.zarr",
-        varname="ECMWF_UK",
+        varname="HRES-IFS_uk",
         test_t0=test_t0,
     )
 
