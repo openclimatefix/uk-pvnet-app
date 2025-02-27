@@ -1,6 +1,5 @@
 """A pydantic model for the ML models"""
 import logging
-import os
 from importlib.resources import files
 
 import fsspec
