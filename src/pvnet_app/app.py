@@ -84,15 +84,11 @@ def save_batch_to_s3(batch, model_name, s3_directory):
     try:
         fs = fsspec.open(s3_directory).fs
         fs.put(save_batch, f"{s3_directory}/{save_batch}")
-        logger.info(
-            f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}",
-        )
+        logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}")
         os.remove(save_batch)
         logger.info("Removed local copy of batch")
     except Exception as e:
-        logger.error(
-            f"Failed to save batch to {s3_directory}/{save_batch} with error {e}",
-            )
+        logger.error(f"Failed to save batch to {s3_directory}/{save_batch} with error {e}")
 
 
 

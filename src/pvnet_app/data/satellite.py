@@ -434,6 +434,10 @@ class SatelliteDownloader:
             "variable": -1,
         }
 
+        # Clear old encoding
+        for v in list(ds.variables.keys()):
+            ds[v].encoding.clear()
+
         ds.chunk(save_chunk_dict).to_zarr(self.destination_path)
 
 
@@ -451,7 +455,7 @@ class SatelliteDownloader:
         ds = self.choose_and_load_satellite_data()
         
         if self.data_is_okay(ds):
-            ds = self.process(ds)
+            ds = self.process(ds).compute()
             self.resave(ds)
 
         else:
