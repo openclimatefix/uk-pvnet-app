@@ -93,7 +93,7 @@ models:
         version: 263741ebb6b71559d113d799c9a579a973cc24ba
     summation:
         repo: openclimatefix/pvnet_summation_uk_national_day_ahead
-        version: 765a377cf2c10fa8374f123d9b5a6ca4bf98d5e3
+        version: 7a2f26b94ac261160358b224944ef32998bd60ce
     use_adjuster: True
     save_gsp_sum: True
     verbose: True
