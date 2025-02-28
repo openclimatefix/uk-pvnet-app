@@ -24,7 +24,7 @@ def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_
 
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables
-        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path =  "temp_nwp_ukv.zarr"
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
@@ -88,12 +88,10 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
 
         os.environ["DB_URL"] = db_url
 
-        temp_nwp_path = "temp_nwp_ukv.zarr"
-        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = "temp_nwp_ecmwf.zarr"
-        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         # There is no satellite data available at the environ path
@@ -157,12 +155,10 @@ def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf
 
         os.environ["DB_URL"] = db_url
 
-        temp_nwp_path = "temp_nwp_ukv.zarr"
-        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = "temp_nwp_ecmwf.zarr"
-        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         os.environ["SATELLITE_ZARR_PATH"] = "nonexistent_sat.zarr.zip"
