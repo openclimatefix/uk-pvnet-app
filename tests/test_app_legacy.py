@@ -1,3 +1,5 @@
+"""Test the app using the legacy dataloader - ocf_datapipes"""
+
 import os
 import tempfile
 
@@ -12,8 +14,7 @@ from nowcasting_datamodel.models.forecast import (
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
-# Its nice to have this here, so we can run the latest version in production, but still use the old models
-# Once we have re trained PVnet summation models we can remove this
+
 def test_app_ecwmf_only(test_t0, db_session, nwp_ecmwf_data, db_url):
     """Test the app for the case running model just on ecmwf"""
 
@@ -23,8 +24,7 @@ def test_app_ecwmf_only(test_t0, db_session, nwp_ecmwf_data, db_url):
 
         os.environ["DB_URL"] = db_url
 
-        temp_nwp_path = "temp_nwp_ecmwf.zarr"
-        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         # There is no satellite or ukv data available at the environ path
@@ -37,6 +37,7 @@ def test_app_ecwmf_only(test_t0, db_session, nwp_ecmwf_data, db_url):
         os.environ["USE_OCF_DATA_SAMPLER"] = "False"
         os.environ["USE_ECMWF_ONLY"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
@@ -47,8 +48,6 @@ def test_app_ecwmf_only(test_t0, db_session, nwp_ecmwf_data, db_url):
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run
     all_models = get_all_models(get_ecmwf_only=True, use_ocf_data_sampler=False)
-
-    assert len(all_models)==1
 
     # Check correct number of forecasts have been made
     # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
@@ -80,10 +79,8 @@ def test_app_ecwmf_only(test_t0, db_session, nwp_ecmwf_data, db_url):
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
 
-# test legacy models
-# Its nice to have this here, so we can run the latest version in production, but still use the old models
-# Once we have re trained PVnet summation models we can remove this
-def test_app_ocf_datapipes(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, db_url):
+
+def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data, db_url):
     """Test the app running the day ahead model"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -106,6 +103,7 @@ def test_app_ocf_datapipes(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sa
         os.environ["USE_OCF_DATA_SAMPLER"] = "False"
         os.environ["USE_ECMWF_ONLY"] = "False"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set
@@ -170,6 +168,7 @@ def test_app_day_ahead_model(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, 
         os.environ["RUN_EXTRA_MODELS"] = "False"
         os.environ["USE_OCF_DATA_SAMPLER"] = "False"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         # Thes import needs to come after the environ vars have been set

@@ -148,6 +148,8 @@ def app(
           defaults to 250 MW.
         - FORECAST_VALIDATE_ZIG_ZAG_ERROR, threshold for forecast zig-zag error on,
           defaults to 500 MW.
+        - FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT, when the solar elevation is above this,
+          we expect positive forecast values. Defaults to 10 degrees.
         - FILTER_BAD_FORECASTS, option to filter out bad forecasts. If set to true and the forecast 
           fails the validation checks, it will not be saved. Defaults to false, where all forecasts
           are saved even if they fail the checks.
@@ -181,6 +183,9 @@ def app(
 
     zig_zag_warning_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
     zig_zag_error_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
+    sun_elevation_lower_limit = float(
+        os.getenv('FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT', 10)
+    )
     
     db_url = os.environ["DB_URL"] # Will raise KeyError if not set
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
@@ -348,11 +353,16 @@ def app(
     logger.info("Validating forecasts")
     for k in list(forecast_compilers.keys()):
 
+        natioanl_forecast = (
+            forecast_compilers[k].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
+        ).to_series()
+
         forecast_okay = validate_forecast(
-            national_forecast_values=forecast_compilers[k].da_abs_all.values,
+            national_forecast=natioanl_forecast,
             national_capacity=national_capacity,
             zip_zag_warning_threshold=zig_zag_warning_threshold,
             zig_zag_error_threshold=zig_zag_error_threshold,
+            sun_elevation_lower_limit=sun_elevation_lower_limit,
             model_name=k,
         )
 
