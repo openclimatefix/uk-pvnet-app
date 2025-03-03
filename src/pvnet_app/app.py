@@ -16,13 +16,9 @@ from nowcasting_datamodel.models.base import Base_Forecast
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.config import get_union_of_configs, save_yaml_config
+from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader
 from pvnet_app.data.gsp import get_gsp_and_national_capacities
-from pvnet_app.data.satellite import (
-    check_model_satellite_inputs_available,
-    download_all_sat_data,
-    preprocess_sat_data,
-)
 from pvnet_app.dataloader import get_dataloader
 from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.model_configs.pydantic_models import get_all_models
@@ -65,7 +61,7 @@ sentry_sdk.set_tag("version", __version__)
 # Model will use GPU if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Forecast made for these GSP IDs and summed to national with ID=>0
+# Forecast made for these GSP IDs and summed to national with ID=0
 all_gsp_ids = list(range(1, 318))
 
 # Batch size used to make forecasts for all GSPs
@@ -88,15 +84,11 @@ def save_batch_to_s3(batch, model_name, s3_directory):
     try:
         fs = fsspec.open(s3_directory).fs
         fs.put(save_batch, f"{s3_directory}/{save_batch}")
-        logger.info(
-            f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}",
-        )
+        logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}")
         os.remove(save_batch)
         logger.info("Removed local copy of batch")
     except Exception as e:
-        logger.error(
-            f"Failed to save batch to {s3_directory}/{save_batch} with error {e}",
-            )
+        logger.error(f"Failed to save batch to {s3_directory}/{save_batch} with error {e}")
 
 
 
@@ -111,7 +103,9 @@ def get_boolean_env_var(env_var: str, default: bool) -> bool:
         The boolean value of the environment variable.
     """
     if env_var in os.environ:
-        return os.getenv(env_var).lower() == "true"
+        env_var_value = os.getenv(env_var).lower()
+        assert env_var_value in ["true", "false"]
+        return env_var_value == "true"
     else:
         return default
 
@@ -182,6 +176,10 @@ def app(
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
     ecmwf_source_path = os.getenv("NWP_ECMWF_ZARR_PATH", None)
     ukv_source_path = os.getenv("NWP_UKV_ZARR_PATH", None)
+    sat_source_path_5 = os.getenv("SATELLITE_ZARR_PATH", None)
+    sat_source_path_15 = (
+        None if (sat_source_path_5 is None) else sat_source_path_5.replace(".zarr", "_15.zarr")
+    )
 
     # --- Log version and variables
     logger.info(f"Using `pvnet` library version: {__pvnet_version__}")
@@ -225,13 +223,15 @@ def app(
 
     # --- Download satellite data
     logger.info("Downloading satellite data")
-    sat_available = download_all_sat_data()
+    
+    sat_downloader = SatelliteDownloader(
+        t0=t0,
+        source_path_5=sat_source_path_5,
+        source_path_15=sat_source_path_15,
+        legacy=(not use_ocf_data_sampler), 
+    )
+    sat_downloader.run()
 
-    # Preprocess the satellite data if available and store available timesteps
-    if not sat_available:
-        sat_datetimes = pd.DatetimeIndex([])
-    else:
-        sat_datetimes = preprocess_sat_data(t0, use_legacy=not use_ocf_data_sampler)
 
     # --- Download and process NWP data
     logger.info("Downloading NWP data")
@@ -258,7 +258,7 @@ def app(
         # Check if the data available will allow the model to run
         logger.info(f"Checking that the input data for model '{model_config.name}' exists")
         model_can_run = (
-            check_model_satellite_inputs_available(data_config_path, t0, sat_datetimes)
+            sat_downloader.check_model_inputs_available(data_config_path, t0)
             and ecmwf_downloader.check_model_inputs_available(data_config_path, t0)
             and ukv_downloader.check_model_inputs_available(data_config_path, t0)
         )
@@ -317,6 +317,11 @@ def app(
 
         for forecast_compiler in forecast_compilers.values():
             forecast_compiler.predict_batch(batch)
+
+    # Delete the downloaded data
+    sat_downloader.clean_up()
+    ecmwf_downloader.clean_up()
+    ukv_downloader.clean_up()
 
     # ---------------------------------------------------------------------------
     # Merge batch results to xarray DataArray

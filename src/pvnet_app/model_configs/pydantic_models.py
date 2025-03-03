@@ -38,7 +38,7 @@ class Model(BaseModel):
     )
 
 
-class Models(BaseModel):
+class ModelCollection(BaseModel):
     """A group of ml models"""
 
     models: list[Model] = Field(..., description="A list of models to use for the forecast")
@@ -78,21 +78,21 @@ def get_all_models(
     with fsspec.open(filename, mode="r") as stream:
         try:
             models_dict = parse_config(data=stream)
-            models = Models(**models_dict)
+            model_collection = ModelCollection(**models_dict)
         except Exception as config_error:
             log.error(f"Error parsing model configuration: {config_error}")
             raise config_error
 
     # Override the use_adjuster and save_gsp_sum properties
     if not allow_use_adjuster:
-        for model in models:
+        for model in model_collection.models:
             model.use_adjuster = False
     if not allow_save_gsp_sum:
-        for model in models:
+        for model in model_collection.models:
             model.save_gsp_sum = False
 
     # Filter models
-    filtered_models = models.models.copy()
+    filtered_models = model_collection.models.copy()
 
     if get_ecmwf_only:
         log.info("Filtering for ECMWF model only")

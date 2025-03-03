@@ -91,16 +91,13 @@ def test_app_ocf_datapipes(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sa
 
         os.environ["DB_URL"] = db_url
 
-        temp_nwp_path = "temp_nwp_ukv.zarr"
-        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = "temp_nwp_ecmwf.zarr"
-        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
-        temp_sat_path = "temp_sat.zarr.zip"
-        os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
+        os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path = "temp_sat.zarr.zip"
         with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
             sat_5_data.to_zarr(store)
 
@@ -159,16 +156,13 @@ def test_app_day_ahead_model(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, 
 
         os.environ["DB_URL"] = db_url
 
-        temp_nwp_path = "temp_nwp_ukv.zarr"
-        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = "temp_nwp_ecmwf.zarr"
-        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
-        temp_sat_path = "temp_sat.zarr.zip"
-        os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
+        os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path = "temp_sat.zarr.zip"
         with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
             sat_5_data.to_zarr(store)
 

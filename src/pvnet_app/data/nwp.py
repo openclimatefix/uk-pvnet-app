@@ -204,6 +204,10 @@ class NWPDownloader(ABC):
         self.valid_times = get_nwp_valid_times(ds)
 
         self.resave(ds)
+
+    def clean_up(self) -> None:
+        """Remove the downloaded data"""
+        shutil.rmtree(self.destination_path, ignore_errors=True)
     
     
     def check_model_inputs_available(
