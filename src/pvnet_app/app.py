@@ -61,7 +61,7 @@ sentry_sdk.set_tag("version", __version__)
 # Model will use GPU if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Forecast made for these GSP IDs and summed to national with ID=>0
+# Forecast made for these GSP IDs and summed to national with ID=0
 all_gsp_ids = list(range(1, 318))
 
 # Batch size used to make forecasts for all GSPs
