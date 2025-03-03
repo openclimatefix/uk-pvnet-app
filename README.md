@@ -32,6 +32,8 @@ The following environment variables are used in the app:
 - `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
 - `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250 MW.
 - `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500 MW.
+- `FILTER_BAD_FORECASTS`: If set to true and the forecast fails validation checks, it will not be 
+   saved. Defaults to false, where all forecasts are saved even if they fail the checks.
 
 ### Examples
 
