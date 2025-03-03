@@ -22,12 +22,14 @@ from pvnet_app.data.gsp import get_gsp_and_national_capacities
 from pvnet_app.dataloader import get_dataloader
 from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.model_configs.pydantic_models import get_all_models
+from pvnet_app.data.batch_validation import check_batch
+from pvnet_app.consts import __version__
+from pvnet_app.validate_forecast import validate_forecast
+
 
 try:
-    __version__ = version("pvnet-app")
     __pvnet_version__ = version("pvnet")
 except PackageNotFoundError:
-    __version__ = "v?"
     __pvnet_version__ = "v?"
 
 # ---------------------------------------------------------------------------
@@ -127,8 +129,9 @@ def app(
         num_workers (int): Number of workers to use to load batches of data. When set to default
             value of -1, it will use one less than the number of CPU cores workers.
 
-    This app expects these environmental variables to be available:
+    This app requires these environmental variables to be available:
         - DB_URL
+    These variables are optional depending on the models being run:
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
         - SATELLITE_ZARR_PATH
@@ -145,6 +148,9 @@ def app(
           defaults to 250 MW.
         - FORECAST_VALIDATE_ZIG_ZAG_ERROR, threshold for forecast zig-zag error on,
           defaults to 500 MW.
+        - FILTER_BAD_FORECASTS, option to filter out bad forecasts. If set to true and the forecast 
+          fails the validation checks, it will not be saved. Defaults to false, where all forecasts
+          are saved even if they fail the checks.
     """
 
     # ---------------------------------------------------------------------------
@@ -171,6 +177,10 @@ def app(
     use_ocf_data_sampler = get_boolean_env_var("USE_OCF_DATA_SAMPLER", default=True)
     use_adjuster = get_boolean_env_var("USE_ADJUSTER", default=True)
     save_gsp_sum = get_boolean_env_var("SAVE_GSP_SUM", default=False)
+    filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
+
+    zig_zag_warning_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
+    zig_zag_error_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
     
     db_url = os.environ["DB_URL"] # Will raise KeyError if not set
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
@@ -180,7 +190,7 @@ def app(
     sat_source_path_15 = (
         None if (sat_source_path_5 is None) else sat_source_path_5.replace(".zarr", "_15.zarr")
     )
-
+    
     # --- Log version and variables
     logger.info(f"Using `pvnet` library version: {__pvnet_version__}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
@@ -311,6 +321,9 @@ def app(
     for i, batch in enumerate(dataloader):
         logger.info(f"Predicting for batch: {i}")
 
+        # Do some basic validation of the batch
+        check_batch(batch)
+
         if (s3_batch_save_dir is not None) and i == 0:
             model_name = next(iter(forecast_compilers))
             save_batch_to_s3(batch, model_name, s3_batch_save_dir) 
@@ -324,11 +337,34 @@ def app(
     ukv_downloader.clean_up()
 
     # ---------------------------------------------------------------------------
-    # Merge batch results to xarray DataArray
+    # Merge batch results to xarray DataArray and make national forecast
     logger.info("Processing raw predictions to DataArray")
 
     for forecast_compiler in forecast_compilers.values():
         forecast_compiler.compile_forecasts()
+
+    # ---------------------------------------------------------------------------
+    # Run validation checks on the forecast values
+    logger.info("Validating forecasts")
+    for k in list(forecast_compilers.keys()):
+
+        forecast_okay = validate_forecast(
+            national_forecast_values=forecast_compilers[k].da_abs_all.values,
+            national_capacity=national_capacity,
+            zip_zag_warning_threshold=zig_zag_warning_threshold,
+            zig_zag_error_threshold=zig_zag_error_threshold,
+            model_name=k,
+        )
+
+        if not forecast_okay:
+            logger.warning(f"Forecast for model {k} failed validation")
+            if filter_bad_forecasts:
+                # This forecast will not be saved
+                del forecast_compilers[k]
+
+    if len(forecast_compilers) == 0:
+        raise Exception("No models passed the forecast validation checks")
+
 
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
