@@ -22,18 +22,29 @@ The following environment variables are used in the app:
 
 ### Optional Environment Variables
 
-- `SENTRY_DSN`: Optional link to Sentry.
-- `ENVIRONMENT`: The environment this is running in. Defaults to local.
-- `USE_ADJUSTER`: Option to use adjuster. Defaults to true.
-- `SAVE_GSP_SUM`: Option to save GSP sum for PVNet V2. Defaults to false.
+#### These control the model(s) run
+
 - `RUN_EXTRA_MODELS`: Option to run extra models. Defaults to false.
 - `DAY_AHEAD_MODEL`: Option to use day ahead model. Defaults to false.
 - `USE_ECMWF_ONLY`: Option to use ECMWF only model. Defaults to false.
 - `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
-- `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250 MW.
-- `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500 MW.
+
+#### These control the saved results
+
+- `USE_ADJUSTER`: Option to use adjuster. Defaults to true.
+- `SAVE_GSP_SUM`: Option to save GSP sum for PVNet V2. Defaults to false.
+
+#### These extra varaibles control validation and logging
+
+- `SENTRY_DSN`: Optional link to Sentry.
+- `ENVIRONMENT`: The environment this is running in. Defaults to local.
+- `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250MW.
+- `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500MW.
+- `FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT`, when the solar elevation is above this,
+  we expect positive forecast values. Defaults to 10 degrees.
 - `FILTER_BAD_FORECASTS`: If set to true and the forecast fails validation checks, it will not be 
-   saved. Defaults to false, where all forecasts are saved even if they fail the checks.
+  saved. Defaults to false, where all forecasts are saved even if they fail the checks.
+
 
 ### Examples
 
@@ -90,7 +101,7 @@ After the ML models have run, we check the following
 - The forecast is not above 110% of the national capacity. An error is raised if any forecast value is above 110% of the national capacity.
 - The forecast is not above 100 GW, any forecast value above 30 GW we get a warning but any forecast value above 100 GW we raise an error. 
 - If the forecast goes up, then down, then up, more than 500 MW we raise an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
-- TODO: Check positive values in day: https://github.com/openclimatefix/uk-pvnet-app/issues/200
+- Check positive values in day. If the sun is up, we expect positive values. 
 
 ## Development
 

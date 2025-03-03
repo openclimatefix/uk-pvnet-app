@@ -14,7 +14,7 @@ models:
         version: f3135c47eb0f21320dbd8c590bdd03dfafc39bca
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: ffac655f9650b81865d96023baa15839f3ce26ec
+        version: 01ca2b6e37a71deb446bb90471b44a1851d3e43f
     use_adjuster: True
     save_gsp_sum: False
     verbose: True
@@ -27,7 +27,7 @@ models:
         version: d81a9cf8adca49739ea6a3d031e36510f44744a1
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: dcfdc17fda8e48c387122614bec8b284eaa868b9
+        version: 7057e8c2baa065aa4024dd6b6381b71ac4879c87
 
   # Only uses satellite data
   - name: pvnet_v2-sat0-only
@@ -36,7 +36,7 @@ models:
       version: 158f9aeb006dddc10ef67612a91e7175a87b8dd0
     summation:
       repo: openclimatefix/pvnet_v2_summation
-      version: adbf9e7797fee9a5050beb8c13841696e72f99ef
+      version: c5371880120503646327dc2df2da2698de82982e
 
   # Only uses UKV data
   - name: pvnet_v2-ukv
@@ -45,7 +45,7 @@ models:
         version: 4009df82e63e30546e2000728bff34b9c0520617
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 5fc3ea16be141df38b2fad8c11a524243e9b8555
+        version: 1789cd9bdaded3896587efd54d3e9a257762fb63
     uses_satellite_data: False
 
   # Only uses ECMWF data
@@ -55,7 +55,7 @@ models:
         version: 20b882bd4ceaee190a1c994d861f8e5d553ea843
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 9ddd4845cbb97b91e16de0c3370f666e1eab1c30
+        version: b40867abbc2e5163c9a665daf511cbf372cc5ac9
     ecmwf_only: True
     uses_satellite_data: False
 
@@ -66,7 +66,7 @@ models:
         version: 263741ebb6b71559d113d799c9a579a973cc24ba
     summation:
         repo: openclimatefix/pvnet_summation_uk_national_day_ahead
-        version: b3cd41ff08afde1fa9269d1ad0fbdf9c5b62df23
+        version: 7a2f26b94ac261160358b224944ef32998bd60ce
     use_adjuster: True
     save_gsp_sum: True
     verbose: True

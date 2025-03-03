@@ -1,20 +1,26 @@
 import logging
 import numpy as np
+import pandas as pd
+import pvlib
 
 
 logger = logging.getLogger()
 
+# A forecast is bad if above this fraction of national capacity
+RELATIVE_MAX_FORECAST = 1.1
 
-RELATIVE_MAX_FORECAST = 1.1  # 110% of the national capacity
-
-# The all time peak generation as of 2025-03-03 was 11.5 GW
+# A forecast is bad if above this absolute value
+# Note: The all time peak generation as of 2025-03-03 was 11.5 GW
 #  - See https://www.solar.sheffield.ac.uk/pvlive/
-# Set a limit of 15 GW for now
 ABSOLUTE_MAX_FORECAST = 15_000
+
+# The UK's longitude and latitude - used for solar position calculations
+UK_LONGITUDE = -3.4360
+UK_LATITUDE = 55.3781
 
 
 def check_forecast_max(
-    national_forecast_values: np.ndarray,
+    national_forecast: pd.Series,
     national_capacity: float,
     model_name: str,
 ):
@@ -31,7 +37,7 @@ def check_forecast_max(
     forecast_okay = True
 
     # Compute the maximum from the entire forecast array
-    max_forecast_mw = np.max(national_forecast_values)
+    max_forecast_mw = national_forecast.values.max()
 
     # Check it doesn't exceed the national capacity
     if max_forecast_mw > RELATIVE_MAX_FORECAST * national_capacity:
@@ -55,7 +61,7 @@ def check_forecast_max(
 
 
 def check_forecast_fluctuations(
-    national_forecast_values: np.ndarray,
+    national_forecast: pd.Series,
     warning_threshold: float,
     error_threshold: float,
     model_name: str,
@@ -74,7 +80,7 @@ def check_forecast_fluctuations(
 
     forecast_okay = True
 
-    diff = np.diff(national_forecast_values)
+    diff = np.diff(national_forecast.values)
 
     def zig_zag_over_threshold(threshold):
         return (
@@ -96,37 +102,84 @@ def check_forecast_fluctuations(
     return forecast_okay
 
 
+def check_forecast_positive_during_daylight(
+    national_forecast: pd.Series,
+    sun_elevation_lower_limit: float,
+    model_name: str,
+):
+    """Check that the forecast values are positive when the sun is up.
+
+    Args:
+        national_forecast: The forecast values for the nation (in MW)
+        sun_elevation_lower_limit: The lower limit for the sun elevation (in degrees)
+        model_name: The name of the model that generated the forecast
+    """
+
+    forecast_okay = True
+
+    # Calculate the solar position throughout the forecast
+    solpos = pvlib.solarposition.get_solarposition(
+        time=national_forecast.index, # The index is expect to be the valid times
+        longitude=UK_LONGITUDE,
+        latitude=UK_LATITUDE,
+        method='nrel_numpy'
+    )
+
+    # Check if forecast values are > 0 when sun elevation is over the threshold
+    daylight_mask = solpos["elevation"] > sun_elevation_lower_limit
+
+    if not (national_forecast[daylight_mask] > 0).all():
+        logger.warning(
+            f"{model_name}: Forecast values must be > 0 when sun elevation > "
+            f"{sun_elevation_lower_limit} degree."
+        )
+        forecast_okay = False
+    
+    return forecast_okay
+
+
 def validate_forecast(
-    national_forecast_values: np.ndarray,
+    national_forecast: pd.Series,
     national_capacity: float,
     zip_zag_warning_threshold: float,
     zig_zag_error_threshold: float,
+    sun_elevation_lower_limit: float,
     model_name: str,
 ) -> bool:
     """Performs various checks on the forecast values.
 
-    - Checks the forecast doesn't exceed some values. See check_forecast_max()
-    - Checks for fluctuations in the forecast values. See check_forecast_fluctuations()
+    - Checks the forecast doesn't exceed some values. See `check_forecast_max()`
+    - Checks for fluctuations in the forecast values. See `check_forecast_fluctuations()`
+    - Checks that forecast values are positive when the sun is up. See 
+      `check_forecast_positive_during_daylight()`
 
     Args:
         national_forecast_values: All the forecast values for the nation (in MW).
         national_capacity: The national PV capacity (in MW).
         zip_zag_warning_threshold: The threshold in MW for zig-zag check warning.
         zig_zag_error_threshold:  The threshold in MW for zig-zag check failure.
+        sun_elevation_lower_limit: The lower limit for the sun elevation (in degrees). The forecast
+            values must be positive when the sun is above this angle.
         model_name: The name of the model that generated the forecast.
     """
 
     forecast_max_okay = check_forecast_max(
-        national_forecast_values=national_forecast_values,
+        national_forecast=national_forecast,
         national_capacity=national_capacity,
         model_name=model_name,
     )
 
     forecast_fluctuations_okay = check_forecast_fluctuations(
-        national_forecast_values=national_forecast_values,
+        national_forecast=national_forecast,
         model_name=model_name,
         warning_threshold=zip_zag_warning_threshold,
         error_threshold=zig_zag_error_threshold,
     )
+
+    forecast_positive_during_daylight = check_forecast_positive_during_daylight(
+        national_forecast=national_forecast,
+        sun_elevation_lower_limit=sun_elevation_lower_limit,
+        model_name=model_name,
+    )
     
-    return forecast_max_okay & forecast_fluctuations_okay
+    return forecast_max_okay & forecast_fluctuations_okay & forecast_positive_during_daylight
