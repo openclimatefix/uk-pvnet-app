@@ -59,7 +59,7 @@ class ForecastCompiler:
             use_legacy: Whether to run legacy dataloader
         """
         model_name = model_config.pvnet.repo
-        model_version = model_config.pvnet.version
+        model_version = model_config.pvnet.commit
 
         logger.info(f"Loading model: {model_name} - {model_version}")
 
@@ -86,7 +86,7 @@ class ForecastCompiler:
             model_name,
             model_version,
             model_config.summation.repo,
-            model_config.summation.version,
+            model_config.summation.commit,
             device,
         )
 

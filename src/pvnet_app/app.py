@@ -226,7 +226,7 @@ def app(
         # First load the data config
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
-            revision=model_config.pvnet.version,
+            revision=model_config.pvnet.commit,
         )
 
         # Check if the data available will allow the model to run

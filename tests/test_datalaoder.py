@@ -18,7 +18,7 @@ def test_data_config():
             # get config from huggingface
             data_config_path = PVNetBaseModel.get_data_config(
                 model.pvnet.repo,
-                revision=model.pvnet.version,
+                revision=model.pvnet.commit,
             )
 
             # make a temporary file ending in yaml
@@ -41,7 +41,7 @@ def test_get_datapipes_dataloader(db_url, test_t0):
         # get config from huggingface
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
-            revision=model_config.pvnet.version,
+            revision=model_config.pvnet.commit,
         )
 
         _ = get_datapipes_dataloader(
