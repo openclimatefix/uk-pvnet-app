@@ -40,7 +40,7 @@ The following environment variables are used in the app:
 - `ENVIRONMENT`: The environment this is running in. Defaults to local.
 - `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250MW.
 - `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500MW.
-- `FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT`, when the solar elevation is above this,
+- `FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT`, when the solar elevation is above this,
   we expect positive forecast values. Defaults to 10 degrees.
 - `FILTER_BAD_FORECASTS`: If set to true and the forecast fails validation checks, it will not be 
   saved. Defaults to false, where all forecasts are saved even if they fail the checks.

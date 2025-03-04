@@ -24,19 +24,17 @@ def get_gsp_and_national_capacities(
     """
     with db_connection.get_session() as session:
         # Get GSP capacities
-        gsp_capacities = get_latest_gsp_capacities(
+        all_capacities = get_latest_gsp_capacities(
             session=session,
-            gsp_ids=gsp_ids,
+            gsp_ids=[0]+gsp_ids,
             datetime_utc=t0 - timedelta(days=2),
         )
 
-        # Get national capacity (needed if using summation model)
-        national_capacity = get_latest_gsp_capacities(session, [0])[0]
-
     # Do basic sanity checking
-    if np.isnan(gsp_capacities).any():
-        raise ValueError("GSP capacities contain NaNs")
-    if np.isnan(national_capacity):
-        raise ValueError("National capacity is NaN")
+    if np.isnan(all_capacities).any():
+        raise ValueError("Capacities contain NaNs")
+        
+    national_capacity = all_capacities[0].item()
+    gsp_capacities = all_capacities[1:]
 
     return gsp_capacities, national_capacity

@@ -6,7 +6,6 @@ import tempfile
 from importlib.metadata import PackageNotFoundError, version
 
 import dask
-import fsspec
 import pandas as pd
 import sentry_sdk
 import torch
@@ -15,16 +14,17 @@ from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
+from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3
 from pvnet_app.config import get_union_of_configs, save_yaml_config
+from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader
 from pvnet_app.data.gsp import get_gsp_and_national_capacities
+from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.dataloader import get_dataloader
 from pvnet_app.forecast_compiler import ForecastCompiler
-from pvnet_app.model_configs.pydantic_models import get_all_models
-from pvnet_app.data.batch_validation import check_batch
-from pvnet_app.consts import __version__
 from pvnet_app.validate_forecast import validate_forecast
+from pvnet_app.consts import __version__
 
 
 try:
@@ -71,45 +71,6 @@ batch_size = 10
 
 # ---------------------------------------------------------------------------
 # APP MAIN
-
-def save_batch_to_s3(batch, model_name, s3_directory):
-    """Saves a batch to a local file and uploads it to S3.
-
-    Args:
-        batch: The data batch to save (torch.Tensor).
-        model_name: The name of the model (str).
-        s3_directory: The S3 directory to save the batch to (str).
-    """
-    save_batch = f"{model_name}_latest_batch.pt"
-    torch.save(batch,save_batch)
-
-    try:
-        fs = fsspec.open(s3_directory).fs
-        fs.put(save_batch, f"{s3_directory}/{save_batch}")
-        logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}")
-        os.remove(save_batch)
-        logger.info("Removed local copy of batch")
-    except Exception as e:
-        logger.error(f"Failed to save batch to {s3_directory}/{save_batch} with error {e}")
-
-
-
-def get_boolean_env_var(env_var: str, default: bool) -> bool:
-    """Get a boolean environment variable.
-
-    Args:
-        env_var: The name of the environment variable.
-        default: The default value to use if the environment variable is not set.
-
-    Returns:
-        The boolean value of the environment variable.
-    """
-    if env_var in os.environ:
-        env_var_value = os.getenv(env_var).lower()
-        assert env_var_value in ["true", "false"]
-        return env_var_value == "true"
-    else:
-        return default
 
 
 def app(
@@ -183,9 +144,7 @@ def app(
 
     zig_zag_warning_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
     zig_zag_error_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
-    sun_elevation_lower_limit = float(
-        os.getenv('FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT', 10)
-    )
+    sun_elevation_lower_limit = float(os.getenv('FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT', 10))
     
     db_url = os.environ["DB_URL"] # Will raise KeyError if not set
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
@@ -267,7 +226,7 @@ def app(
         # First load the data config
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
-            revision=model_config.pvnet.version,
+            revision=model_config.pvnet.commit,
         )
 
         # Check if the data available will allow the model to run
@@ -326,10 +285,11 @@ def app(
     for i, batch in enumerate(dataloader):
         logger.info(f"Predicting for batch: {i}")
 
-        # Do some basic validation of the batch
+        # Do basic validation of the batch: Will raise error if the batch passes the checks
         check_batch(batch)
 
         if (s3_batch_save_dir is not None) and i == 0:
+            # Save the batch under the name of the first model
             model_name = next(iter(forecast_compilers))
             save_batch_to_s3(batch, model_name, s3_batch_save_dir) 
 

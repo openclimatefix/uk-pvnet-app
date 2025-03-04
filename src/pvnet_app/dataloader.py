@@ -5,7 +5,7 @@ import pandas as pd
 from ocf_data_sampler.numpy_sample.collate import stack_np_samples_into_batch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKRegionalDataset
 
-from ocf_datapipes.batch import BatchKey
+from ocf_datapipes.batch import BatchKey, NumpyBatch
 from ocf_datapipes.batch import stack_np_examples_into_batch as legacy_stack_np_examples_into_batch
 from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
 from ocf_datapipes.utils import Location
@@ -23,7 +23,7 @@ def get_data_sampler_dataloader(
     gsp_ids: list[int],
     batch_size: int,
     num_workers: int,
-):
+) -> DataLoader:
 
     # Populate the data config with production data paths
     modified_data_config_filename = Path(config_filename).parent / "data_config.yaml"
@@ -41,8 +41,8 @@ def get_data_sampler_dataloader(
         gsp_ids=gsp_ids,
     )
 
-    # Set up dataloader for parallel loading
-    dataloader_kwargs = dict(
+    return DataLoader(
+        dataset,
         shuffle=False,
         batch_size=batch_size,
         sampler=None,
@@ -56,10 +56,8 @@ def get_data_sampler_dataloader(
         persistent_workers=False,
     )
 
-    return DataLoader(dataset, **dataloader_kwargs)
 
-
-def legacy_squeeze(batch):
+def legacy_squeeze(batch: NumpyBatch) -> NumpyBatch:
     batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].squeeze(1)
     return batch
 
@@ -71,7 +69,7 @@ def get_datapipes_dataloader(
     batch_size: int,
     num_workers: int,
     db_url: str,
-):
+) -> DataLoader:
 
     # Populate the data config with production data paths
     populated_data_config_filename = Path(config_filename).parent / "data_config.yaml"
@@ -91,10 +89,7 @@ def get_datapipes_dataloader(
     gsp_id_to_shape = gsp_id_to_shape.loc[gsp_ids]
     x_osgb = gsp_id_to_shape.geometry.centroid.x.astype(np.float32)
     y_osgb = gsp_id_to_shape.geometry.centroid.y.astype(np.float32)
-    locations = []
-    for gsp_id in gsp_ids:
-        location = Location(x=x_osgb.loc[gsp_id], y=y_osgb.loc[gsp_id], id=gsp_id)
-        locations.append(location)
+    locations = [Location(x=x_osgb.loc[i], y=y_osgb.loc[i], id=i) for i in gsp_ids]
 
     # Location and time datapipes, the locations objects have x_osgb and y_osgb
     location_pipe = IterableWrapper(locations)
@@ -116,8 +111,8 @@ def get_datapipes_dataloader(
         .map(legacy_squeeze)
     )
 
-    # Set up dataloader for parallel loading
-    dataloader_kwargs = dict(
+    return DataLoader(
+        batch_datapipe,
         shuffle=False,
         batch_size=None,  # batched in datapipe step
         sampler=None,
@@ -132,8 +127,6 @@ def get_datapipes_dataloader(
         persistent_workers=False,
     )
 
-    return DataLoader(batch_datapipe, **dataloader_kwargs)
-
 
 def get_dataloader(
     config_filename: str,
@@ -143,7 +136,18 @@ def get_dataloader(
     num_workers: int,
     db_url: str | None,
     use_data_sampler: bool,
-):
+) -> DataLoader:
+    """Construct the dataloader for the given configuration
+    
+    Args:
+        config_filename: The path to the configuration file
+        t0: The init-time of the forecast
+        gsp_ids: The GSP IDs to forecast for
+        batch_size: The batch size to use
+        num_workers: The number of workers to use
+        db_url: The URL of the database to use (for legacy usage only)
+        use_data_sampler: Whether to use ocf-data-sampler. Else uses ocf_datapipes.
+    """
     
     if use_data_sampler:
         return get_data_sampler_dataloader(

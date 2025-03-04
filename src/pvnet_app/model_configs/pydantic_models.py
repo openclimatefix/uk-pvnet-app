@@ -9,43 +9,52 @@ from pydantic import BaseModel, Field, field_validator
 log = logging.getLogger(__name__)
 
 
-class ModelHF(BaseModel):
-    repo: str = Field(..., title="Repo name", description="The HF Repo")
-    version: str = Field(..., title="Repo version", description="The HF version")
+class HuggingFaceCommit(BaseModel):
+    """The location of a model on Hugging Face"""
+    repo: str = Field(..., description="The Hugging Face repo")
+    commit: str = Field(..., description="The commit hash")
 
 
-class Model(BaseModel):
-    """One ML Model"""
+class ModelConfig(BaseModel):
+    """Configuration of a model and the settings it will be run with in the app"""
 
-    name: str = Field(..., title="Model Name", description="The name of the model")
-    pvnet: ModelHF = Field(..., title="PVNet", description="The PVNet model")
-    summation: ModelHF = Field(..., title="Summation", description="The Summation model")
+    name: str = Field(..., description="The name of the model")
+    pvnet: HuggingFaceCommit = Field(..., description="The PVNet model location")
+    summation: HuggingFaceCommit = Field(..., description="The summation model location")
 
-    use_adjuster: bool = Field(False, description="Whether to use the adjuster model")
-    save_gsp_sum: bool = Field(False, description="Whether to save the GSP sum")
-    verbose: bool = Field(False, description="Whether to print verbose output")
+    use_adjuster: bool = Field(False, description="Whether to use the adjuster")
+    save_gsp_sum: bool = Field(
+        False, 
+        description="Whether to save the sum of GSPs as welll as the national estimate"
+    )
+    verbose: bool = Field(False, description="Whether to log verbose output for the model")
     save_gsp_to_recent: bool = Field(
         False, 
-        description="Whether to save the GSP to Forecast Value Last Seven Days",
+        description="Whether to save the GSP results to the `ForecastValueLastSevenDays` table",
     )
-    day_ahead: bool = Field(False, description="If this model is day ahead or not")
+    day_ahead: bool = Field(False, description="If this model is for day-ahead forecasts or not")
     ecmwf_only: bool = Field(False, description="If this model is only using ecmwf data")
-    uses_satellite_data: bool = Field(True, description="If this model uses satellite data")
-
+    uses_satellite_data: bool = Field(
+        True, 
+        description="If this model uses satellite data (currently this is only used in tests)"
+    )
     uses_ocf_data_sampler: bool = Field(
         True,
-        description="If this model uses data sampler, old one uses ocf_datapipes",
+        description="If this model uses ocf-data-sampler. Else uses ocf_datapipes",
     )
 
 
-class ModelCollection(BaseModel):
-    """A group of ml models"""
+class ModelConfigCollection(BaseModel):
+    """A collection of model configurations"""
 
-    models: list[Model] = Field(..., description="A list of models to use for the forecast")
+    models: list[ModelConfig] = Field(
+        ..., 
+        description="A list of model configs to use for the forecast"
+    )
 
     @field_validator("models")
     @classmethod
-    def name_must_be_unique(cls, v: list[Model]) -> list[Model]:
+    def name_must_be_unique(cls, v: list[ModelConfig]) -> list[ModelConfig]:
         """Ensure that all model names are unique, respect to using ocf_data_sampler or not"""
         names = [(model.name, model.uses_ocf_data_sampler) for model in v]
 
@@ -61,7 +70,7 @@ def get_all_models(
     get_day_ahead_only: bool = False,
     run_extra_models: bool = False,
     use_ocf_data_sampler: bool = True,
-) -> list[Model]:
+) -> list[ModelConfig]:
     """Returns all the models for a given client
 
     Args:
@@ -78,7 +87,7 @@ def get_all_models(
     with fsspec.open(filename, mode="r") as stream:
         try:
             models_dict = parse_config(data=stream)
-            model_collection = ModelCollection(**models_dict)
+            model_collection = ModelConfigCollection(**models_dict)
         except Exception as config_error:
             log.error(f"Error parsing model configuration: {config_error}")
             raise config_error

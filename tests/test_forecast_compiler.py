@@ -17,9 +17,9 @@ def test_model_loading():
     for model_config in models:
         # Extract model info
         model_name = model_config.pvnet.repo
-        model_version = model_config.pvnet.version
+        model_version = model_config.pvnet.commit
         summation_name = model_config.summation.repo if model_config.summation else None
-        summation_version = model_config.summation.version if model_config.summation else None
+        summation_version = model_config.summation.commit if model_config.summation else None
         
         # Load models via ForecastCompiler
         pvnet_model, summation_model = ForecastCompiler.load_model(
