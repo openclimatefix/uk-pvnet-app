@@ -8,7 +8,7 @@ import zarr
 
 from pvnet_app.consts import sat_path
 from pvnet_app.data.satellite import (
-    contains_too_many_values,
+    contains_too_many_of_value,
     check_model_satellite_inputs_available,
     extend_satellite_data_with_nans,
     interpolate_missing_satellite_timestamps,
@@ -329,18 +329,18 @@ def test_interpolate_missing_satellite_timestamps():
     assert (ds_interp.data.values==1).all().item()
 
 
-def test_contains_too_many_values(sat_5_data):
+def test_contains_too_many_of_value(sat_5_data):
     
     # The original data has no zeros or NaNs
-    assert not contains_too_many_values(sat_5_data, value=0, threshold=0.)
-    assert not contains_too_many_values(sat_5_data, value=np.nan, threshold=0.)
+    assert not contains_too_many_of_value(sat_5_data, value=0, threshold=0.)
+    assert not contains_too_many_of_value(sat_5_data, value=np.nan, threshold=0.)
 
     # Check it can detect too many zeros
     ds = sat_5_data.copy(deep=True)
     ds['data'].values[:] = 0
-    assert contains_too_many_values(ds, value=0, threshold=0.1)
+    assert contains_too_many_of_value(ds, value=0, threshold=0.1)
 
     # Check it can detect too many NaNs
     ds = sat_5_data.copy(deep=True)
     ds['data'].values[:] = np.nan
-    assert contains_too_many_values(ds, value=np.nan, threshold=0.1)
+    assert contains_too_many_of_value(ds, value=np.nan, threshold=0.1)
