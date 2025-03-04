@@ -1,4 +1,3 @@
-import os
 import tempfile
 
 from ocf_data_sampler.config import load_yaml_configuration
@@ -23,7 +22,7 @@ def test_data_config():
             )
 
             # make a temporary file ending in yaml
-            temp_data_config_path = os.path.join(tmpdirname, "data_config.yaml")
+            temp_data_config_path = f"{tmpdirname}/data_config.yaml"
 
             modify_data_config_for_production(
                 input_path=data_config_path,
@@ -34,7 +33,7 @@ def test_data_config():
             _ = load_yaml_configuration(temp_data_config_path)
 
 
-def test_datapipes_dataloader(db_url, test_t0):
+def test_get_datapipes_dataloader(db_url, test_t0):
 
     models = get_all_models(run_extra_models=True, use_ocf_data_sampler=False)
     for model_config in models:

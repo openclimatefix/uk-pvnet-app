@@ -10,7 +10,6 @@ from pvnet_app.validate_forecast import (
 )
 
 
-
 def test_validate_forecast_ok():
     """Test that validate_forecast passes when forecast is valid"""
 
@@ -124,7 +123,7 @@ def test_validate_forecast_with_zigzag_warning(caplog):
 
     national_forecast = pd.Series(
         [1000, 1300, 800, 1200, 500], 
-        index=pd.date_range(start="2025-01-01 00:00",  periods=5, freq="30min")
+        index=pd.date_range(start="2025-01-01 00:00", periods=5, freq="30min")
     )
 
     # Capture warning messages

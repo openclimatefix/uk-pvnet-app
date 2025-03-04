@@ -63,7 +63,7 @@ def fill_1d_bool_gaps(x, max_gap):
 
 
 def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedelta) -> xr.Dataset:
-    """Linearly nterpolate missing satellite timestamps
+    """Linearly interpolate missing satellite timestamps
 
     The max gap is inclusive of timestamps either side. E.g. if max gap is 15 minutes and the  
     satellite includes timestamps 12:00 and 12:15, then 12:05 and 12:10 will be filled. If the max 
@@ -232,7 +232,7 @@ def check_model_satellite_inputs_available(
     return available
 
 
-def contains_too_many_values(
+def contains_too_many_of_value(
     ds: xr.Dataset, 
     value: float, 
     threshold: float,
@@ -245,25 +245,26 @@ def contains_too_many_values(
         threshold: The maximum fraction of the value allowed
     """
 
-    logger.info(f"Checking satellite data for constant value ({value})")
+    logger.info(f"Checking satellite data for value ({value})")
 
     too_many_values = False
-    for time in ds.time:
-        data = ds.data.sel(time=time).values
 
-        # we have to treat value=np.nan differently,
-        # this is because np.nan == np.nan is False
-        if np.isnan(value):
-            fraction_true_values = np.isnan(data).mean()
-        else:
-            fraction_true_values = (data == value).mean()
+    # We will calculate fractional ocurence for each time
+    reduction_dims = set(ds.data.dims) - {"time"}
+    if np.isnan(value):
+        # np.nan != np.nan, so we have to use isnan
+        fraction_values = np.isnan(ds.data).mean(dim=reduction_dims)
+    else:
+        fraction_values = (ds.data == value).mean(dim=reduction_dims)
 
-        if fraction_true_values > threshold:
-            logger.warning(
-                f"Satellite data contains {value} (greater than {threshold}), "
-                f"This is for time step {time}"
-            )
-            too_many_values = True
+    if fraction_values.max() > threshold:
+        logger.warning(
+            f"Satellite data contains values {value} greater than {threshold:.2%} of the time"
+            f"{fraction_values.to_series().to_string()}"
+        )
+
+        too_many_values=True
+
     return too_many_values
 
 
@@ -277,7 +278,6 @@ def scale_satellite_data(ds: xr.Dataset) -> xr.Dataset:
         ds: The satellite data
     """
     return ds / 1023
-
 
 
 class SatelliteDownloader:
@@ -376,7 +376,8 @@ class SatelliteDownloader:
         
         return ds
     
-    def data_is_okay(self, ds: xr.Dataset) -> bool:
+    @staticmethod
+    def data_is_okay(ds: xr.Dataset) -> bool:
         """Apply quality checks to the satellite data
         
         Args:
@@ -385,9 +386,9 @@ class SatelliteDownloader:
         Returns:
             bool: Whether the data passes the quality checks
         """
-        too_many_nans = contains_too_many_values(ds, value=np.nan, threshold=0.1)
+        too_many_nans = contains_too_many_of_value(ds, value=np.nan, threshold=0.1)
         # Note that in the UK, even at night, the values are not zero
-        too_many_zeros = contains_too_many_values(ds, value=0, threshold=0.1)
+        too_many_zeros = contains_too_many_of_value(ds, value=0, threshold=0.1)
         return (not too_many_nans) and (not too_many_zeros)
         
     
@@ -402,7 +403,7 @@ class SatelliteDownloader:
         """
 
         # Interpolate missing satellite timestamps
-        ds = interpolate_missing_satellite_timestamps(ds, pd.Timedelta("15min"))
+        ds = interpolate_missing_satellite_timestamps(ds, max_gap=pd.Timedelta("15min"))
 
         if not self.legacy:
             # Scale the satellite data if not legacy. The legacy dataloader does production data 
@@ -412,9 +413,9 @@ class SatelliteDownloader:
         # Store the available satellite timestamps before we extend with NaNs
         self.valid_times = pd.to_datetime(ds.time.values)
 
-        # Extend the satellite data with NaNs if needed by the model and record the delay of most recent
-        # non-nan timestamp
-        ds = extend_satellite_data_with_nans(ds, self.t0)
+        # Extend the satellite data with NaNs if needed by the model and record the delay of most 
+        # recent non-nan timestamp
+        ds = extend_satellite_data_with_nans(ds, t0=self.t0)
 
         return ds
 
@@ -467,7 +468,12 @@ class SatelliteDownloader:
         data_config_filename: str,
         t0: pd.Timestamp,
     ) -> bool:
-
+        """Check if the satellite data the model needs is available
+        
+        Args:
+            data_config_filename: The path to the data configuration file
+            t0: The init-time of the forecast
+        """
         return check_model_satellite_inputs_available(
             data_config_filename=data_config_filename,
             t0=t0,

@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 def download_data(source: str, destination: str) -> bool:
+    """Download data from a source to a destination
+    
+    Args:
+        source: The source path
+        destination: The destination path
+    """
 
     fs = fsspec.open(source).fs
 
@@ -40,7 +46,7 @@ def regrid_nwp_data(
         ds: The NWP data to regrid
         target_coords_path: The path to the target grid
         method: The regridding method to use
-        nwp_source: The source of the NWP data - only used for logging messages
+        nwp_source: The source of the NWP data (only used for logging messages)
     """
     logger.info(f"Regridding{nwp_source} to expected grid to {target_coords_path}")
 
@@ -74,10 +80,6 @@ def regrid_nwp_data(
 
     regridder = xe.Regridder(ds, ds_target_coords, method=method)
     return regridder(ds_rechunked).compute(scheduler="single-threaded")
-
-
-def get_nwp_valid_times(ds: xr.Dataset) -> pd.DatetimeIndex:
-    return pd.to_datetime(ds.init_time.values[0]) + pd.to_timedelta(ds.step)
 
 
 def check_model_nwp_inputs_available(
@@ -114,37 +116,23 @@ def check_model_nwp_inputs_available(
         # Get the NWP valid times required by the model
         freq = pd.Timedelta(f"{nwp_config.time_resolution_minutes}min")
 
-        req_start_time = (
-            t0 - pd.Timedelta(f"{nwp_config.history_minutes}min")
-        ).ceil(freq)
+        req_start_time = (t0 - pd.Timedelta(f"{nwp_config.history_minutes}min")).ceil(freq)
 
-        req_end_time = (
-            t0 + pd.Timedelta(f"{nwp_config.forecast_minutes}min")
-        ).ceil(freq) 
+        req_end_time = (t0 + pd.Timedelta(f"{nwp_config.forecast_minutes}min")).ceil(freq) 
             
         # If we diff accumulated channels in time we'll need one more timestamp
         if len(nwp_config.nwp_accum_channels)>0:
             req_end_time = req_end_time + freq
 
-        required_nwp_times = pd.date_range(
-            start=req_start_time, 
-            end=req_end_time, 
-            freq=freq,
-        )
+        required_nwp_times = pd.date_range(start=req_start_time, end=req_end_time, freq=freq)
 
         # Check if any of the expected datetimes are missing
-        missing_time_steps = np.setdiff1d(
-            required_nwp_times, 
-            nwp_valid_times, 
-            assume_unique=True
-        )
+        missing_time_steps = np.setdiff1d(required_nwp_times, nwp_valid_times, assume_unique=True)
 
         available = len(missing_time_steps)==0
 
         if len(missing_time_steps) > 0:
-            logger.warning(
-                f"Some {nwp_source} timesteps for {t0=} missing: \n{missing_time_steps}"
-            )
+            logger.warning(f"Some {nwp_source} timesteps for {t0=} missing: \n{missing_time_steps}")
     
     else:
         available = True
@@ -201,9 +189,10 @@ class NWPDownloader(ABC):
         ds = self.process(ds)
 
         # Store the valid times for the NWP data
-        self.valid_times = get_nwp_valid_times(ds)
+        self.valid_times = pd.to_datetime(ds.init_time.values[0]) + pd.to_timedelta(ds.step)
 
         self.resave(ds)
+
 
     def clean_up(self) -> None:
         """Remove the downloaded data"""
@@ -215,6 +204,12 @@ class NWPDownloader(ABC):
         data_config_filename: str,
         t0: pd.Timestamp,
     ) -> bool:
+        """Check if the NWP data the model needs is available
+        
+        Args:
+            data_config_filename: The path to the data configuration file
+            t0: The init-time of the forecast
+        """
 
         return check_model_nwp_inputs_available(
             data_config_filename=data_config_filename,
@@ -234,8 +229,14 @@ class ECMWFDownloader(NWPDownloader):
         "latitude": 50,
         "longitude": 50,
     }
-
-    def regrid(self, ds: xr.Dataset) -> xr.Dataset:
+    
+    @staticmethod
+    def regrid(ds: xr.Dataset) -> xr.Dataset:
+        """Regrid the ECMWF data to the target grid
+        
+        In training the ECMWF was at twice the resolution as we have available in production. This
+        regridding step will put the data on the same grid as the training data
+        """
         return regrid_nwp_data(
             ds=ds,
             target_coords_path=files("pvnet_app.data").joinpath("nwp_ecmwf_target_coords.nc"),
@@ -243,11 +244,11 @@ class ECMWFDownloader(NWPDownloader):
             nwp_source="ECMWF",
         )
 
-
-    def extend_to_shetlands(self, ds: xr.Dataset) -> xr.Dataset:
+    @staticmethod
+    def extend_to_shetlands(ds: xr.Dataset) -> xr.Dataset:
         """Extend the ECMWF data to reach the shetlands (with NaNS) as in the training data
         
-        The training data stoped at 60 degrees latitude but extended with NaNs to reach the 
+        The training data stopped at 60 degrees latitude but was extended with NaNs to reach the 
         Shetlands. We repeat this here.
         """
 
@@ -257,17 +258,20 @@ class ECMWFDownloader(NWPDownloader):
         # and reflects what the model saw in training
         return ds.reindex(latitude=np.concatenate([np.arange(62, 60, -0.05), ds.latitude.values]))
 
-
-    def rename_variables(self, ds):
-        """Rename the ECMWF variables to match the training data"""
+    @staticmethod
+    def rename_variables(ds):
+        """Rename the ECMWF variables to match the training data
+        
+        Rename variable names in the variable coordinate to match the names the model expects and 
+        was trained on.
+        
+        This change happened in the new nwp-consumer>=1.0.0. Ideally we won't need this step in the
+        future once the training data is updated.
+        """
         
         logger.info("Renaming the ECMWF variables")
         ds = ds.rename({"hres-ifs_uk": "ECMWF_UK"})
 
-        # rename variable names in the variable coordinate
-        # This is a renaming from ECMWF variables to what we use in the ML Model
-        # This change happened in the new nwp-consumer>=1.0.0
-        # Ideally we won't need this step in the future
         variable_coords = ds.variable.values
         rename = {
             "cloud_cover_high": "hcc",
@@ -298,8 +302,8 @@ class ECMWFDownloader(NWPDownloader):
         
         return ds
 
-
-    def remove_nans(self, ds: xr.Dataset) -> xr.Dataset:
+    @staticmethod
+    def remove_nans(ds: xr.Dataset) -> xr.Dataset:
         """Remove the NaNs introduced the the NWP consumer bug
 
         - The last step of the ECMWF data is NaN
@@ -339,12 +343,13 @@ class UKVDownloader(NWPDownloader):
         "y": 100,
     }
 
-    def regrid(self, ds: xr.Dataset) -> xr.Dataset:
+    @staticmethod
+    def regrid(ds: xr.Dataset) -> xr.Dataset:
         """Regrid the UKV data to the target grid
         
         In production the UKV data is on a different grid structure to the training data. The
-        trraining data is on a regular OSGB grid. The production data is on some other curvilinear 
-        grid.        
+        training data from CEDA is on a regular OSGB grid. The production data is on some other 
+        curvilinear grid.        
         """
         return regrid_nwp_data(
             ds=ds,
@@ -353,12 +358,13 @@ class UKVDownloader(NWPDownloader):
             nwp_source="UKV",
         )
 
-
-    def fix_dtype(self, ds: xr.Dataset) -> xr.Dataset:
+    @staticmethod
+    def fix_dtype(ds: xr.Dataset) -> xr.Dataset:
         """Fix the dtype of the UKV data.
         
-        In training the UKV data is float16. This causes it to overflow into inf values which we 
-        now need to force in production to be consistent with training.
+        In training the UKV data is float16. This caused it to overflow into inf values for the 
+        visibility channel which is measured in metres and can be above 2**16=65km. We 
+        need to force this overflow to happen in production to be consistent with training.
         """
         return ds.astype(np.float16)
 

@@ -10,7 +10,7 @@ from nowcasting_datamodel.models.forecast import (
 )
 
 from pvnet_app.model_configs.pydantic_models import get_all_models
-
+from pvnet_app.app import app
 
 
 def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, db_url):
@@ -105,10 +105,6 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
-        # Run prediction
-        # Thes import needs to come after the environ vars have been set
-        from pvnet_app.app import app
-
         app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
 
     # Only the models which don't use satellite will be run in this case
@@ -170,8 +166,6 @@ def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
-        # Import at runtime to ensure environment variables are set
-        from pvnet_app.app import app
         app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
 
     all_models = get_all_models(get_day_ahead_only=True, use_ocf_data_sampler=True)

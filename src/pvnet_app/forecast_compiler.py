@@ -18,7 +18,7 @@ from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 
 
-from pvnet_app.model_configs.pydantic_models import Model
+from pvnet_app.model_configs.pydantic_models import ModelConfig
 from pvnet_app.consts import __version__
 
 logger = logging.getLogger(__name__)
@@ -37,18 +37,18 @@ _model_mismatch_msg = (
 
 
 class ForecastCompiler:
-    """Class for making and compiling solar forecasts from for all GB GSPsn and national total"""
+    """Class for making and compiling solar forecasts from for all GB GSPs and national total"""
 
     def __init__(
         self,
-        model_config: Model,
+        model_config: ModelConfig,
         device: torch.device,
         t0: pd.Timestamp,
         gsp_capacities: xr.DataArray,
         national_capacity: float,
         use_legacy: bool = False,
     ):
-        """Class for making and compiling solar forecasts from for all GB GSPsn and national total
+        """Class for making and compiling solar forecasts from for all GB GSPs and national total
 
         Args:
             model_config: The configuration for the model

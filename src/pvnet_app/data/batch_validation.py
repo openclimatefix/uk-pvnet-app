@@ -2,7 +2,14 @@ from ocf_datapipes.batch import BatchKey, NumpyBatch, NWPBatchKey
 
 
 def check_nwp_sources_not_all_zero(batch: NumpyBatch) -> None:
-    """Check that the NWP data in the batch is not all zeros"""
+    """Check that the NWP data in the batch is not all zeros
+    
+    Args:
+        batch: The batch to check
+
+    Raises:
+        ValueError: If the NWP data is all zeros
+    """
 
     if "nwp" in batch:
         top_key = "nwp"
@@ -20,5 +27,12 @@ def check_nwp_sources_not_all_zero(batch: NumpyBatch) -> None:
 
 
 def check_batch(batch: NumpyBatch) -> None:
-    # validate nwp data is not all zeros
+    """Check the batch for any defined issues
+    
+    Args:
+        batch: The batch to check
+    
+    Raises:
+        ValueError: If the batch is invalid
+    """
     check_nwp_sources_not_all_zero(batch)

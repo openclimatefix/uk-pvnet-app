@@ -4,14 +4,23 @@ from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path, sat_path
 
 
 def load_yaml_config(path: str) -> dict:
-    """Load config file from path"""
+    """Load config file from path
+    
+    Args:
+        path: The path to the config file
+    """
     with open(path) as file:
         config = yaml.load(file, Loader=yaml.FullLoader)
     return config
 
 
 def save_yaml_config(config: dict, path: str) -> None:
-    """Save config file to path"""
+    """Save config file to path
+    
+    Args:
+        config: The config to save
+        path: The path to save the config file
+    """
     with open(path, "w") as file:
         yaml.dump(config, file, default_flow_style=False)
 
@@ -21,7 +30,7 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
 
     Args:
         config: The data config
-        gsp_path: For lagacy usage only
+        gsp_path: Address of the GSP database (for lagacy usage only)
     """
     production_paths = {
         "gsp": gsp_path,
@@ -80,7 +89,6 @@ def reformat_config_data_sampler(config: dict) -> dict:
 
     Args:
         config: The data config
-
     """
     # Replace satellite
     if "satellite" in config["input_data"]:
@@ -182,7 +190,7 @@ def modify_data_config_for_production(
     Args:
         input_path: Path to input datapipes configuration file
         output_path: Location to save the output configuration file
-        gsp_path: For legacy usage only
+        gsp_path: Address of the GSP database (for lagacy usage only)
         reformat_config: Reformat config to new format
     """
     config = load_yaml_config(input_path)
