@@ -1,102 +1,120 @@
 # Here we define all the models that are available in the app
-# Batches are prepared only once, so the extra models must be able to run on the batches created
-# to run the pvnet_v2 model
+# Batches are prepared only once, and it is assumed that all of the models configs can be unified
+# by the pvnet_app.config.get_union_of_configs function
+
 models:
+  # ------------------------------------------------------
+  # These are the new models trained with ocf-data-sampler
+  # ------------------------------------------------------
+  
+  # Currently this model uses a 30 minute satellite delay
   - name: pvnet_v2
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        version: f3135c47eb0f21320dbd8c590bdd03dfafc39bca
+        commit: f3135c47eb0f21320dbd8c590bdd03dfafc39bca
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 01ca2b6e37a71deb446bb90471b44a1851d3e43f
+        commit: 01ca2b6e37a71deb446bb90471b44a1851d3e43f
     use_adjuster: True
     save_gsp_sum: False
     verbose: True
     save_gsp_to_recent: true
-    
-  - name: pvnet_v2-sat0-samples-v1
+  
+  # This model uses a 0 minute satellite delay. This name is out of date
+  - name: pvnet_v2-sat0
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        version: d81a9cf8adca49739ea6a3d031e36510f44744a1
+        commit: d81a9cf8adca49739ea6a3d031e36510f44744a1
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 7057e8c2baa065aa4024dd6b6381b71ac4879c87
+        commit: 7057e8c2baa065aa4024dd6b6381b71ac4879c87
 
-    # single source models
-  - name: pvnet_v2-sat0-only-samples-v1"
+  # Only uses satellite data
+  - name: pvnet_v2-sat0-only
     pvnet:
       repo: openclimatefix/pvnet_uk_region
-      version: 158f9aeb006dddc10ef67612a91e7175a87b8dd0
+      commit: 158f9aeb006dddc10ef67612a91e7175a87b8dd0
     summation:
       repo: openclimatefix/pvnet_v2_summation
-      version: c5371880120503646327dc2df2da2698de82982e
+      commit: c5371880120503646327dc2df2da2698de82982e
 
-  - name: pvnet_v2-ukv-only-samples-v1
+  # Only uses UKV data
+  - name: pvnet_v2-ukv
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        version: 4009df82e63e30546e2000728bff34b9c0520617
+        commit: 4009df82e63e30546e2000728bff34b9c0520617
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: 1789cd9bdaded3896587efd54d3e9a257762fb63
+        commit: 1789cd9bdaded3896587efd54d3e9a257762fb63
     uses_satellite_data: False
 
+  # Only uses ECMWF data
   - name: pvnet_ecmwf # this name is important as it used for blending
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        version: 20b882bd4ceaee190a1c994d861f8e5d553ea843
+        commit: 20b882bd4ceaee190a1c994d861f8e5d553ea843
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        version: b40867abbc2e5163c9a665daf511cbf372cc5ac9
+        commit: b40867abbc2e5163c9a665daf511cbf372cc5ac9
     ecmwf_only: True
     uses_satellite_data: False
-# This is the old model for pvnet and pvnet_ecmwf
-  - name: pvnet_v2
-    pvnet:
-      repo: openclimatefix/pvnet_uk_region
-      version: aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac
-    summation:
-      repo: openclimatefix/pvnet_v2_summation
-      version: a7fd71727f4cb2b933992b2108638985e24fa5a3
-    use_adjuster: True
-    save_gsp_sum: False
-    verbose: True
-    save_gsp_to_recent: True
-    uses_ocf_data_sampler: False
-  - name: pvnet_ecmwf # this name is important as it used for blending
-    pvnet:
-        repo: openclimatefix/pvnet_uk_region
-        version: c14f7427d9854d63430aa936ce45f55d3818d033
-    summation:
-        repo: openclimatefix/pvnet_v2_summation
-        version: 4fe6b1441b6dd549292c201ed85eee156ecc220c
-    ecmwf_only: True
-    uses_satellite_data: False
-    uses_ocf_data_sampler: False
-# Legacy day ahead model without data-sampler
+
+  # Day-ahead model which does not use satellite data
   - name: pvnet_day_ahead
     pvnet:
         repo: openclimatefix/pvnet_uk_region_day_ahead
-        version: d87565731692a6003e43caac4feaed0f69e79272
+        commit: 263741ebb6b71559d113d799c9a579a973cc24ba
     summation:
         repo: openclimatefix/pvnet_summation_uk_national_day_ahead
-        version: ed60c5d32a020242ca4739dcc6dbc8864f783a08
-    use_adjuster: True
-    save_gsp_sum: True
-    verbose: True
-    save_gsp_to_recent: True
-    day_ahead: True
-    uses_ocf_data_sampler: False
-# Day ahead model that utilises data-sampler
-  - name: pvnet_day_ahead
-    pvnet:
-        repo: openclimatefix/pvnet_uk_region_day_ahead
-        version: 263741ebb6b71559d113d799c9a579a973cc24ba
-    summation:
-        repo: openclimatefix/pvnet_summation_uk_national_day_ahead
-        version: 7a2f26b94ac261160358b224944ef32998bd60ce
+        commit: 7a2f26b94ac261160358b224944ef32998bd60ce
     use_adjuster: True
     save_gsp_sum: True
     verbose: True
     save_gsp_to_recent: True
     day_ahead: True
     uses_ocf_data_sampler: True
+  
+  # ------------------------------------------------------
+  # These are the legacy models trained with ocf_datapipes
+  # ------------------------------------------------------
+
+  # Currently this model uses a 30 minute satellite delay
+  - name: pvnet_v2
+    pvnet:
+      repo: openclimatefix/pvnet_uk_region
+      commit: aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac
+    summation:
+      repo: openclimatefix/pvnet_v2_summation
+      commit: a7fd71727f4cb2b933992b2108638985e24fa5a3
+    use_adjuster: True
+    save_gsp_sum: False
+    verbose: True
+    save_gsp_to_recent: True
+    uses_ocf_data_sampler: False
+  
+  # Only uses ECMWF data
+  - name: pvnet_ecmwf # this name is important as it used for blending
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        commit: c14f7427d9854d63430aa936ce45f55d3818d033
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        commit: 4fe6b1441b6dd549292c201ed85eee156ecc220c
+    ecmwf_only: True
+    uses_satellite_data: False
+    uses_ocf_data_sampler: False
+
+  # Legacy day-ahead model which uses satellite data
+  - name: pvnet_day_ahead
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region_day_ahead
+        commit: d87565731692a6003e43caac4feaed0f69e79272
+    summation:
+        repo: openclimatefix/pvnet_summation_uk_national_day_ahead
+        commit: ed60c5d32a020242ca4739dcc6dbc8864f783a08
+    use_adjuster: True
+    save_gsp_sum: True
+    verbose: True
+    save_gsp_to_recent: True
+    day_ahead: True
+    uses_ocf_data_sampler: False

@@ -37,6 +37,10 @@ def test_get_all_models_ocf_data_sampler():
     models = get_all_models(use_ocf_data_sampler=False, run_extra_models=True)
     assert len(models) == 2
 
-    models = get_all_models(use_ocf_data_sampler=False, run_extra_models=True, get_day_ahead_only=True)
+    models = get_all_models(
+        use_ocf_data_sampler=False, 
+        run_extra_models=True, 
+        get_day_ahead_only=True
+    )
     assert len(models) == 1
 

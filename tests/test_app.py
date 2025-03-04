@@ -10,7 +10,7 @@ from nowcasting_datamodel.models.forecast import (
 )
 
 from pvnet_app.model_configs.pydantic_models import get_all_models
-
+from pvnet_app.app import app
 
 
 def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, db_url):
@@ -24,17 +24,14 @@ def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_
 
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables
-        temp_nwp_path = "temp_nwp_ukv.zarr"
-        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = "temp_nwp_ecmwf.zarr"
-        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         # In production sat zarr is zipped
-        temp_sat_path = "temp_sat.zarr.zip"
-        os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path
+        os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path = "temp_sat.zarr.zip"
         with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
             sat_5_data_zero_delay.to_zarr(store)
 
@@ -92,12 +89,10 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
 
         os.environ["DB_URL"] = db_url
 
-        temp_nwp_path = "temp_nwp_ukv.zarr"
-        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = "temp_nwp_ecmwf.zarr"
-        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         # There is no satellite data available at the environ path
@@ -109,10 +104,6 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
         os.environ["USE_OCF_DATA_SAMPLER"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
-
-        # Run prediction
-        # Thes import needs to come after the environ vars have been set
-        from pvnet_app.app import app
 
         app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
 
@@ -162,12 +153,10 @@ def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf
 
         os.environ["DB_URL"] = db_url
 
-        temp_nwp_path = "temp_nwp_ukv.zarr"
-        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
 
-        temp_nwp_path = "temp_nwp_ecmwf.zarr"
-        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
         os.environ["SATELLITE_ZARR_PATH"] = "nonexistent_sat.zarr.zip"
@@ -177,8 +166,6 @@ def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
-        # Import at runtime to ensure environment variables are set
-        from pvnet_app.app import app
         app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
 
     all_models = get_all_models(get_day_ahead_only=True, use_ocf_data_sampler=True)
