@@ -99,11 +99,12 @@ def app(
     The following are optional:
         - SENTRY_DSN, optional link to sentry
         - ENVIRONMENT, the environment this is running in, defaults to local
-        - USE_ADJUSTER, option to use adjuster, defaults to true
-        - SAVE_GSP_SUM, option to save gsp sum for pvnet_v2, defaults to false
-        - RUN_EXTRA_MODELS, option to run extra models, defaults to false
+        - ALLOW_ADJUSTER: Option to allow the adjuster to be used. If false this overwrites the 
+          adjuster option in the model configs so it is not used. Defaults to true.
+        - ALLOW_SAVE_GSP_SUM: Option to allow model to save the GSP sum. If false this overwrites 
+          the model configs so saving of the GSP sum is not used. Defaults to false.
         - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
-        - USE_ECMWF_ONLY, option to use ecmwf only model, defaults to false
+        - RUN_CRITICAL_MODELS_ONLY, option to run critical models only, defaults to false
         - USE_OCF_DATA_SAMPLER, option to use ocf_data_sampler, defaults to true
         - FORECAST_VALIDATE_ZIG_ZAG_WARNING, threshold for forecast zig-zag warning,
           defaults to 250 MW.
@@ -135,11 +136,10 @@ def app(
 
     # --- Unpack the environment variables
     use_day_ahead_model = get_boolean_env_var("DAY_AHEAD_MODEL", default=False)
-    use_ecmwf_only = get_boolean_env_var("USE_ECMWF_ONLY", default=False)
-    run_extra_models = get_boolean_env_var("RUN_EXTRA_MODELS", default=False)
+    run_critical_models_only = get_boolean_env_var("RUN_CRITICAL_MODELS_ONLY", default=False)
     use_ocf_data_sampler = get_boolean_env_var("USE_OCF_DATA_SAMPLER", default=True)
-    use_adjuster = get_boolean_env_var("USE_ADJUSTER", default=True)
-    save_gsp_sum = get_boolean_env_var("SAVE_GSP_SUM", default=False)
+    allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
+    allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
 
     zig_zag_warning_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
@@ -162,20 +162,19 @@ def app(
     logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
     logger.info(f"Using {num_workers} workers")
     logger.info(f"Using day ahead model: {use_day_ahead_model}")
-    logger.info(f"Using ecmwf only: {use_ecmwf_only}")
-    logger.info(f"Running extra models: {run_extra_models}")
-    logger.info(f"Using adjuster: {use_adjuster}")
-    logger.info(f"Saving GSP sum: {save_gsp_sum}")
+    logger.info(f"Running critical models only: {run_critical_models_only}")
+    logger.info(f"Allow adjuster: {allow_adjuster}")
+    logger.info(f"Allow saving GSP sum: {allow_save_gsp_sum}")
 
     # --- Get the model configurations
     model_configs = get_all_models(
-        allow_use_adjuster=use_adjuster,
-        allow_save_gsp_sum=save_gsp_sum,
-        get_ecmwf_only=use_ecmwf_only,
+        allow_adjuster=allow_adjuster,
+        allow_save_gsp_sum=allow_save_gsp_sum,
+        get_critical_only=run_critical_models_only,
         get_day_ahead_only=use_day_ahead_model,
-        run_extra_models=run_extra_models,
         use_ocf_data_sampler=use_ocf_data_sampler,
     )
+
     if len(model_configs)==0:
         raise Exception("No models found after filtering")
 

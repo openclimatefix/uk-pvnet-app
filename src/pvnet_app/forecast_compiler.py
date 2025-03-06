@@ -73,7 +73,7 @@ class ForecastCompiler:
         self.apply_adjuster = model_config.use_adjuster
         self.save_gsp_sum = model_config.save_gsp_sum
         self.save_gsp_to_recent = model_config.save_gsp_to_recent
-        self.verbose = model_config.verbose
+        self.verbose_logging = model_config.verbose_logging
         self.use_legacy = use_legacy            
 
         # Create stores for the predictions
@@ -141,7 +141,7 @@ class ForecastCompiler:
 
     def log_info(self, message: str) -> None:
         """Maybe log message depending on verbosity"""
-        if self.verbose:
+        if self.verbose_logging:
             logger.info(message)
     
 

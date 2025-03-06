@@ -10,7 +10,7 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 
 def test_data_config():
 
-    models = get_all_models(run_extra_models=True, use_ocf_data_sampler=True)
+    models = get_all_models(get_critical_only=False, use_ocf_data_sampler=True)
 
     with tempfile.TemporaryDirectory() as tmpdirname:
 
@@ -35,7 +35,7 @@ def test_data_config():
 
 def test_get_datapipes_dataloader(db_url, test_t0):
 
-    models = get_all_models(run_extra_models=True, use_ocf_data_sampler=False)
+    models = get_all_models(get_critical_only=False, use_ocf_data_sampler=False)
     for model_config in models:
 
         # get config from huggingface

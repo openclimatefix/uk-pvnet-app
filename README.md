@@ -24,15 +24,16 @@ The following environment variables are used in the app:
 
 #### These control the model(s) run
 
-- `RUN_EXTRA_MODELS`: Option to run extra models. Defaults to false.
+- `RUN_CRITICAL_MODELS_ONLY`: Option to run critical models only. Defaults to false.
 - `DAY_AHEAD_MODEL`: Option to use day ahead model. Defaults to false.
-- `USE_ECMWF_ONLY`: Option to use ECMWF only model. Defaults to false.
 - `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
 
 #### These control the saved results
 
-- `USE_ADJUSTER`: Option to use adjuster. Defaults to true.
-- `SAVE_GSP_SUM`: Option to save GSP sum for PVNet V2. Defaults to false.
+- `ALLOW_ADJUSTER`: Option to allow the adjuster to be used. If false this overwrites the adjuster 
+  option in the model configs so it is not used. Defaults to true.
+- `ALLOW_SAVE_GSP_SUM`: Option to allow model to save the GSP sum. If false this overwrites the
+  model configs so saving of the GSP sum is not used. Defaults to false.
 
 #### These extra varaibles control validation and logging
 
@@ -55,9 +56,9 @@ export DB_URL="postgresql://user:password@localhost:5432/dbname"
 export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
 export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
 export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
-export USE_ADJUSTER="true"
-export SAVE_GSP_SUM="false"
-export RUN_EXTRA_MODELS="false"
+export ALLOW_ADJUSTER="true"
+export ALLOW_SAVE_GSP_SUM="false"
+export RUN_CRITICAL_MODELS_ONLY="true"
 export DAY_AHEAD_MODEL="false"
 export SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
 export ENVIRONMENT="production"

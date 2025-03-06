@@ -27,13 +27,20 @@ class ModelConfig(BaseModel):
         False, 
         description="Whether to save the sum of GSPs as welll as the national estimate"
     )
-    verbose: bool = Field(False, description="Whether to log verbose output for the model")
+    verbose_logging: bool = Field(False, description="Whether to log verbose output for the model")
     save_gsp_to_recent: bool = Field(
         False, 
         description="Whether to save the GSP results to the `ForecastValueLastSevenDays` table",
     )
-    day_ahead: bool = Field(False, description="If this model is for day-ahead forecasts or not")
-    ecmwf_only: bool = Field(False, description="If this model is only using ecmwf data")
+    is_day_ahead: bool = Field(
+        False, 
+        description="If this model makes day-ahead forecasts (as opposed to intra-day)",
+    )
+    is_critical: bool = Field(
+        False, 
+        description="If this model must always be part of the critial set of models which should "
+        "always be run",
+    )
     uses_satellite_data: bool = Field(
         True, 
         description="If this model uses satellite data (currently this is only used in tests)"
@@ -64,22 +71,20 @@ class ModelConfigCollection(BaseModel):
 
 
 def get_all_models(
-    allow_use_adjuster: bool = True,
+    allow_adjuster: bool = True,
     allow_save_gsp_sum: bool = True,
-    get_ecmwf_only: bool = False,
+    get_critical_only: bool = False,
     get_day_ahead_only: bool = False,
-    run_extra_models: bool = False,
     use_ocf_data_sampler: bool = True,
 ) -> list[ModelConfig]:
     """Returns all the models for a given client
 
     Args:
-        allow_use_adjuster: If set to false all models will have use_adjuster set to false
-        allow_save_gsp_sum: If set to false all models will have save_gsp_sum set to false
-        get_ecmwf_only: If only the ECMWF model should be returned
+        allow_adjuster: If set to false, all models will have use_adjuster set to false
+        allow_save_gsp_sum: If set to false, all models will have save_gsp_sum set to false
+        get_critical_only: If only the critical models should be returned
         get_day_ahead_only: If only the day-ahead model should be returned
-        run_extra_models: If all extra models should be returned
-        use_ocf_data_sampler: If the ocf-data-sampler models should be returned
+        use_ocf_data_sampler: If only the ocf-data-sampler models should be returned
     """
     
     filename = files("pvnet_app.model_configs").joinpath("all_models.yaml")
@@ -93,7 +98,7 @@ def get_all_models(
             raise config_error
 
     # Override the use_adjuster and save_gsp_sum properties
-    if not allow_use_adjuster:
+    if not allow_adjuster:
         for model in model_collection.models:
             model.use_adjuster = False
     if not allow_save_gsp_sum:
@@ -103,32 +108,34 @@ def get_all_models(
     # Filter models
     filtered_models = model_collection.models.copy()
 
-    if get_ecmwf_only:
-        log.info("Filtering for ECMWF model only")
-        filtered_models = [model for model in filtered_models if model.ecmwf_only]
+    if get_critical_only:
+        log.info("Filtering to critical models")
+        filtered_models = [model for model in filtered_models if model.is_critical]
 
     if get_day_ahead_only:
-        log.info("Filtering for Day Ahead model")
-        filtered_models = [model for model in filtered_models if model.day_ahead]
+        log.info("Filtering to day-ahead models")
+        filtered_models = [model for model in filtered_models if model.is_day_ahead]
     else:
-        log.info("Excluding Day Ahead model")
-        filtered_models = [model for model in filtered_models if not model.day_ahead]
-
-    if not run_extra_models and not get_day_ahead_only and not get_ecmwf_only:
-        log.info("Limiting to default pvnet_v2 model")
-        filtered_models = [model for model in filtered_models if model.name == "pvnet_v2"]
+        log.info("Filtering to intra-day models")
+        filtered_models = [model for model in filtered_models if not model.is_day_ahead]
 
     if use_ocf_data_sampler:
-        log.info("Filtering for models using OCF Data Sampler")
+        log.info("Filtering to models which use ocf-data-sampler")
         filtered_models = [model for model in filtered_models if model.uses_ocf_data_sampler]
     else:
-        log.info("Filtering for models not using OCF Data Sampler")
+        log.info("Filtering to models which use ocf_datapipes")
         filtered_models = [model for model in filtered_models if not model.uses_ocf_data_sampler]
+
+    # We should always have at least one model 
+    if len(filtered_models)==0:
+        raise Exception("No models found")
 
     selected_model_info = [
         (model.name, f"uses_ocf_data_sampler={model.uses_ocf_data_sampler}")
         for model in filtered_models
     ]
     log.info(f"Selected models: {selected_model_info}")
+
+
 
     return filtered_models
