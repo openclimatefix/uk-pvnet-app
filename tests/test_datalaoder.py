@@ -1,13 +1,10 @@
-import os
 import tempfile
-from datetime import timedelta
 
-import pandas as pd
 from ocf_data_sampler.config import load_yaml_configuration
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.config import modify_data_config_for_production
-from pvnet_app.dataloader import get_legacy_dataloader
+from pvnet_app.dataloader import get_datapipes_dataloader
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
@@ -21,11 +18,11 @@ def test_data_config():
             # get config from huggingface
             data_config_path = PVNetBaseModel.get_data_config(
                 model.pvnet.repo,
-                revision=model.pvnet.version,
+                revision=model.pvnet.commit,
             )
 
             # make a temporary file ending in yaml
-            temp_data_config_path = os.path.join(tmpdirname, "data_config.yaml")
+            temp_data_config_path = f"{tmpdirname}/data_config.yaml"
 
             modify_data_config_for_production(
                 input_path=data_config_path,
@@ -36,9 +33,7 @@ def test_data_config():
             _ = load_yaml_configuration(temp_data_config_path)
 
 
-def test_dataloader_legacy(db_url):
-
-    os.environ["DB_URL"] = db_url
+def test_get_datapipes_dataloader(db_url, test_t0):
 
     models = get_all_models(run_extra_models=True, use_ocf_data_sampler=False)
     for model_config in models:
@@ -46,15 +41,14 @@ def test_dataloader_legacy(db_url):
         # get config from huggingface
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
-            revision=model_config.pvnet.version,
+            revision=model_config.pvnet.commit,
         )
 
-        t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor(timedelta(minutes=30))
-
-        _ = get_legacy_dataloader(
+        _ = get_datapipes_dataloader(
             config_filename=data_config_path,
-            t0=t0,
+            t0=test_t0,
             gsp_ids=list(range(1, 10)),
             batch_size=2,
             num_workers=1,
+            db_url=db_url,
         )

@@ -1,31 +1,28 @@
 import logging
-import warnings
 from datetime import UTC, datetime
-from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
 import pandas as pd
-import torch
 import xarray as xr
+import torch
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
 from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
-from ocf_datapipes.batch import BatchKey, NumpyBatch, NWPBatchKey
+from ocf_datapipes.batch import (
+    BatchKey, NumpyBatch, NWPBatchKey, batch_to_tensor, copy_batch_to_device
+)
 from ocf_datapipes.utils.consts import ELEVATION_MEAN, ELEVATION_STD
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 
-from pvnet_app.model_configs.pydantic_models import Model
-from pvnet_app.validate_forecast import validate_forecast
+
+from pvnet_app.model_configs.pydantic_models import ModelConfig
+from pvnet_app.consts import __version__
 
 logger = logging.getLogger(__name__)
 
-try:
-    __version__ = version("pvnet-app")
-except PackageNotFoundError:
-    __version__ = "v?"
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -40,18 +37,18 @@ _model_mismatch_msg = (
 
 
 class ForecastCompiler:
-    """Class for making and compiling solar forecasts from for all GB GSPsn and national total"""
+    """Class for making and compiling solar forecasts from for all GB GSPs and national total"""
 
     def __init__(
         self,
-        model_config: Model,
+        model_config: ModelConfig,
         device: torch.device,
         t0: pd.Timestamp,
         gsp_capacities: xr.DataArray,
         national_capacity: float,
         use_legacy: bool = False,
     ):
-        """Class for making and compiling solar forecasts from for all GB GSPsn and national total
+        """Class for making and compiling solar forecasts from for all GB GSPs and national total
 
         Args:
             model_config: The configuration for the model
@@ -62,7 +59,7 @@ class ForecastCompiler:
             use_legacy: Whether to run legacy dataloader
         """
         model_name = model_config.pvnet.repo
-        model_version = model_config.pvnet.version
+        model_version = model_config.pvnet.commit
 
         logger.info(f"Loading model: {model_name} - {model_version}")
 
@@ -77,7 +74,7 @@ class ForecastCompiler:
         self.save_gsp_sum = model_config.save_gsp_sum
         self.save_gsp_to_recent = model_config.save_gsp_to_recent
         self.verbose = model_config.verbose
-        self.use_legacy = use_legacy
+        self.use_legacy = use_legacy            
 
         # Create stores for the predictions
         self.normed_preds = []
@@ -89,7 +86,7 @@ class ForecastCompiler:
             model_name,
             model_version,
             model_config.summation.repo,
-            model_config.summation.version,
+            model_config.summation.commit,
             device,
         )
 
@@ -97,6 +94,7 @@ class ForecastCompiler:
         self.valid_times = t0 + pd.timedelta_range(
             start="30min", freq="30min", periods=self.model.forecast_len,
         )
+
 
     @staticmethod
     def load_model(
@@ -106,7 +104,16 @@ class ForecastCompiler:
         summation_version: str | None,
         device: torch.device,
     ):
-        """Load the GSP and summation models"""
+        """Load the GSP and summation models
+        
+        Args:
+            model_name: The huggingface repo of the GSP model
+            model_version: The commit hash of the GSP repo to load
+            summation_name: The huggingface repo of the summation model
+            summation_version: The commit hash of the summation model to load
+            device: The device the models will be run on
+        """
+        
         # Load the GSP level model
         model = PVNetBaseModel.from_pretrained(
             model_id=model_name,
@@ -124,24 +131,26 @@ class ForecastCompiler:
 
             # Compare the current GSP model with the one the summation model was trained on
             this_gsp_model = (model_name, model_version)
-            sum_expected_gsp_model = (
-                sum_model.pvnet_model_name, sum_model.pvnet_model_version)
+            sum_expected_gsp_model = (sum_model.pvnet_model_name, sum_model.pvnet_model_version)
 
             if sum_expected_gsp_model != this_gsp_model:
-                warnings.warn(_model_mismatch_msg.format(
-                    *this_gsp_model, *sum_expected_gsp_model))
+                logger.warning(_model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model))
 
         return model, sum_model
+
 
     def log_info(self, message: str) -> None:
         """Maybe log message depending on verbosity"""
         if self.verbose:
             logger.info(message)
+    
 
+    @torch.no_grad
     def predict_batch(self, batch: NumpyBatch) -> None:
         """Make predictions for a batch and store results internally"""
-        self.log_info(
-            f"Predicting for model: {self.model_name}-{self.model_version}")
+        self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
+
+        batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
         if not self.use_legacy:
             change_keys_to_ocf_datapipes_keys(batch)
@@ -153,15 +162,9 @@ class ForecastCompiler:
 
         self.log_info(f"{batch[BatchKey.gsp_id]=}")
 
-        # TODO: This change should be moved inside PVNet
+        # TODO: This maintains compatibility between data-sampler and the old PVNet. This will go 
+        # after upgrading to PVNet 4.0 and removing support for legacy models run with datapipes
         batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
-
-        # validate nwp data is not all zeros
-        for nwp_source in batch[BatchKey.nwp].keys():
-            if (batch[BatchKey.nwp][nwp_source][NWPBatchKey.nwp] == 0).all():
-                raise ValueError(f"nwp data for {nwp_source} is all zeros. "
-                                 f"This cant be right. "
-                                 f"To fix this check raw NWP data, and the nwp-consumer")
 
         # Run batch through model
         preds = self.model(batch).detach().cpu().numpy()
@@ -191,6 +194,8 @@ class ForecastCompiler:
         self.log_info(f"GSP IDs: {these_gsp_ids}")
         self.log_info(f"Max prediction: {np.max(preds, axis=1)}")
 
+
+    @torch.no_grad
     def compile_forecasts(self) -> None:
         """Compile all forecasts internally in a single DataArray
 
@@ -202,39 +207,33 @@ class ForecastCompiler:
         # Compile results from all batches
         normed_preds = np.concatenate(self.normed_preds)
         sun_down_masks = np.concatenate(self.sun_down_masks)
-        gsp_ids_all_batches = np.concatenate(self.gsp_ids_each_batch).squeeze()
+        # TODO: With the datapipes, the GSP IDs are in a 2D array. The squeeze below can be removed 
+        # after removing support for legacy models run with datapipes
+        gsp_ids = np.concatenate(self.gsp_ids_each_batch).squeeze()
 
         # Reorder GSPs which can end up shuffled if multiprocessing is used
-        inds = gsp_ids_all_batches.argsort()
+        inds = gsp_ids.argsort()
 
         normed_preds = normed_preds[inds]
         sun_down_masks = sun_down_masks[inds]
-        gsp_ids_all_batches = gsp_ids_all_batches[inds]
+        gsp_ids = gsp_ids[inds]
 
         # Merge batch results to xarray DataArray
-        da_normed = self.preds_to_dataarray(
-            normed_preds, self.model.output_quantiles, gsp_ids_all_batches,
-        )
+        da_normed = self.preds_to_dataarray(normed_preds, self.model.output_quantiles, gsp_ids)
 
         da_sundown_mask = xr.DataArray(
             data=sun_down_masks,
             dims=["gsp_id", "target_datetime_utc"],
             coords=dict(
-                gsp_id=gsp_ids_all_batches,
+                gsp_id=gsp_ids,
                 target_datetime_utc=self.valid_times,
             ),
         )
 
-        # Check that the GSP capacities are not NaNs
-        if np.isnan(self.gsp_capacities.values).any():
-            raise ValueError("GSP capacities contain NaNs")
-
         # Multiply normalised forecasts by capacities and clip negatives
         self.log_info(f"Converting to absolute MW using {self.gsp_capacities}")
-        da_abs = da_normed.clip(0, None) * \
-            self.gsp_capacities.values[:, None, None]
-        max_preds = da_abs.sel(output_label="forecast_mw").max(
-            dim="target_datetime_utc")
+        da_abs = da_normed.clip(0, None) * self.gsp_capacities.values[:, None, None]
+        max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
         self.log_info(f"Maximum predictions: {max_preds}")
 
         # Apply sundown mask
@@ -243,8 +242,9 @@ class ForecastCompiler:
         if self.summation_model is None:
             self.log_info("Summing across GSPs to produce national forecast")
             da_abs_national = (
-                da_abs.sum(dim="gsp_id").expand_dims(
-                    dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
+                da_abs.sum(dim="gsp_id")
+                .expand_dims(dim="gsp_id", axis=0)
+                .assign_coords(gsp_id=[0])
             )
         else:
             self.log_info("Using summation model to produce national forecast")
@@ -253,15 +253,13 @@ class ForecastCompiler:
             inputs = {
                 "pvnet_outputs": torch.Tensor(normed_preds[np.newaxis]).to(self.device),
                 "effective_capacity": (
-                    torch.Tensor(self.gsp_capacities.values /
-                                 self.national_capacity)
+                    torch.Tensor(self.gsp_capacities.values/self.national_capacity)
                     .to(self.device)
                     .unsqueeze(0)
                     .unsqueeze(-1)
                 ),
             }
-            normed_national = self.summation_model(
-                inputs).detach().squeeze().cpu().numpy()
+            normed_national = self.summation_model(inputs).detach().squeeze().cpu().numpy()
 
             # Convert national predictions to DataArray
             da_normed_national = self.preds_to_dataarray(
@@ -271,8 +269,7 @@ class ForecastCompiler:
             )
 
             # Multiply normalised forecasts by capacity, clip negatives
-            da_abs_national = da_normed_national.clip(
-                0, None) * self.national_capacity
+            da_abs_national = da_normed_national.clip(0, None) * self.national_capacity
 
             # Apply sundown mask - All GSPs must be masked to mask national
             da_abs_national = da_abs_national.where(
@@ -282,19 +279,9 @@ class ForecastCompiler:
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}",
         )
 
-        # Pass the entire national forecast array (for potential extra checks in future).
-        national_forecast_values = da_abs_national.sel(
-            output_label="forecast_mw", gsp_id=0).values
-
-        national_forecast_values = pd.Series(data=national_forecast_values, index=self.valid_times)
-        validate_forecast(
-            national_forecast_values=national_forecast_values,
-            national_capacity=self.national_capacity,
-            logger_func=self.log_info,
-        )
-
         # Store the compiled predictions internally
         self.da_abs_all = xr.concat([da_abs_national, da_abs], dim="gsp_id")
+
 
     def preds_to_dataarray(
         self,
@@ -322,6 +309,7 @@ class ForecastCompiler:
             ),
         )
         return da
+
 
     def log_forecast_to_database(self, session: Session) -> None:
         """Log the compiled forecast to the database"""
@@ -397,9 +385,13 @@ class ForecastCompiler:
                 save_to_last_seven_days=True,
             )
 
+
     @staticmethod
     def convert_dataarray_to_forecasts(
-        da_preds: xr.DataArray, session: Session, model_tag: str, version: str,
+        da_preds: xr.DataArray, 
+        session: Session, 
+        model_tag: str, 
+        version: str,
     ) -> list[ForecastSQL]:
         """Make a ForecastSQL object from a DataArray.
 
@@ -411,27 +403,21 @@ class ForecastCompiler:
         Return:
             List of ForecastSQL objects
         """
-        assert "target_datetime_utc" in da_preds.coords
-        assert "gsp_id" in da_preds.coords
-        assert "forecast_mw" in da_preds.output_label
 
-        # get last input data
-        input_data_last_updated = get_latest_input_data_last_updated(
-            session=session)
+        # Get time when the input data was last updated
+        # TODO: This time will probably be wrong. It can take 15 mins to run the app, so the 
+        # forecast will have downloaded older data than is reflected here
+        input_data_last_updated = get_latest_input_data_last_updated(session=session)
 
-        # get model name
         model = get_model(name=model_tag, version=version, session=session)
 
         forecasts = []
 
         for gsp_id in da_preds.gsp_id.values:
 
-            # make forecast values
-            forecast_values = []
-
-            location = get_location(session=session, gsp_id=int(gsp_id))
-
             da_gsp = da_preds.sel(gsp_id=gsp_id)
+
+            forecast_values = []
 
             for target_time in pd.to_datetime(da_gsp.target_datetime_utc.values):
 
@@ -446,29 +432,26 @@ class ForecastCompiler:
 
                 properties = {}
 
-                if "forecast_mw_plevel_10" in da_gsp_time.output_label:
-                    p10 = da_gsp_time.sel(
-                        output_label="forecast_mw_plevel_10").item()
-                    # `p10` can be NaN if PVNet has probabilistic outputs and PVNet_summation
-                    # doesn't, or vice versa. Do not log the value if NaN
-                    if not np.isnan(p10):
-                        properties["10"] = p10
+                for p_level in ["10", "90"]:
 
-                if "forecast_mw_plevel_90" in da_gsp_time.output_label:
-                    p90 = da_gsp_time.sel(
-                        output_label="forecast_mw_plevel_90").item()
-
-                    if not np.isnan(p90):
-                        properties["90"] = p90
+                    if f"forecast_mw_plevel_{p_level}" in da_gsp_time.output_label:
+                        p_val = da_gsp_time.sel(output_label=f"forecast_mw_plevel_{p_level}").item()
+                        # `p[10, 90]` can be NaN if PVNet has probabilistic outputs and 
+                        # PVNet_summation doesn't, or vice versa. Do not log the value if NaN
+                        if not np.isnan(p_val):
+                            properties[p_level] = p_val
 
                 if len(properties) > 0:
                     forecast_value_sql.properties = properties
 
                 forecast_values.append(forecast_value_sql)
 
-            # make forecast object
+            location = get_location(session=session, gsp_id=int(gsp_id))
+
             forecast = ForecastSQL(
                 model=model,
+                # TODO: Should this time reflect when the forecast is saved, or the forecast 
+                # init-time?
                 forecast_creation_time=datetime.now(tz=UTC),
                 location=location,
                 input_data_last_updated=input_data_last_updated,
@@ -484,14 +467,18 @@ class ForecastCompiler:
 def change_keys_to_ocf_datapipes_keys(batch):
     """Change string keys from ocf-data-sampler to BatchKey from ocf-datapipes
 
+    The key change is done in-place
+
     Until PVNet is merged from dev-data-sampler, we need to do this.
     After this, we might need to change the other way around, for the legacy models.
     """
-    keys_to_rename = [BatchKey.satellite_actual,
-                      BatchKey.nwp,
-                      BatchKey.gsp_solar_elevation,
-                      BatchKey.gsp_solar_azimuth,
-                      BatchKey.gsp_id]
+    keys_to_rename = [
+        BatchKey.satellite_actual,
+        BatchKey.nwp,
+        BatchKey.gsp_solar_elevation,
+        BatchKey.gsp_solar_azimuth,
+        BatchKey.gsp_id
+    ]
 
     for key in keys_to_rename:
         if key.name in batch:
@@ -499,7 +486,7 @@ def change_keys_to_ocf_datapipes_keys(batch):
             del batch[key.name]
 
     if BatchKey.nwp in batch.keys():
-        nwp_config = batch[BatchKey.nwp]
-        for nwp_source in nwp_config.keys():
-            batch[BatchKey.nwp][nwp_source][NWPBatchKey.nwp] = batch[BatchKey.nwp][nwp_source]["nwp"]
-            del batch[BatchKey.nwp][nwp_source]["nwp"]
+        nwp_batch = batch[BatchKey.nwp]
+        for nwp_source in nwp_batch.keys():
+            nwp_batch[nwp_source][NWPBatchKey.nwp] = nwp_batch[nwp_source]["nwp"]
+            del nwp_batch[nwp_source]["nwp"]
