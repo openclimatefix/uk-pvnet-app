@@ -44,8 +44,14 @@ logger = logging.getLogger()
 
 # Get rid of the verbose sqlalchemy logs
 logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
-# Turn off logs from aiobotocore
-logging.getLogger("aiobotocore").setLevel(logging.ERROR)  
+
+# Disable logs from aiobotocore and its submodules
+logging.getLogger("aiobotocore").setLevel(logging.CRITICAL)
+logging.getLogger("aiobotocore.httpchecksum").setLevel(logging.CRITICAL)
+
+# Ensure logs don't propagate
+logging.getLogger("aiobotocore").propagate = False
+logging.getLogger("aiobotocore.httpchecksum").propagate = False  
 
 # Sentry
 sentry_sdk.init(
