@@ -11,7 +11,7 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 def test_model_loading():
     """Test that all configured models can be loaded correctly."""
 
-    models = get_all_models(run_extra_models=True, use_ocf_data_sampler=True)    
+    models = get_all_models(get_critical_only=False, use_ocf_data_sampler=True)    
     device = torch.device("cpu")
     
     for model_config in models:

@@ -36,8 +36,8 @@ def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_
             sat_5_data_zero_delay.to_zarr(store)
 
         # Set environmental variables
-        os.environ["RUN_EXTRA_MODELS"] = "True"
-        os.environ["SAVE_GSP_SUM"] = "True"
+        os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
+        os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["DAY_AHEAD_MODEL"] = "False"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
@@ -48,7 +48,7 @@ def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_
 
         app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
 
-    all_models = get_all_models(run_extra_models=True)
+    all_models = get_all_models(get_critical_only=False, use_ocf_data_sampler=True)
 
     # Check correct number of forecasts have been made
     # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
@@ -98,8 +98,8 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
         # There is no satellite data available at the environ path
         os.environ["SATELLITE_ZARR_PATH"] = "nonexistent_sat.zarr.zip"
 
-        os.environ["RUN_EXTRA_MODELS"] = "True"
-        os.environ["SAVE_GSP_SUM"] = "True"
+        os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
+        os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["DAY_AHEAD_MODEL"] = "False"
         os.environ["USE_OCF_DATA_SAMPLER"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
@@ -109,7 +109,7 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
 
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run
-    all_models = get_all_models(run_extra_models=True)
+    all_models = get_all_models()
     all_models = [model for model in all_models if not model.uses_satellite_data]
 
     # Check correct number of forecasts have been made
@@ -161,7 +161,7 @@ def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf
 
         os.environ["SATELLITE_ZARR_PATH"] = "nonexistent_sat.zarr.zip"
         os.environ["DAY_AHEAD_MODEL"] = "True"
-        os.environ["RUN_EXTRA_MODELS"] = "False"
+        os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["USE_OCF_DATA_SAMPLER"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
