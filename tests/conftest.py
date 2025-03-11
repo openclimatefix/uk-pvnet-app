@@ -26,13 +26,13 @@ def test_t0():
     return pd.Timestamp.now(tz=None).floor(timedelta(minutes=30))
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def db_url():
     with PostgresContainer("postgres:16.1") as postgres:
         yield postgres.get_connection_url()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def db_connection(test_t0, db_url):
     """Database engine, this includes the table creation."""
 
