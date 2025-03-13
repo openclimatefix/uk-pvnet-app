@@ -22,17 +22,30 @@ The following environment variables are used in the app:
 
 ### Optional Environment Variables
 
-- `PVNET_V2_VERSION`: The version of the PVNet V2 model to use. Default is a version above.
-- `USE_ADJUSTER`: Option to use adjuster. Defaults to true.
-- `SAVE_GSP_SUM`: Option to save GSP sum for PVNet V2. Defaults to false.
-- `RUN_EXTRA_MODELS`: Option to run extra models. Defaults to false.
+#### These control the model(s) run
+
+- `RUN_CRITICAL_MODELS_ONLY`: Option to run critical models only. Defaults to false.
 - `DAY_AHEAD_MODEL`: Option to use day ahead model. Defaults to false.
+- `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
+
+#### These control the saved results
+
+- `ALLOW_ADJUSTER`: Option to allow the adjuster to be used. If false this overwrites the adjuster 
+  option in the model configs so it is not used. Defaults to true.
+- `ALLOW_SAVE_GSP_SUM`: Option to allow model to save the GSP sum. If false this overwrites the
+  model configs so saving of the GSP sum is not used. Defaults to false.
+
+#### These extra varaibles control validation and logging
+
 - `SENTRY_DSN`: Optional link to Sentry.
 - `ENVIRONMENT`: The environment this is running in. Defaults to local.
-- `USE_ECMWF_ONLY`: Option to use ECMWF only model. Defaults to false.
-- `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
-- `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250 MW.
-- `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500 MW.
+- `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250MW.
+- `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500MW.
+- `FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT`, when the solar elevation is above this,
+  we expect positive forecast values. Defaults to 10 degrees.
+- `FILTER_BAD_FORECASTS`: If set to true and the forecast fails validation checks, it will not be 
+  saved. Defaults to false, where all forecasts are saved even if they fail the checks.
+
 
 ### Examples
 
@@ -43,10 +56,9 @@ export DB_URL="postgresql://user:password@localhost:5432/dbname"
 export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
 export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
 export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
-export PVNET_V2_VERSION="v2.0.0"
-export USE_ADJUSTER="true"
-export SAVE_GSP_SUM="false"
-export RUN_EXTRA_MODELS="false"
+export ALLOW_ADJUSTER="true"
+export ALLOW_SAVE_GSP_SUM="false"
+export RUN_CRITICAL_MODELS_ONLY="true"
 export DAY_AHEAD_MODEL="false"
 export SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
 export ENVIRONMENT="production"
@@ -90,7 +102,7 @@ After the ML models have run, we check the following
 - The forecast is not above 110% of the national capacity. An error is raised if any forecast value is above 110% of the national capacity.
 - The forecast is not above 100 GW, any forecast value above 30 GW we get a warning but any forecast value above 100 GW we raise an error. 
 - If the forecast goes up, then down, then up, more than 500 MW we raise an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
-- TODO: Check positive values in day: https://github.com/openclimatefix/uk-pvnet-app/issues/200
+- Check positive values in day. If the sun is up, we expect positive values. 
 
 ## Development
 

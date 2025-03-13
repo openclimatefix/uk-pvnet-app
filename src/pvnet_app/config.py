@@ -4,14 +4,23 @@ from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path, sat_path
 
 
 def load_yaml_config(path: str) -> dict:
-    """Load config file from path"""
+    """Load config file from path
+    
+    Args:
+        path: The path to the config file
+    """
     with open(path) as file:
         config = yaml.load(file, Loader=yaml.FullLoader)
     return config
 
 
 def save_yaml_config(config: dict, path: str) -> None:
-    """Save config file to path"""
+    """Save config file to path
+    
+    Args:
+        config: The config to save
+        path: The path to save the config file
+    """
     with open(path, "w") as file:
         yaml.dump(config, file, default_flow_style=False)
 
@@ -21,7 +30,7 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
 
     Args:
         config: The data config
-        gsp_path: For lagacy usage only
+        gsp_path: Address of the GSP database (for lagacy usage only)
     """
     production_paths = {
         "gsp": gsp_path,
@@ -33,7 +42,6 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
     for source in ["gsp", "satellite"]:
         if source in config["input_data"]:
             if config["input_data"][source][f"{source}_zarr_path"] != "":
-                assert source in production_paths, f"Missing production path: {source}"
                 config["input_data"][source][f"{source}_zarr_path"] = production_paths[source]
 
     # NWP is nested so much be treated separately
@@ -41,7 +49,6 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
             if nwp_config[nwp_source]["nwp_zarr_path"] != "":
-                assert "nwp" in production_paths, "Missing production path: nwp"
                 assert nwp_source in production_paths["nwp"], f"Missing NWP path: {nwp_source}"
                 nwp_config[nwp_source]["nwp_zarr_path"] = production_paths["nwp"][nwp_source]
 
@@ -53,7 +60,6 @@ def overwrite_config_dropouts(config: dict) -> dict:
 
     Args:
         config: The data config
-
     """
     # Replace data sources
     if "satellite" in config["input_data"]:
@@ -83,7 +89,6 @@ def reformat_config_data_sampler(config: dict) -> dict:
 
     Args:
         config: The data config
-
     """
     # Replace satellite
     if "satellite" in config["input_data"]:
@@ -100,9 +105,11 @@ def reformat_config_data_sampler(config: dict) -> dict:
                 ("satellite_channels", "channels"),
             ]
 
-            update_config(rename_pairs=rename_pairs,
-                          config=satellite_config,
-                          remove_keys=["live_delay_minutes"])
+            update_config(
+                rename_pairs=rename_pairs,
+                config=satellite_config,
+                remove_keys=["live_delay_minutes"]
+            )
 
     # NWP is nested so must be treated separately
     if "nwp" in config["input_data"]:
@@ -133,16 +140,18 @@ def reformat_config_data_sampler(config: dict) -> dict:
 
         update_config(rename_pairs=rename_pairs, config=gsp_config)
 
-    update_config(rename_pairs=[],
-                  config=config["input_data"],
-                  change_history_minutes=False,
-                  remove_keys=["default_forecast_minutes", "default_history_minutes"])
+    update_config(
+        rename_pairs=[],
+        config=config["input_data"],
+        change_history_minutes=False,
+        remove_keys=["default_forecast_minutes", "default_history_minutes"]
+    )
 
     return config
 
 
 def update_config(rename_pairs: list, config: dict, change_history_minutes: bool = True, remove_keys=None):
-    """Update the config with rename pairs, and remove keys if they exist
+    """Update the config in place with rename pairs, and remove keys if they exist
 
     1. Rename keys in the config
     2. Change history minutes to interval start minutes, with a negative value
@@ -171,14 +180,17 @@ def update_config(rename_pairs: list, config: dict, change_history_minutes: bool
 
 
 def modify_data_config_for_production(
-    input_path: str, output_path: str, gsp_path: str = "", reformat_config: bool = False,
+    input_path: str, 
+    output_path: str, 
+    gsp_path: str = "", 
+    reformat_config: bool = False,
 ) -> None:
     """Resave the data config with the data source filepaths and dropouts overwritten
 
     Args:
         input_path: Path to input datapipes configuration file
         output_path: Location to save the output configuration file
-        gsp_path: For legacy usage only
+        gsp_path: Address of the GSP database (for lagacy usage only)
         reformat_config: Reformat config to new format
     """
     config = load_yaml_config(input_path)
