@@ -5,7 +5,7 @@ on:
     branches-ignore: ['main']
     paths-ignore: ['README.md']
   pull_request:
-    types: [opened, reopened, synchronize]  # <- Added "synchronize" for new commits
+    types: [opened, reopened, synchronize]  
     paths-ignore: ['README.md']
 
 jobs:
