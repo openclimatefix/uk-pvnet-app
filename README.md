@@ -66,6 +66,21 @@ export USE_ECMWF_ONLY="false"
 export USE_OCF_DATA_SAMPLER="true"
 ```
 
+## ML Models Used for PVNet
+
+| Model Name                | Satellite | NWP UKV | NWP ECMWF | Legacy | PVNet Hugging Face Link | PVNet Summation Hugging Face Link |
+|---------------------------|-----------|---------|-----------|--------|--------------------------|----------------------------------|
+| **pvnet_v2**              | yes       | yes     | yes       | no     | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/f3135c47eb0f21320dbd8c590bdd03dfafc39bca) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/01ca2b6e37a71deb446bb90471b44a1851d3e43f) |
+| **pvnet_ecmwf**           | no        | no      | yes       | no     | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/20b882bd4ceaee190a1c994d861f8e5d553ea843) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/b40867abbc2e5163c9a665daf511cbf372cc5ac9) |
+| **pvnet-sat0**            | yes       | no      | no        | no     | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/d81a9cf8adca49739ea6a3d031e36510f44744a1) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/7057e8c2baa065aa4024dd6b6381b71ac4879c87) |
+| **pvnet-sat0-only**       | yes       | no      | no        | no     | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/158f9aeb006dddc10ef67612a91e7175a87b8dd0) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/c5371880120503646327dc2df2da2698de82982e) |
+| **pvnet-ukv-only**        | no        | yes     | no        | no     | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/4009df82e63e30546e2000728bff34b9c0520617) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/1789cd9bdaded3896587efd54d3e9a257762fb63) |
+| **pvnet_day_ahead**       | no        | yes     | yes       | no     | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region_day_ahead/tree/263741ebb6b71559d113d799c9a579a973cc24ba) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_summation_uk_national_day_ahead/tree/7a2f26b94ac261160358b224944ef32998bd60ce) |
+| **Legacy pvnet_v2**       | yes       | yes     | yes       | yes    | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/a7fd71727f4cb2b933992b2108638985e24fa5a3) |
+| **Legacy pvnet_ecmwf**    | no        | no      | yes       | yes    | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/c14f7427d9854d63430aa936ce45f55d3818d033) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/4fe6b1441b6dd549292c201ed85eee156ecc220c) |
+| **Legacy pvnet_day_ahead**| yes       | yes     | yes       | yes    | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region_day_ahead/tree/d87565731692a6003e43caac4feaed0f69e79272) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_summation_uk_national_day_ahead/tree/ed60c5d32a020242ca4739dcc6dbc8864f783a08) |
+
+
 ## Validation Checks
 
 We run a number of different validation checks on the data and the forecasts that are made. 
@@ -140,7 +155,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/mahmoud-40"><img src="https://avatars.githubusercontent.com/u/116794637?v=4?s=100" width="100px;" alt="Mahmoud Abdulmawlaa"/><br /><sub><b>Mahmoud Abdulmawlaa</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=mahmoud-40" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/meghana-0211"><img src="https://avatars.githubusercontent.com/u/136890863?v=4?s=100" width="100px;" alt="Meghana Sancheti"/><br /><sub><b>Meghana Sancheti</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=meghana-0211" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/mukiralad"><img src="https://avatars.githubusercontent.com/u/67241568?v=4?s=100" width="100px;" alt="Dheeraj Mukirala"/><br /><sub><b>Dheeraj Mukirala</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=mukiralad" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/utsav-pal"><img src="https://avatars.githubusercontent.com/u/159793156?v=4?s=100" width="100px;" alt="utsav-pal"/><br /><sub><b>utsav-pal</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=utsav-pal" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/utsav-pal"><img src="https://avatars.githubusercontent.com/u/159793156?v=4?s=100" width="100px;" alt="utsav-pal"/><br /><sub><b>utsav-pal</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=utsav-pal" title="Code">💻</a> <a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=utsav-pal" title="Documentation">📖</a></td>
     </tr>
   </tbody>
 </table>
