@@ -368,10 +368,52 @@ class UKVDownloader(NWPDownloader):
         """
         return ds.astype(np.float16)
 
+    @staticmethod
+    def rename_variables(ds):
+        """Rename the ECMWF variables to match the training data
+
+        Rename variable names in the variable coordinate to match the names the model expects and
+        was trained on.
+
+        This change happened in the new nwp-consumer>=1.0.0. Ideally we won't need this step in the
+        future once the training data is updated.
+        """
+
+        logger.info("Renaming the ECMWF variables")
+        ds = ds.rename({"um-ukv": "UKV"})
+
+        variable_coords = ds.variable.values
+        rename = {"cloud_cover_high": "hcc",
+                  "cloud_cover_low": "lcc",
+                  "cloud_cover_medium": "mcc",
+                  "cloud_cover_total": "tcc",
+                  "snow_depth_gl": "sde",
+                  "direct_shortwave_radiation_flux_gl": "sr",
+                  "downward_longwave_radiation_flux_gl": "dlwrf",
+                  "downward_shortwave_radiation_flux_gl": "dswrf",
+                  "downward_ultraviolet_radiation_flux_gl": "duvrs",
+                  "relative_humidity_sl": "r",
+                  "temperature_sl": "t",
+                  "total_precipitation_rate_gl": "prate",
+                  "visibility_sl": "vis",
+                  "wind_direction_10m": "wdir10",
+                  "wind_speed_10m": "si10",
+                  "wind_v_component_10m": "v10",
+                  "wind_u_component_10m": "u10"}
+
+        for k, v in rename.items():
+            variable_coords[variable_coords == k] = v
+
+        # assign the new variable names
+        ds = ds.assign_coords(variable=variable_coords)
+
+        return ds
+
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
 
         ds = self.regrid(ds)
         ds = self.fix_dtype(ds)
+        ds = self.rename_variables(ds)
 
         return ds
