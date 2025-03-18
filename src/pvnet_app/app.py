@@ -14,7 +14,7 @@ from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
-from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3
+from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3, check_model_runs_finished
 from pvnet_app.config import get_union_of_configs, save_yaml_config
 from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.data.satellite import SatelliteDownloader
@@ -115,6 +115,9 @@ def app(
         - FILTER_BAD_FORECASTS, option to filter out bad forecasts. If set to true and the forecast 
           fails the validation checks, it will not be saved. Defaults to false, where all forecasts
           are saved even if they fail the checks.
+        - RAISE_MODEL_FAILURE: Option to raise an exception if a model fails to run. If set to
+          "any" it will raise an exception if any model fails. If set to "critical" it will raise
+          an exception if any critical model fails. If not set, it will not raise an exception.
     """
 
     # ---------------------------------------------------------------------------
@@ -141,6 +144,7 @@ def app(
     allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
     allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
+    raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
 
     zig_zag_warning_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
     zig_zag_error_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
@@ -349,7 +353,13 @@ def app(
             forecast_compiler.log_forecast_to_database(session=session)
 
     logger.info("Finished forecast")
-    
+
+    if raise_model_failure in ["any", "critical"]:
+        check_model_runs_finished(
+            completed_forecasts=list(forecast_compilers.keys()),
+            model_configs=model_configs, 
+            raise_if_missing=raise_model_failure,
+        )
 
 if __name__ == "__main__":
     typer.run(app)

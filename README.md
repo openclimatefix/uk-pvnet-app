@@ -45,7 +45,9 @@ The following environment variables are used in the app:
   we expect positive forecast values. Defaults to 10 degrees.
 - `FILTER_BAD_FORECASTS`: If set to true and the forecast fails validation checks, it will not be 
   saved. Defaults to false, where all forecasts are saved even if they fail the checks.
-
+- `RAISE_MODEL_FAILURE`: Option to raise an exception if a model fails to run. If set to "any" it 
+  will raise an exception if any model fails. If set to "critical" it will raise an exception if any
+  critical model fails. If not set, it will not raise an exception.
 
 ### Examples
 
