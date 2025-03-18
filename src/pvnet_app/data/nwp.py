@@ -379,41 +379,43 @@ class UKVDownloader(NWPDownloader):
         future once the training data is updated.
         """
 
-        logger.info("Renaming the ECMWF variables")
-        ds = ds.rename({"um-ukv": "UKV"})
+        logger.info("Renaming the UKV variables")
+        if "um-ukv" in ds.data_vars:
 
-        variable_coords = ds.variable.values
-        rename = {"cloud_cover_high": "hcc",
-                  "cloud_cover_low": "lcc",
-                  "cloud_cover_medium": "mcc",
-                  "cloud_cover_total": "tcc",
-                  "snow_depth_gl": "sde",
-                  "direct_shortwave_radiation_flux_gl": "sr",
-                  "downward_longwave_radiation_flux_gl": "dlwrf",
-                  "downward_shortwave_radiation_flux_gl": "dswrf",
-                  "downward_ultraviolet_radiation_flux_gl": "duvrs",
-                  "relative_humidity_sl": "r",
-                  "temperature_sl": "t",
-                  "total_precipitation_rate_gl": "prate",
-                  "visibility_sl": "vis",
-                  "wind_direction_10m": "wdir10",
-                  "wind_speed_10m": "si10",
-                  "wind_v_component_10m": "v10",
-                  "wind_u_component_10m": "u10"}
+            ds = ds.rename({"um-ukv": "UKV"})
 
-        for k, v in rename.items():
-            variable_coords[variable_coords == k] = v
+            variable_coords = ds.variable.values
+            rename = {"cloud_cover_high": "hcc",
+                      "cloud_cover_low": "lcc",
+                      "cloud_cover_medium": "mcc",
+                      "cloud_cover_total": "tcc",
+                      "snow_depth_gl": "sde",
+                      "direct_shortwave_radiation_flux_gl": "sr",
+                      "downward_longwave_radiation_flux_gl": "dlwrf",
+                      "downward_shortwave_radiation_flux_gl": "dswrf",
+                      "downward_ultraviolet_radiation_flux_gl": "duvrs",
+                      "relative_humidity_sl": "r",
+                      "temperature_sl": "t",
+                      "total_precipitation_rate_gl": "prate",
+                      "visibility_sl": "vis",
+                      "wind_direction_10m": "wdir10",
+                      "wind_speed_10m": "si10",
+                      "wind_v_component_10m": "v10",
+                      "wind_u_component_10m": "u10"}
 
-        # assign the new variable names
-        ds = ds.assign_coords(variable=variable_coords)
+            for k, v in rename.items():
+                variable_coords[variable_coords == k] = v
+
+            # assign the new variable names
+            ds = ds.assign_coords(variable=variable_coords)
 
         return ds
 
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
 
+        ds = self.rename_variables(ds)
         ds = self.regrid(ds)
         ds = self.fix_dtype(ds)
-        ds = self.rename_variables(ds)
 
         return ds
