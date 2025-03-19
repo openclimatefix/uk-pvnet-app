@@ -6,14 +6,36 @@ from abc import ABC, abstractmethod
 from typing_extensions import override
 
 import fsspec
-import numpy as np
-import pandas as pd
-import xarray as xr
 import xesmf as xe
 
 from ocf_datapipes.config.load import load_yaml_configuration
 
+import numpy as np
+import pandas as pd
+import pyproj
+import xarray as xr
+
 from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path
+
+
+# WGS84 is short for "World Geodetic System 1984", used in GPS. Uses
+# latitude and longitude.
+WGS84 = 4326
+
+# This is the Lambert Azimuthal Equal Area projection used in the UKV data
+lambert_aea2 = {'proj': 'laea',
+          'lat_0':54.9,
+          'lon_0':-2.5,
+          'x_0':0.,
+          'y_0':0.,
+          'ellps': 'WGS84',
+          'datum': 'WGS84'}
+
+laea = pyproj.Proj(**lambert_aea2)
+wgs84 = pyproj.Proj(f"+init=EPSG:{WGS84}")
+
+laea_to_lat_lon = pyproj.Transformer.from_proj(laea, wgs84).transform
+
 
 logger = logging.getLogger(__name__)
 
@@ -380,6 +402,7 @@ class UKVDownloader(NWPDownloader):
         """
 
         logger.info("Renaming the UKV variables")
+        # this is for nwp-consumer>=1.0.0
         if "um-ukv" in ds.data_vars:
 
             ds = ds.rename({"um-ukv": "UKV"})
@@ -408,6 +431,23 @@ class UKVDownloader(NWPDownloader):
 
             # assign the new variable names
             ds = ds.assign_coords(variable=variable_coords)
+
+            # rename x_laea to x and y_laea to y
+            ds = ds.rename({'x_laea': 'x', 'y_laea': 'y'})
+
+            # calculate latitude and longitude from x_laea and y_laea
+            # x is an array of 455, and y is an array of 639
+            # we need to change x to a 2d array of shape (455, 639)
+            # and y to a 2d array of shape (455, 639)
+            x, y = ds.x.values, ds.y.values
+            x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
+            y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
+
+            # calculate latitude and longitude from x and y
+            lat, lon = laea_to_lat_lon(xx=x, yy=y)
+
+            ds = ds.assign_coords(latitude=(["y", "x"], lat))
+            ds = ds.assign_coords(longitude=(["y", "x"], lon))
 
         return ds
 
