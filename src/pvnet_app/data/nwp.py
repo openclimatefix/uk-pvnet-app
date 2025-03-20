@@ -375,6 +375,7 @@ class UKVDownloader(NWPDownloader):
     def rename_variables(ds):
         """Change the UKV variable names to match the training data"""
 
+        # This is for nwp-consumer>=1.0.0
         if "um-ukv" in ds.data_vars:
 
             logger.info("Renaming the UKV variables")
@@ -416,6 +417,7 @@ class UKVDownloader(NWPDownloader):
         to the training grid.
         """
 
+        # This is for nwp-consumer>=1.0.0
         if "latitude" not in ds:
 
             logger.info("Adding lon-lat coords to the UKV data")
