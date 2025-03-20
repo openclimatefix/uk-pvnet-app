@@ -18,25 +18,6 @@ import xarray as xr
 from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path
 
 
-# WGS84 is short for "World Geodetic System 1984", used in GPS. Uses
-# latitude and longitude.
-WGS84 = 4326
-
-# This is the Lambert Azimuthal Equal Area projection used in the UKV data
-lambert_aea2 = {'proj': 'laea',
-          'lat_0':54.9,
-          'lon_0':-2.5,
-          'x_0':0.,
-          'y_0':0.,
-          'ellps': 'WGS84',
-          'datum': 'WGS84'}
-
-laea = pyproj.Proj(**lambert_aea2)
-wgs84 = pyproj.Proj(f"+init=EPSG:{WGS84}")
-
-laea_to_lat_lon = pyproj.Transformer.from_proj(laea, wgs84).transform
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -392,62 +373,87 @@ class UKVDownloader(NWPDownloader):
 
     @staticmethod
     def rename_variables(ds):
-        """Rename the ECMWF variables to match the training data
+        """Change the UKV variable names to match the training data"""
 
-        Rename variable names in the variable coordinate to match the names the model expects and
-        was trained on.
-
-        This change happened in the new nwp-consumer>=1.0.0. Ideally we won't need this step in the
-        future once the training data is updated.
-        """
-
-        logger.info("Renaming the UKV variables")
-        # this is for nwp-consumer>=1.0.0
+        # This is for nwp-consumer>=1.0.0
         if "um-ukv" in ds.data_vars:
+
+            logger.info("Renaming the UKV variables")
 
             ds = ds.rename({"um-ukv": "UKV"})
 
-            variable_coords = ds.variable.values
-            rename = {"cloud_cover_high": "hcc",
-                      "cloud_cover_low": "lcc",
-                      "cloud_cover_medium": "mcc",
-                      "cloud_cover_total": "tcc",
-                      "snow_depth_gl": "sde",
-                      "direct_shortwave_radiation_flux_gl": "sr",
-                      "downward_longwave_radiation_flux_gl": "dlwrf",
-                      "downward_shortwave_radiation_flux_gl": "dswrf",
-                      "downward_ultraviolet_radiation_flux_gl": "duvrs",
-                      "relative_humidity_sl": "r",
-                      "temperature_sl": "t",
-                      "total_precipitation_rate_gl": "prate",
-                      "visibility_sl": "vis",
-                      "wind_direction_10m": "wdir10",
-                      "wind_speed_10m": "si10",
-                      "wind_v_component_10m": "v10",
-                      "wind_u_component_10m": "u10"}
+            varname_mapping = {
+                "cloud_cover_high": "hcc",
+                "cloud_cover_low": "lcc",
+                "cloud_cover_medium": "mcc",
+                "cloud_cover_total": "tcc",
+                "snow_depth_gl": "sde",
+                "direct_shortwave_radiation_flux_gl": "sr",
+                "downward_longwave_radiation_flux_gl": "dlwrf",
+                "downward_shortwave_radiation_flux_gl": "dswrf",
+                "downward_ultraviolet_radiation_flux_gl": "duvrs",
+                "relative_humidity_sl": "r",
+                "temperature_sl": "t",
+                "total_precipitation_rate_gl": "prate",
+                "visibility_sl": "vis",
+                "wind_direction_10m": "wdir10",
+                "wind_speed_10m": "si10",
+                "wind_v_component_10m": "v10",
+                "wind_u_component_10m": "u10"
+            }
 
-            for k, v in rename.items():
-                variable_coords[variable_coords == k] = v
-
-            # assign the new variable names
+            variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
+                
             ds = ds.assign_coords(variable=variable_coords)
 
-            # rename x_laea to x and y_laea to y
+        return ds
+
+    @staticmethod
+    def add_lon_lat_coords(ds: xr.Dataset) -> xr.Dataset:
+        """Add latitude and longitude coords to the UKV data
+        
+        The training UKV data is on a regular OSGB grid but the live data is on a Lambert Azimuthal
+        Equal Area grid. We need to add longitudes and latitudes coords so we can regrid the data
+        to the training grid.
+        """
+
+        # This is for nwp-consumer>=1.0.0
+        if "latitude" not in ds:
+
+            logger.info("Adding lon-lat coords to the UKV data")
+
             ds = ds.rename({'x_laea': 'x', 'y_laea': 'y'})
 
-            # calculate latitude and longitude from x_laea and y_laea
-            # x is an array of 455, and y is an array of 639
-            # we need to change x to a 2d array of shape (455, 639)
-            # and y to a 2d array of shape (455, 639)
+            # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
+            laea = pyproj.Proj(
+                proj='laea',
+                lat_0=54.9,
+                lon_0=-2.5,
+                x_0=0.,
+                y_0=0.,
+                ellps="WGS84",
+                datum="WGS84",
+            )
+
+            # WGS84 is short for "World Geodetic System 1984". This is a lon-lat coord system
+            wgs84 = pyproj.Proj(f"+init=EPSG:4326")
+
+            laea_to_lon_lat = pyproj.Transformer.from_proj(laea, wgs84, always_xy=True).transform
+
+            # Calculate longitude and latitude from x_laea and y_laea
+            # - x is an array of shape (455,)
+            # - y is an array of shape (639,)
+            # We need to change x and y to a 2D arrays of shape (455, 639)
             x, y = ds.x.values, ds.y.values
             x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
             y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
 
-            # calculate latitude and longitude from x and y
-            lat, lon = laea_to_lat_lon(xx=x, yy=y)
+            lons, lats = laea_to_lon_lat(xx=x, yy=y)
 
-            ds = ds.assign_coords(latitude=(["y", "x"], lat))
-            ds = ds.assign_coords(longitude=(["y", "x"], lon))
+            ds = ds.assign_coords(
+                longitude=(["y", "x"], lons),
+                latitude=(["y", "x"], lats),
+            )
 
         return ds
 
@@ -455,6 +461,7 @@ class UKVDownloader(NWPDownloader):
     def process(self, ds: xr.Dataset) -> xr.Dataset:
 
         ds = self.rename_variables(ds)
+        ds = self.add_lon_lat_coords(ds)
         ds = self.regrid(ds)
         ds = self.fix_dtype(ds)
 
