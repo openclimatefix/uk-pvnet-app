@@ -192,7 +192,11 @@ class NWPDownloader(ABC):
         ds = self.process(ds)
 
         # Store the valid times for the NWP data
-        self.valid_times = pd.to_datetime(ds.init_time.values[0]) + pd.to_timedelta(ds.step)
+        init_time = pd.to_datetime(ds.init_time.values[0])
+        self.valid_times = init_time + pd.to_timedelta(ds.step)
+        logger.info(
+            f"{self.nwp_source} has init-time {init_time} and valid times: {self.valid_times}"
+        )
 
         self.resave(ds)
 
