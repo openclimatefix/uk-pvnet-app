@@ -150,9 +150,10 @@ class NWPDownloader(ABC):
     nwp_source: str = None
     save_chunk_dict: dict = None
 
-    def __init__(self, source_path: str | None):
+    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None):
         self.source_path = source_path
         self.valid_times = None
+        self.nwp_variables = nwp_variables
     
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
@@ -188,6 +189,10 @@ class NWPDownloader(ABC):
             return
 
         ds = xr.open_zarr(self.destination_path)
+
+        if self.nwp_variables is not None:
+            logger.info(f"Selecting variables: {self.nwp_variables} from {ds.variable.values}")
+            ds = ds.sel(variable=self.nwp_variables)
 
         ds = self.process(ds)
 

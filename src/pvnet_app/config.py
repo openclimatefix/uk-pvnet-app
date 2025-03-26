@@ -246,3 +246,18 @@ def get_union_of_configs(config_paths: list[str]) -> dict:
                         common_config["input_data"]["nwp"][nwp_key] = nwp_conf
 
     return common_config
+
+
+def get_nwp_channels(provider: str, nwp_config: dict) -> None| list[str]:
+    """Get the NWP channels from the NWP config
+
+    Args:
+        provider: The NWP provider
+        nwp_config: The NWP config
+    """
+    nwp_channels = None
+    if "nwp" in nwp_config["input_data"]:
+        if provider in nwp_config["input_data"]["nwp"]:
+            nwp_channels = nwp_config["input_data"]["nwp"][provider]["nwp_channels"]
+    return nwp_channels
+
