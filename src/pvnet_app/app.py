@@ -213,11 +213,11 @@ def app(
     # --- Download and process NWP data
     logger.info("Downloading NWP data")
 
-    ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path)
-    ecmwf_downloader.run()
-
     ukv_downloader = UKVDownloader(source_path=ukv_source_path)
     ukv_downloader.run()
+
+    ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path)
+    ecmwf_downloader.run()
 
     # ---------------------------------------------------------------------------
     # 2. Set up models
