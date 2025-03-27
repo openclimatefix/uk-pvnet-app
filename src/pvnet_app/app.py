@@ -15,7 +15,7 @@ from nowcasting_datamodel.models.base import Base_Forecast
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3, check_model_runs_finished
-from pvnet_app.config import get_union_of_configs, save_yaml_config
+from pvnet_app.config import get_nwp_channels, get_union_of_configs, save_yaml_config
 from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader
@@ -187,6 +187,17 @@ def app(
 
     temp_dir = tempfile.TemporaryDirectory()
 
+    # 0. Get Model configs
+    data_config_from_model = {}
+    for model_config in model_configs:
+        # First load the data config
+        data_config_path = PVNetBaseModel.get_data_config(
+            model_config.pvnet.repo,
+            revision=model_config.pvnet.commit,
+        )
+        data_config_from_model[model_config.name] = data_config_path
+    common_all_config = get_union_of_configs(data_config_from_model.values())
+
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
@@ -209,15 +220,16 @@ def app(
     )
     sat_downloader.run()
 
-
     # --- Download and process NWP data
     logger.info("Downloading NWP data")
 
-    ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path)
-    ecmwf_downloader.run()
-
-    ukv_downloader = UKVDownloader(source_path=ukv_source_path)
+    ukv_variables = get_nwp_channels(provider="ukv", nwp_config=common_all_config)
+    ukv_downloader = UKVDownloader(source_path=ukv_source_path, nwp_variables=ukv_variables)
     ukv_downloader.run()
+
+    ecmwf_variables = get_nwp_channels(provider="ecmwf", nwp_config=common_all_config)
+    ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path, nwp_variables=ecmwf_variables)
+    ecmwf_downloader.run()
 
     # ---------------------------------------------------------------------------
     # 2. Set up models
@@ -226,11 +238,9 @@ def app(
     forecast_compilers = {}
     used_data_config_paths = []
     for model_config in model_configs:
+
         # First load the data config
-        data_config_path = PVNetBaseModel.get_data_config(
-            model_config.pvnet.repo,
-            revision=model_config.pvnet.commit,
-        )
+        data_config_path = data_config_from_model[model_config.name]
 
         # Check if the data available will allow the model to run
         logger.info(f"Checking that the input data for model '{model_config.name}' exists")

@@ -150,9 +150,10 @@ class NWPDownloader(ABC):
     nwp_source: str = None
     save_chunk_dict: dict = None
 
-    def __init__(self, source_path: str | None):
+    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None):
         self.source_path = source_path
         self.valid_times = None
+        self.nwp_variables = nwp_variables
     
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
@@ -169,6 +170,14 @@ class NWPDownloader(ABC):
         shutil.rmtree(self.destination_path, ignore_errors=True)
         ds.chunk(self.save_chunk_dict).to_zarr(self.destination_path)
 
+    def filter_variables(self, ds: xr.Dataset) -> xr.Dataset:
+        """Filter the NWP data to only include the variables needed by the models"""
+
+        if self.nwp_variables is not None:
+            logger.info(f"Selecting variables: {self.nwp_variables} from {ds.variable.values}")
+            ds = ds.sel(variable=self.nwp_variables)
+
+        return ds
 
     def run(self) -> None:
         """Download, process, and save the NWP data"""
@@ -333,9 +342,10 @@ class ECMWFDownloader(NWPDownloader):
         # This regridding explicitly puts the data on the exact same grid as in training
         # Regridding must be done before .extend_to_shetlands() is called
         ds = self.remove_nans(ds)
+        ds = self.rename_variables(ds)
+        ds = self.filter_variables(ds)
         ds = self.regrid(ds)
         ds = self.extend_to_shetlands(ds)
-        ds = self.rename_variables(ds)
 
         return ds
     
@@ -465,6 +475,7 @@ class UKVDownloader(NWPDownloader):
     def process(self, ds: xr.Dataset) -> xr.Dataset:
 
         ds = self.rename_variables(ds)
+        ds = self.filter_variables(ds)
         ds = self.add_lon_lat_coords(ds)
         ds = self.regrid(ds)
         ds = self.fix_dtype(ds)

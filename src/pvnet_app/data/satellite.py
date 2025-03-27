@@ -148,8 +148,8 @@ def extend_satellite_data_with_nans(
 
         if delay > limit:
             logger.warning(
-                "The satellite data is delayed by more than {limit}. "
-                "Will only infill {limit} forward from the latest satellite timestamp.",
+                f"The satellite data is delayed by more than {limit}. "
+                f"Will only infill {limit} forward from the latest satellite timestamp.",
             )
         fill_timedelta = min(delay, limit)
 
