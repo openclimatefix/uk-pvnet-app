@@ -197,6 +197,7 @@ class NWPDownloader(ABC):
             return
 
         ds = xr.open_zarr(self.destination_path).compute()
+        ds = ds.astype(np.float32)
 
         ds = self.process(ds)
 
