@@ -196,7 +196,7 @@ class NWPDownloader(ABC):
             )
             return
 
-        ds = xr.open_zarr(self.destination_path).compute()
+        ds = xr.open_zarr(self.destination_path)
 
         ds = self.process(ds)
 
