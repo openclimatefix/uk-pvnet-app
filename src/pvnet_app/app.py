@@ -359,8 +359,9 @@ def app(
     logger.info("Writing to database")
 
     with db_connection.get_session() as session:
-        for forecast_compiler in forecast_compilers.values():
-            forecast_compiler.log_forecast_to_database(session=session)
+        with session.no_autoflush:
+            for forecast_compiler in forecast_compilers.values():
+                forecast_compiler.log_forecast_to_database(session=session)
 
     logger.info("Finished forecast")
 
