@@ -239,7 +239,7 @@ def check_model_satellite_inputs_available(
     return available
 
 
-def get_pvnet_satellite_spatial_slice(
+def get_pvnet_satellite_spatial_bounds(
     ds: xr.Dataset, 
     width_pixels: int = 24, 
     height_pixels: int = 24,
@@ -455,7 +455,7 @@ class SatelliteDownloader:
         """
 
         # Slice the data to the spatial extent used in PVNet
-        spatial_slice = get_pvnet_satellite_spatial_slice(ds)
+        spatial_slice = get_pvnet_satellite_spatial_bounds(ds)
         ds = ds.sel(spatial_slice)
 
         too_many_nans = contains_too_many_of_value(ds, value=np.nan, threshold=0.05)
