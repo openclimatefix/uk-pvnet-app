@@ -95,11 +95,11 @@ data that the model expects.
 
 We check:
 - Whether 5 minute and/or 15 minute satellite data is available
-- We check if there are any NaNs in the satellite data, if there are, an error is raised
-- We check if there are more that 10% zeros in the satellite data, if there are, an error is raised
-- We check whether there are any missing timestamps in the satellite data. We linearly interpolate
+- If more than 5% of satellite data is NaN - if so the satellite data is treated as missing
+- If more that 10% of satellite data is zero - if so the satellite data is treated as missing
+- Whether there are any missing timestamps in the satellite data. We linearly interpolate
 any gaps less that 15 minutes.
-- We check whether the exact timestamps that the model expects are all available after infilling
+- Whether the exact timestamps that the model expects are all available after infilling and checks
 
 ### NWP data
 
