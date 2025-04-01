@@ -62,12 +62,12 @@ def check_model_runs_finished(
             If set to "critical", only missing critical models will raise an exception.
     """
     
-    if raise_if_missing=="any":
+    if raise_if_missing == "any":
         required_forecasts = set([model_config.name for model_config in model_configs])
         failed_forecasts = required_forecasts - set(completed_forecasts)
         message = "The following models failed to run"
     
-    elif raise_if_missing=="critical":
+    elif raise_if_missing == "critical":
         required_forecasts = set(
             [model_config.name for model_config in model_configs if model_config.is_critical]
         )
@@ -75,7 +75,9 @@ def check_model_runs_finished(
         message = "The following critical models failed to run"
     
     else:
-        raise ValueError(f"Invalid value for raise_if_missing: {raise_if_missing}")
+        raise ValueError(f"Invalid value for raise_if_missing: {raise_if_missing}. "
+                         f"Should be 'any' or 'critical'")
     
-    if len(failed_forecasts)>0:
-        raise Exception(f"{message}: {failed_forecasts}")
+    if len(failed_forecasts) > 0:
+        raise Exception(f"{message}: {failed_forecasts}. "
+                        f"Completed forecasts: {completed_forecasts}")
