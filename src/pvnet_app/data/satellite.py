@@ -266,10 +266,10 @@ def get_pvnet_satellite_spatial_bounds(
     # This gives us a bounding box used by PVNet
     locations = get_gsp_locations()
 
-    xmin = -np.inf
-    xmax = np.inf
-    ymin = -np.inf
-    ymax = np.inf
+    xmin = np.inf
+    xmax = -np.inf
+    ymin = np.inf
+    ymax = -np.inf
 
     for location in locations:
         
@@ -280,10 +280,10 @@ def get_pvnet_satellite_spatial_bounds(
             height_pixels=height_pixels,
         )
         
-        xmin = min(xmin, da_slice.x_geostationary.min())
-        xmax = max(xmax, da_slice.x_geostationary.max())
-        ymin = min(ymin, da_slice.y_geostationary.min())
-        xmax = max(ymax, da_slice.y_geostationary.max())
+        xmin = min(xmin, da_slice.x_geostationary.min().item())
+        xmax = max(xmax, da_slice.x_geostationary.max().item())
+        ymin = min(ymin, da_slice.y_geostationary.min().item())
+        ymax = max(ymax, da_slice.y_geostationary.max().item())
 
     # Allow for coords to be reversed
     if ds.x_geostationary[-1] > ds.x_geostationary[0]:
