@@ -3,7 +3,7 @@ import fsspec
 import torch
 import logging
 
-from ocf_datapipes.batch import NumpyBatch
+from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 
 from pvnet_app.model_configs.pydantic_models import ModelConfig
 
@@ -75,9 +75,11 @@ def check_model_runs_finished(
         message = "The following critical models failed to run"
     
     else:
-        raise ValueError(f"Invalid value for raise_if_missing: {raise_if_missing}. "
-                         f"Should be 'any' or 'critical'")
+        raise ValueError(
+            f"Invalid value for raise_if_missing: {raise_if_missing}. Should be 'any' or 'critical'"
+        )
     
     if len(failed_forecasts) > 0:
-        raise Exception(f"{message}: {failed_forecasts}. "
-                        f"Completed forecasts: {completed_forecasts}")
+        raise Exception(
+            f"{message}: {failed_forecasts}. Completed forecasts: {completed_forecasts}"
+        )

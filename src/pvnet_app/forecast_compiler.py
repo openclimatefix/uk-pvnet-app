@@ -9,10 +9,8 @@ from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
 from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
-from ocf_datapipes.batch import (
-    BatchKey, NumpyBatch, NWPBatchKey, batch_to_tensor, copy_batch_to_device
-)
-from ocf_datapipes.utils.consts import ELEVATION_MEAN, ELEVATION_STD
+from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
+from ocf_data_sampler.torch_datasets.sample.base import copy_batch_to_device, batch_to_tensor
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
@@ -46,7 +44,6 @@ class ForecastCompiler:
         t0: pd.Timestamp,
         gsp_capacities: xr.DataArray,
         national_capacity: float,
-        use_legacy: bool = False,
     ):
         """Class for making and compiling solar forecasts from for all GB GSPs and national total
 
@@ -56,7 +53,6 @@ class ForecastCompiler:
             t0: The t0 time used to compile the results to numpy array
             gsp_capacities: DataArray of the solar capacities for all regional GSPs at t0
             national_capacity: The national solar capacity at t0
-            use_legacy: Whether to run legacy dataloader
         """
         model_name = model_config.pvnet.repo
         model_version = model_config.pvnet.commit
@@ -74,7 +70,6 @@ class ForecastCompiler:
         self.save_gsp_sum = model_config.save_gsp_sum
         self.save_gsp_to_recent = model_config.save_gsp_to_recent
         self.verbose_logging = model_config.verbose_logging
-        self.use_legacy = use_legacy            
 
         # Create stores for the predictions
         self.normed_preds = []
@@ -152,35 +147,21 @@ class ForecastCompiler:
 
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
-        if not self.use_legacy:
-            change_keys_to_ocf_datapipes_keys(batch)
-
         # Store GSP IDs for this batch for reordering later
-        these_gsp_ids = batch[BatchKey.gsp_id].cpu().numpy()
+        these_gsp_ids = batch["gsp_id"].cpu().numpy()
 
         self.gsp_ids_each_batch += [these_gsp_ids]
 
-        self.log_info(f"{batch[BatchKey.gsp_id]=}")
-
-        # TODO: This maintains compatibility between data-sampler and the old PVNet. This will go 
-        # after upgrading to PVNet 4.0 and removing support for legacy models run with datapipes
-        batch[BatchKey.gsp_id] = batch[BatchKey.gsp_id].unsqueeze(1)
+        self.log_info(f"Predicting for GSPs: {these_gsp_ids}")
 
         # Run batch through model
         preds = self.model(batch).detach().cpu().numpy()
 
         # Calculate unnormalised elevation and sun-dowm mask
         self.log_info("Computing sundown mask")
-        if self.use_legacy:
-            # The old dataloader standardises the data
-            elevation = (
-                batch[BatchKey.gsp_solar_elevation].cpu().numpy() *
-                ELEVATION_STD + ELEVATION_MEAN
-            )
-        else:
-            # The new dataloader normalises the data to [0, 1]
-            elevation = (
-                batch[BatchKey.gsp_solar_elevation].cpu().numpy() - 0.5) * 180
+
+        # The new dataloader normalises the data to [0, 1]
+        elevation = (batch["solar_elevation"].cpu().numpy() - 0.5) * 180
 
         # We only need elevation mask for forecasted values, not history
         elevation = elevation[:, -preds.shape[1]:]
@@ -191,7 +172,6 @@ class ForecastCompiler:
         self.sun_down_masks += [sun_down_mask]
 
         # Log max prediction
-        self.log_info(f"GSP IDs: {these_gsp_ids}")
         self.log_info(f"Max prediction: {np.max(preds, axis=1)}")
 
 
@@ -207,9 +187,7 @@ class ForecastCompiler:
         # Compile results from all batches
         normed_preds = np.concatenate(self.normed_preds)
         sun_down_masks = np.concatenate(self.sun_down_masks)
-        # TODO: With the datapipes, the GSP IDs are in a 2D array. The squeeze below can be removed 
-        # after removing support for legacy models run with datapipes
-        gsp_ids = np.concatenate(self.gsp_ids_each_batch).squeeze()
+        gsp_ids = np.concatenate(self.gsp_ids_each_batch)
 
         # Reorder GSPs which can end up shuffled if multiprocessing is used
         inds = gsp_ids.argsort()
@@ -462,31 +440,3 @@ class ForecastCompiler:
             forecasts.append(forecast)
 
         return forecasts
-
-
-def change_keys_to_ocf_datapipes_keys(batch):
-    """Change string keys from ocf-data-sampler to BatchKey from ocf-datapipes
-
-    The key change is done in-place
-
-    Until PVNet is merged from dev-data-sampler, we need to do this.
-    After this, we might need to change the other way around, for the legacy models.
-    """
-    keys_to_rename = [
-        BatchKey.satellite_actual,
-        BatchKey.nwp,
-        BatchKey.gsp_solar_elevation,
-        BatchKey.gsp_solar_azimuth,
-        BatchKey.gsp_id
-    ]
-
-    for key in keys_to_rename:
-        if key.name in batch:
-            batch[key] = batch[key.name]
-            del batch[key.name]
-
-    if BatchKey.nwp in batch.keys():
-        nwp_batch = batch[BatchKey.nwp]
-        for nwp_source in nwp_batch.keys():
-            nwp_batch[nwp_source][NWPBatchKey.nwp] = nwp_batch[nwp_source]["nwp"]
-            del nwp_batch[nwp_source]["nwp"]
