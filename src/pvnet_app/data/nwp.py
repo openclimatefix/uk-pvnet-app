@@ -501,9 +501,9 @@ class UKVDownloader(NWPDownloader):
 
     @staticmethod
     def spatial_crop(ds: xr.Dataset) -> xr.Dataset:
-        """Crop the ECMWF data to the UK """
+        """Crop the UKV data to the UK """
 
-        logger.info("Cropping the ECMWF data to the UK")
+        logger.info("Cropping the UKV data to the UK")
 
         locations = get_gsp_locations()
 
@@ -525,7 +525,10 @@ class UKVDownloader(NWPDownloader):
         ymin -= 1
         ymax += 1
 
-        return ds.sel(y=slice(ymax, ymin), x=slice(xmin, xmax))
+        if 'x' in ds.dims:
+            return ds.sel(y=slice(ymax, ymin), x=slice(xmin, xmax))
+        else:
+            return ds.sel(y_laea=slice(ymax, ymin), x_laea=slice(xmin, xmax))
 
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
