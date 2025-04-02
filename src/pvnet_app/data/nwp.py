@@ -222,7 +222,9 @@ class NWPDownloader(ABC):
 
         ds = self.process(ds)
         self.resave(ds)
-        # Store the valid times for the NWP data
+
+        # Only store the valid_times if the NWP data has been successfully downloaded, 
+        # quality checked, and processed. Else valid_times will be None
         self.valid_times = valid_times            
 
 
