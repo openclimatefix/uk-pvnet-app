@@ -152,8 +152,10 @@ class NWPDownloader(ABC):
 
     def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None):
         self.source_path = source_path
-        self.valid_times = None
         self.nwp_variables = nwp_variables
+        # Initially no valid times are available. This will only change is the data can be 
+        # downloaded, processed, and saved successfully
+        self.valid_times = None
     
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
