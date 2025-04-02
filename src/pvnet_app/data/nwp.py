@@ -217,17 +217,10 @@ class NWPDownloader(ABC):
 
         # Check the data is okay before processing
         if not self.data_is_okay(ds):
-            logger.warning(f"{self.nwp_source} data did not pass quality checks.")
+            logger.warning(f"{self.nwp_source} NWP data did not pass quality checks.")
             return
 
-        
         ds = self.process(ds)
-
-        # Recheck the data after processing
-        if not self.data_is_okay(ds):
-            logger.warning(f"{self.nwp_source} data failed after processing.")
-            return
-
         self.resave(ds)
         # Store the valid times for the NWP data
         self.valid_times = valid_times            
