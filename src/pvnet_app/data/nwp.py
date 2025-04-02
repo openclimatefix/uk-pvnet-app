@@ -209,21 +209,28 @@ class NWPDownloader(ABC):
 
         ds = xr.open_zarr(self.destination_path)
 
+        init_time = pd.to_datetime(ds.init_time.values[0])
+        valid_times = init_time + pd.to_timedelta(ds.step)
         logger.info(
-            f"{self.nwp_source} has init-time {init_time} and valid times: {self.valid_times}"
+            f"{self.nwp_source} has init-time {init_time} and valid times: {valid_times}"
         )
 
-        if self.data_is_okay(ds):
-            ds = self.process(ds)
-
-            # Store the valid times for the NWP data
-            init_time = pd.to_datetime(ds.init_time.values[0])
-            self.valid_times = init_time + pd.to_timedelta(ds.step)
-
-            self.resave(ds)
-
-        else:
+        # Check the data is okay before processing
+        if not self.data_is_okay(ds):
             logger.warning(f"{self.nwp_source} data did not pass quality checks.")
+            return
+
+        
+        ds = self.process(ds)
+
+        # Recheck the data after processing
+        if not self.data_is_okay(ds):
+            logger.warning(f"{self.nwp_source} data failed after processing.")
+            return
+
+        self.resave(ds)
+        # Store the valid times for the NWP data
+        self.valid_times = valid_times            
 
 
     def clean_up(self) -> None:
