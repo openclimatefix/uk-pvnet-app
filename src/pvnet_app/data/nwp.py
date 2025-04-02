@@ -351,9 +351,6 @@ class ECMWFDownloader(NWPDownloader):
         logger.info("Removing data above 60 latitude")
         ds = ds.where(ds.latitude <= 60, drop=True)
 
-        logger.info("Removing data after step 84, step 85 is nan")
-        ds = ds.isel(step=slice(None, 84))
-
         return ds
     
     @override
