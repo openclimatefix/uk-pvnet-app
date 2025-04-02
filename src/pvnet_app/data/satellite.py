@@ -275,6 +275,9 @@ def get_pvnet_satellite_spatial_bounds(
     xmin, ymin = osgb_to_geostationary_area_coords(x=x_osgb_min, y=y_osgb_min, xr_data=da.data)
     xmax, ymax = osgb_to_geostationary_area_coords(x=x_osgb_max, y=y_osgb_max, xr_data=da.data)
 
+    logger.info(f"Bounding box for Satellite: {xmin, xmax, ymin, ymax}. "
+                f"This will be used to check nans")
+
     # add buffer to the bounding box
     xmin -= width_pixels
     xmax += width_pixels
