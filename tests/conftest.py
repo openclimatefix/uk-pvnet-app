@@ -20,6 +20,7 @@ from testcontainers.postgres import PostgresContainer
 
 
 xr.set_options(keep_attrs=True)
+test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/test_data"
 
 @pytest.fixture(scope="session")
 def test_t0():
@@ -110,17 +111,11 @@ def populate_db_session_with_input_data(session, test_t0):
     session.commit()
 
 
-def make_nwp_data(shell_path, varname, test_t0):
+def make_nwp_data(shell_path, varname, init_time):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(shell_path).compute()
 
-    # Last init time was at least 8 hours ago and floor to 3-hour interval
-    t0_datetime_utc = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
-    ds.init_time.values[:] = pd.date_range(
-        t0_datetime_utc - timedelta(hours=3 * (len(ds.init_time) - 1)),
-        t0_datetime_utc,
-        freq=timedelta(hours=3),
-    )
+    ds.init_time.values[:] = init_time
 
     # This is important to avoid saving errors
     for v in list(ds.coords.keys()):
@@ -146,34 +141,46 @@ def make_nwp_data(shell_path, varname, test_t0):
 
 @pytest.fixture(scope="session")
 def nwp_ukv_data(test_t0):
+    # The init time was at least 8 hours ago and floor to 3-hour interval
+    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))     
     return make_nwp_data(
-        shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ukv_shell.zarr",
+        shell_path=f"{test_data_dir}/nwp_ukv_shell.zarr",
         varname="UKV",
-        test_t0=test_t0,
+        init_time=init_time,
     )
 
 
 @pytest.fixture(scope="session")
 def nwp_ecmwf_data(test_t0):
+    # The init time was at least 8 hours ago and floor to 3-hour interval
+    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))              
     return make_nwp_data(
-        shell_path=f"{os.path.dirname(os.path.abspath(__file__))}/test_data/nwp_ecmwf_shell.zarr",
+        shell_path=f"{test_data_dir}/nwp_ecmwf_shell.zarr",
         varname="hres-ifs_uk",
-        test_t0=test_t0,
+        init_time=init_time,
+    )
+
+@pytest.fixture(scope="session")
+def cloudcasting_data(test_t0):
+     # The init time is the same as test_t0
+    return make_nwp_data(
+        shell_path=f"{test_data_dir}/nwp_cloudcasting_shell.zarr",
+        varname="sat_pred",
+        init_time=test_t0,
     )
 
 @pytest.fixture(scope="session")
 def config_filename():
-    return f"{os.path.dirname(os.path.abspath(__file__))}/test_data/test.yaml"
+    return f"{test_data_dir}/test.yaml"
 
 
 def make_sat_data(test_t0, delay_mins, freq_mins):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(
-        f"{os.path.dirname(os.path.abspath(__file__))}/test_data/non_hrv_shell.zarr",
+        f"{test_data_dir}/non_hrv_shell.zarr",
     ).compute()
 
-    # Remove time dim and expand time dim to be len 36 = 3 hours of 5 minute data
-    ds = ds.drop_vars("time")
+    # Expand time dim to be len 36 = 3 hours of 5 minute data
     n_hours = 3
 
     # Add times so they lead up to present

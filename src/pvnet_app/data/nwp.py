@@ -15,7 +15,7 @@ import pandas as pd
 import pyproj
 import xarray as xr
 
-from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path
+from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path, nwp_cloudcasting_path
 
 
 logger = logging.getLogger(__name__)
@@ -508,6 +508,27 @@ class UKVDownloader(NWPDownloader):
         ds = self.regrid(ds)
         ds = self.fix_dtype(ds)
 
+        return ds
+    
+    @override
+    def data_is_okay(self, ds: xr.Dataset) -> bool:
+        contains_nans = ds[list(ds.data_vars.keys())[0]].isnull().any().compute().item()
+        return not contains_nans
+
+
+class CloudcastingDownloader(NWPDownloader):
+
+    destination_path = nwp_ukv_path
+    nwp_source = "cloudcasting"
+    save_chunk_dict = {
+        "step": -1,
+        "x_geostationary": 100,
+        "y_geostationary": 100,
+    }
+
+    @override
+    def process(self, ds: xr.Dataset) -> xr.Dataset:
+        # The cloudcasting data needs no changes
         return ds
     
     @override

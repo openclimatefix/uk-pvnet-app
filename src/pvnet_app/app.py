@@ -18,7 +18,7 @@ from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3, check_model_r
 from pvnet_app.config import get_nwp_channels, get_union_of_configs, save_yaml_config
 from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.data.satellite import SatelliteDownloader
-from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader
+from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader, CloudcastingDownloader
 from pvnet_app.data.gsp import get_gsp_and_national_capacities
 from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.dataloader import get_dataloader
@@ -95,6 +95,7 @@ def app(
     These variables are optional depending on the models being run:
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
+        - CLOUDCASTING_ZARR_PATH
         - SATELLITE_ZARR_PATH
     The following are optional:
         - SENTRY_DSN, optional link to sentry
@@ -154,6 +155,7 @@ def app(
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
     ecmwf_source_path = os.getenv("NWP_ECMWF_ZARR_PATH", None)
     ukv_source_path = os.getenv("NWP_UKV_ZARR_PATH", None)
+    cloudcasting_source_path = os.getenv("CLOUDCASTING_ZARR_PATH", None)
     sat_source_path_5 = os.getenv("SATELLITE_ZARR_PATH", None)
     sat_source_path_15 = (
         None if (sat_source_path_5 is None) else sat_source_path_5.replace(".zarr", "_15.zarr")
@@ -234,19 +236,36 @@ def app(
 
         if "ukv" in common_all_config["input_data"]["nwp"]:
         
-            ukv_variables = get_nwp_channels(provider="ukv", nwp_config=common_all_config)
-            ukv_downloader = UKVDownloader(source_path=ukv_source_path, nwp_variables=ukv_variables)
+            ukv_downloader = UKVDownloader(
+                source_path=ukv_source_path,
+                nwp_variables=get_nwp_channels(provider="ukv", nwp_config=common_all_config),
+            )
             ukv_downloader.run()
 
             data_downloaders.append(ukv_downloader)
         
         if "ecmwf" in common_all_config["input_data"]["nwp"]:
 
-            ecmwf_variables = get_nwp_channels(provider="ecmwf", nwp_config=common_all_config)
-            ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path, nwp_variables=ecmwf_variables)
+            ecmwf_downloader = ECMWFDownloader(
+                source_path=ecmwf_source_path, 
+                nwp_variables=get_nwp_channels(provider="ecmwf", nwp_config=common_all_config)
+            )
             ecmwf_downloader.run()
 
             data_downloaders.append(ecmwf_downloader)
+
+        if "cloudcasting" in common_all_config["input_data"]["nwp"]:
+            
+            cloudcasting_downloader = CloudcastingDownloader(
+                source_path=cloudcasting_source_path, 
+                nwp_variables=get_nwp_channels(
+                    provider="cloudcasting", 
+                    nwp_config=common_all_config
+                )
+            )
+            cloudcasting_downloader.run()
+
+            data_downloaders.append(cloudcasting_downloader)
 
     # ---------------------------------------------------------------------------
     # 2. Set up models
