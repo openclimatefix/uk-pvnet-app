@@ -8,8 +8,8 @@ import pandas as pd
 import xarray as xr
 
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
-from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
 from ocf_data_sampler.load.utils import make_spatial_coords_increasing
+from ocf_data_sampler.select.geospatial import osgb_to_geostationary_area_coords
 
 from ocf_datapipes.config.load import load_yaml_configuration
 
@@ -266,24 +266,20 @@ def get_pvnet_satellite_spatial_bounds(
     # This gives us a bounding box used by PVNet
     locations = get_gsp_locations()
 
-    xmin = np.inf
-    xmax = -np.inf
-    ymin = np.inf
-    ymax = -np.inf
+    x_osgb_min = min([location.x for location in locations])
+    x_osgb_max = max([location.x for location in locations])
+    y_osgb_min = min([location.y for location in locations])
+    y_osgb_max = max([location.y for location in locations])
 
-    for location in locations:
-        
-        da_slice = select_spatial_slice_pixels(
-            da,
-            location,
-            width_pixels=width_pixels,
-            height_pixels=height_pixels,
-        )
-        
-        xmin = min(xmin, da_slice.x_geostationary.min().item())
-        xmax = max(xmax, da_slice.x_geostationary.max().item())
-        ymin = min(ymin, da_slice.y_geostationary.min().item())
-        ymax = max(ymax, da_slice.y_geostationary.max().item())
+    # Convert the bounding box to pixel coordinates
+    xmin, ymin = osgb_to_geostationary_area_coords(x=x_osgb_min, y=y_osgb_min, xr_data=da.data)
+    xmax, ymax = osgb_to_geostationary_area_coords(x=x_osgb_max, y=y_osgb_max, xr_data=da.data)
+
+    # add buffer to the bounding box
+    xmin -= width_pixels
+    xmax += width_pixels
+    ymin -= height_pixels
+    ymax += height_pixels
 
     # Allow for coords to be reversed
     if ds.x_geostationary[-1] > ds.x_geostationary[0]:
