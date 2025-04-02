@@ -160,6 +160,17 @@ class NWPDownloader(ABC):
         """"Apply all processing steps to the NWP data in order to match the training data"""
         pass
 
+    @abstractmethod
+    def data_is_okay(self, ds: xr.Dataset) -> bool:
+        """Apply quality checks to the satellite data
+        
+        Args:
+            ds: The satellite data
+
+        Returns:
+            bool: Whether the data passes the quality checks
+        """
+        pass
 
     def resave(self, ds: xr.Dataset) -> None:
         """Resave the NWP data to the destination path"""
@@ -198,16 +209,21 @@ class NWPDownloader(ABC):
 
         ds = xr.open_zarr(self.destination_path)
 
-        ds = self.process(ds)
-
-        # Store the valid times for the NWP data
-        init_time = pd.to_datetime(ds.init_time.values[0])
-        self.valid_times = init_time + pd.to_timedelta(ds.step)
         logger.info(
             f"{self.nwp_source} has init-time {init_time} and valid times: {self.valid_times}"
         )
 
-        self.resave(ds)
+        if self.data_is_okay(ds):
+            ds = self.process(ds)
+
+            # Store the valid times for the NWP data
+            init_time = pd.to_datetime(ds.init_time.values[0])
+            self.valid_times = init_time + pd.to_timedelta(ds.step)
+
+            self.resave(ds)
+
+        else:
+            logger.warning(f"{self.nwp_source} data did not pass quality checks.")
 
 
     def clean_up(self) -> None:
@@ -349,6 +365,14 @@ class ECMWFDownloader(NWPDownloader):
 
         return ds
     
+    @override
+    def data_is_okay(self, ds: xr.Dataset) -> bool:
+        # Need to slice off known nans first
+        ds = self.remove_nans(ds)
+        contains_nans = ds["hres-ifs_uk"].isnull().any().compute().item()
+        return not contains_nans
+
+
 
 class UKVDownloader(NWPDownloader):
 
@@ -481,3 +505,8 @@ class UKVDownloader(NWPDownloader):
         ds = self.fix_dtype(ds)
 
         return ds
+    
+    @override
+    def data_is_okay(self, ds: xr.Dataset) -> bool:
+        contains_nans = ds["um-ukv"].isnull().any().compute().item()
+        return not contains_nans
