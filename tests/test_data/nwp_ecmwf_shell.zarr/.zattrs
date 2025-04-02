@@ -1,9 +1,0 @@
-{
-    "_data_attrs": {
-        "Conventions": "CF-1.7",
-        "GRIB_centre": "ecmf",
-        "GRIB_centreDescription": "European Centre for Medium-Range Weather Forecasts",
-        "GRIB_subCentre": 0,
-        "institution": "European Centre for Medium-Range Weather Forecasts"
-    }
-}
