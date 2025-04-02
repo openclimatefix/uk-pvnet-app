@@ -9,6 +9,8 @@ import fsspec
 import xesmf as xe
 
 from ocf_datapipes.config.load import load_yaml_configuration
+from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
+from ocf_data_sampler.select.geospatial import osgb_to_lon_lat
 
 import numpy as np
 import pandas as pd
@@ -335,6 +337,31 @@ class ECMWFDownloader(NWPDownloader):
         ds = ds.isel(step=slice(None, 84))
 
         return ds
+
+    @staticmethod
+    def spatial_crop(ds: xr.Dataset) -> xr.Dataset:
+        """Crop the ECMWF data to the UK """
+
+        logger.info("Cropping the ECMWF data to the UK")
+
+        locations = get_gsp_locations()
+
+        x_osgb_min = min([location.x for location in locations])
+        x_osgb_max = max([location.x for location in locations])
+        y_osgb_min = min([location.y for location in locations])
+        y_osgb_max = max([location.y for location in locations])
+
+        xmin, ymin = osgb_to_lon_lat(x_osgb_min, y_osgb_min)
+        xmax, ymax = osgb_to_lon_lat(x_osgb_max, y_osgb_max)
+
+        # add buffer to the bounding box
+        xmin -= 1
+        xmax += 1
+        ymin -= 1
+        ymax += 1
+
+        return ds.sel(latitude=slice(ymax, ymin), longitude=slice(xmin, xmax))
+
     
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
@@ -344,6 +371,7 @@ class ECMWFDownloader(NWPDownloader):
         ds = self.remove_nans(ds)
         ds = self.rename_variables(ds)
         ds = self.filter_variables(ds)
+        ds = self.spatial_crop(ds)
         ds = self.regrid(ds)
         ds = self.extend_to_shetlands(ds)
 
@@ -471,12 +499,37 @@ class UKVDownloader(NWPDownloader):
 
         return ds
 
+    @staticmethod
+    def spatial_crop(ds: xr.Dataset) -> xr.Dataset:
+        """Crop the ECMWF data to the UK """
+
+        logger.info("Cropping the ECMWF data to the UK")
+
+        locations = get_gsp_locations()
+
+        x_osgb_min = min([location.x for location in locations])
+        x_osgb_max = max([location.x for location in locations])
+        y_osgb_min = min([location.y for location in locations])
+        y_osgb_max = max([location.y for location in locations])
+
+        xmin, ymin = osgb_to_lon_lat(x_osgb_min, y_osgb_min)
+        xmax, ymax = osgb_to_lon_lat(x_osgb_max, y_osgb_max)
+
+        # add buffer to the bounding box
+        xmin -= 1
+        xmax += 1
+        ymin -= 1
+        ymax += 1
+
+        return ds.sel(latitude=slice(ymax, ymin), longitude=slice(xmin, xmax))
+
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
 
         ds = self.rename_variables(ds)
         ds = self.filter_variables(ds)
         ds = self.add_lon_lat_coords(ds)
+        ds = self.spatial_crop(ds)
         ds = self.regrid(ds)
         ds = self.fix_dtype(ds)
 
