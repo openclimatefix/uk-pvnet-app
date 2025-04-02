@@ -104,8 +104,8 @@ any gaps less that 15 minutes.
 ### NWP data
 
 We check:
+- If the NWP data contains any NaNs - if so that NWP source is treated as missing
 - Whether the exact timestamps that the model expects from each NWP are available
-
 
 ### ML batch checks
 
