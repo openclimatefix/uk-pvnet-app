@@ -369,7 +369,7 @@ class ECMWFDownloader(NWPDownloader):
     def data_is_okay(self, ds: xr.Dataset) -> bool:
         # Need to slice off known nans first
         ds = self.remove_nans(ds)
-        contains_nans = ds["hres-ifs_uk"].isnull().any().compute().item()
+        contains_nans = ds[list(ds.data_vars.keys())[0]].isnull().any().compute().item()
         return not contains_nans
 
 
@@ -508,5 +508,5 @@ class UKVDownloader(NWPDownloader):
     
     @override
     def data_is_okay(self, ds: xr.Dataset) -> bool:
-        contains_nans = ds["um-ukv"].isnull().any().compute().item()
+        contains_nans = ds[list(ds.data_vars.keys())[0]].isnull().any().compute().item()
         return not contains_nans
