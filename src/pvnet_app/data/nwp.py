@@ -162,10 +162,10 @@ class NWPDownloader(ABC):
 
     @abstractmethod
     def data_is_okay(self, ds: xr.Dataset) -> bool:
-        """Apply quality checks to the satellite data
+        """Apply quality checks to the NWP data
         
         Args:
-            ds: The satellite data
+            ds: The NWP data
 
         Returns:
             bool: Whether the data passes the quality checks
