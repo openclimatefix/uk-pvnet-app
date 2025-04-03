@@ -272,65 +272,13 @@
       "sensor": "seviri",
       "start_time": "2025-04-02T13:15:00",
       "time_parameters": "nominal_end_time: 2025-04-02 13:20:00\nnominal_start_time: 2025-04-02 13:15:00\nobservation_end_time: 2025-04-02 13:19:18.744000\nobservation_start_time: 2025-04-02 13:15:11.510000\n"
-    },
-    "coordinates": "x_osgb y_osgb"
+    }
   },
   "zarr_format": 3,
   "consolidated_metadata": {
     "kind": "inline",
     "must_understand": false,
     "metadata": {
-      "y_osgb": {
-        "shape": [
-          412,
-          680
-        ],
-        "data_type": "float32",
-        "chunk_grid": {
-          "name": "regular",
-          "configuration": {
-            "chunk_shape": [
-              412,
-              680
-            ]
-          }
-        },
-        "chunk_key_encoding": {
-          "name": "default",
-          "configuration": {
-            "separator": "/"
-          }
-        },
-        "fill_value": 0.0,
-        "codecs": [
-          {
-            "name": "bytes",
-            "configuration": {
-              "endian": "little"
-            }
-          },
-          {
-            "name": "zstd",
-            "configuration": {
-              "level": 0,
-              "checksum": false
-            }
-          }
-        ],
-        "attributes": {
-          "coordinate_reference_system": "OSGB",
-          "name": "Northing",
-          "units": "meter",
-          "_FillValue": "AAAAAAAA+H8="
-        },
-        "dimension_names": [
-          "y_geostationary",
-          "x_geostationary"
-        ],
-        "zarr_format": 3,
-        "node_type": "array",
-        "storage_transformers": []
-      },
       "variable": {
         "shape": [
           11
@@ -367,104 +315,6 @@
         "attributes": {},
         "dimension_names": [
           "variable"
-        ],
-        "zarr_format": 3,
-        "node_type": "array",
-        "storage_transformers": []
-      },
-      "y_geostationary": {
-        "shape": [
-          412
-        ],
-        "data_type": "float64",
-        "chunk_grid": {
-          "name": "regular",
-          "configuration": {
-            "chunk_shape": [
-              412
-            ]
-          }
-        },
-        "chunk_key_encoding": {
-          "name": "default",
-          "configuration": {
-            "separator": "/"
-          }
-        },
-        "fill_value": 0.0,
-        "codecs": [
-          {
-            "name": "bytes",
-            "configuration": {
-              "endian": "little"
-            }
-          },
-          {
-            "name": "zstd",
-            "configuration": {
-              "level": 0,
-              "checksum": false
-            }
-          }
-        ],
-        "attributes": {
-          "coordinate_reference_system": "geostationary",
-          "units": "meter",
-          "_FillValue": "AAAAAAAA+H8="
-        },
-        "dimension_names": [
-          "y_geostationary"
-        ],
-        "zarr_format": 3,
-        "node_type": "array",
-        "storage_transformers": []
-      },
-      "x_osgb": {
-        "shape": [
-          412,
-          680
-        ],
-        "data_type": "float32",
-        "chunk_grid": {
-          "name": "regular",
-          "configuration": {
-            "chunk_shape": [
-              412,
-              680
-            ]
-          }
-        },
-        "chunk_key_encoding": {
-          "name": "default",
-          "configuration": {
-            "separator": "/"
-          }
-        },
-        "fill_value": 0.0,
-        "codecs": [
-          {
-            "name": "bytes",
-            "configuration": {
-              "endian": "little"
-            }
-          },
-          {
-            "name": "zstd",
-            "configuration": {
-              "level": 0,
-              "checksum": false
-            }
-          }
-        ],
-        "attributes": {
-          "coordinate_reference_system": "OSGB",
-          "name": "Easting",
-          "units": "meter",
-          "_FillValue": "AAAAAAAA+H8="
-        },
-        "dimension_names": [
-          "y_geostationary",
-          "x_geostationary"
         ],
         "zarr_format": 3,
         "node_type": "array",
@@ -512,6 +362,53 @@
         },
         "dimension_names": [
           "x_geostationary"
+        ],
+        "zarr_format": 3,
+        "node_type": "array",
+        "storage_transformers": []
+      },
+      "y_geostationary": {
+        "shape": [
+          412
+        ],
+        "data_type": "float64",
+        "chunk_grid": {
+          "name": "regular",
+          "configuration": {
+            "chunk_shape": [
+              412
+            ]
+          }
+        },
+        "chunk_key_encoding": {
+          "name": "default",
+          "configuration": {
+            "separator": "/"
+          }
+        },
+        "fill_value": 0.0,
+        "codecs": [
+          {
+            "name": "bytes",
+            "configuration": {
+              "endian": "little"
+            }
+          },
+          {
+            "name": "zstd",
+            "configuration": {
+              "level": 0,
+              "checksum": false
+            }
+          }
+        ],
+        "attributes": {
+          "coordinate_reference_system": "geostationary",
+          "units": "meter",
+          "_FillValue": "AAAAAAAA+H8="
+        },
+        "dimension_names": [
+          "y_geostationary"
         ],
         "zarr_format": 3,
         "node_type": "array",
