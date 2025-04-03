@@ -147,7 +147,7 @@ def nwp_ukv_data(test_t0):
     init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))     
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_ukv_shell.zarr",
-        varname="UKV",
+        varname="um-ukv",
         init_time=init_time,
     )
 

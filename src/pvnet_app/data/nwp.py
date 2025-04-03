@@ -418,35 +418,33 @@ class UKVDownloader(NWPDownloader):
         """Change the UKV variable names to match the training data"""
 
         # This is for nwp-consumer>=1.0.0
-        if "um-ukv" in ds.data_vars:
+        logger.info("Renaming the UKV variables")
 
-            logger.info("Renaming the UKV variables")
+        ds = ds.rename({"um-ukv": "UKV"})
 
-            ds = ds.rename({"um-ukv": "UKV"})
+        varname_mapping = {
+            "cloud_cover_high": "hcc",
+            "cloud_cover_low": "lcc",
+            "cloud_cover_medium": "mcc",
+            "cloud_cover_total": "tcc",
+            "snow_depth_gl": "sde",
+            "direct_shortwave_radiation_flux_gl": "sr",
+            "downward_longwave_radiation_flux_gl": "dlwrf",
+            "downward_shortwave_radiation_flux_gl": "dswrf",
+            "downward_ultraviolet_radiation_flux_gl": "duvrs",
+            "relative_humidity_sl": "r",
+            "temperature_sl": "t",
+            "total_precipitation_rate_gl": "prate",
+            "visibility_sl": "vis",
+            "wind_direction_10m": "wdir10",
+            "wind_speed_10m": "si10",
+            "wind_v_component_10m": "v10",
+            "wind_u_component_10m": "u10"
+        }
 
-            varname_mapping = {
-                "cloud_cover_high": "hcc",
-                "cloud_cover_low": "lcc",
-                "cloud_cover_medium": "mcc",
-                "cloud_cover_total": "tcc",
-                "snow_depth_gl": "sde",
-                "direct_shortwave_radiation_flux_gl": "sr",
-                "downward_longwave_radiation_flux_gl": "dlwrf",
-                "downward_shortwave_radiation_flux_gl": "dswrf",
-                "downward_ultraviolet_radiation_flux_gl": "duvrs",
-                "relative_humidity_sl": "r",
-                "temperature_sl": "t",
-                "total_precipitation_rate_gl": "prate",
-                "visibility_sl": "vis",
-                "wind_direction_10m": "wdir10",
-                "wind_speed_10m": "si10",
-                "wind_v_component_10m": "v10",
-                "wind_u_component_10m": "u10"
-            }
-
-            variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
-                
-            ds = ds.assign_coords(variable=variable_coords)
+        variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
+            
+        ds = ds.assign_coords(variable=variable_coords)
 
         return ds
 
@@ -460,44 +458,43 @@ class UKVDownloader(NWPDownloader):
         """
 
         # This is for nwp-consumer>=1.0.0
-        if "latitude" not in ds:
 
-            logger.info("Adding lon-lat coords to the UKV data")
+        logger.info("Adding lon-lat coords to the UKV data")
 
-            ds = ds.rename({'x_laea': 'x', 'y_laea': 'y'})
+        ds = ds.rename({'x_laea': 'x', 'y_laea': 'y'})
 
-            # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
-            laea = pyproj.Proj(
-                proj='laea',
-                lat_0=54.9,
-                lon_0=-2.5,
-                x_0=0.,
-                y_0=0.,
-                ellps="WGS84",
-                datum="WGS84",
-            )
+        # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
+        laea = pyproj.Proj(
+            proj='laea',
+            lat_0=54.9,
+            lon_0=-2.5,
+            x_0=0.,
+            y_0=0.,
+            ellps="WGS84",
+            datum="WGS84",
+        )
 
-            # WGS84 is short for "World Geodetic System 1984". This is a lon-lat coord system
-            wgs84 = pyproj.Proj(f"+init=EPSG:4326")
+        # WGS84 is short for "World Geodetic System 1984". This is a lon-lat coord system
+        wgs84 = pyproj.Proj(f"+init=EPSG:4326")
 
-            laea_to_lon_lat = pyproj.Transformer.from_proj(laea, wgs84, always_xy=True).transform
+        laea_to_lon_lat = pyproj.Transformer.from_proj(laea, wgs84, always_xy=True).transform
 
-            # Calculate longitude and latitude from x_laea and y_laea
-            # - x is an array of shape (455,)
-            # - y is an array of shape (639,)
-            # We need to change x and y to a 2D arrays of shape (455, 639)
-            x, y = ds.x.values, ds.y.values
-            x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
-            y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
+        # Calculate longitude and latitude from x_laea and y_laea
+        # - x is an array of shape (455,)
+        # - y is an array of shape (639,)
+        # We need to change x and y to a 2D arrays of shape (455, 639)
+        x, y = ds.x.values, ds.y.values
+        x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
+        y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
 
-            lons, lats = laea_to_lon_lat(xx=x, yy=y)
+        lons, lats = laea_to_lon_lat(xx=x, yy=y)
 
-            ds = ds.assign_coords(
-                longitude=(["y", "x"], lons),
-                latitude=(["y", "x"], lats),
-            )
+        ds = ds.assign_coords(
+            longitude=(["y", "x"], lons),
+            latitude=(["y", "x"], lats),
+        )
 
-        return ds
+    return ds
 
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
