@@ -494,7 +494,7 @@ class UKVDownloader(NWPDownloader):
             latitude=(["y", "x"], lats),
         )
 
-    return ds
+        return ds
 
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
