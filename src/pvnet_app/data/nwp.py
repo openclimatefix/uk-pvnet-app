@@ -522,8 +522,8 @@ class CloudcastingDownloader(NWPDownloader):
     nwp_source = "cloudcasting"
     save_chunk_dict = {
         "step": -1,
-        "x_geostationary": 100,
-        "y_geostationary": 100,
+        "x": 100,
+        "y": 100,
     }
 
     @override

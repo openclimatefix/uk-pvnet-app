@@ -19,12 +19,9 @@ from nowcasting_datamodel.models.forecast import (
 from testcontainers.postgres import PostgresContainer
 
 
-xr.set_options(keep_attrs=True)
+test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/test_data"
 
-@pytest.fixture(scope="session")
-def test_data_dir():
-    """Return the test data directory."""
-    return os.path.dirname(os.path.abspath(__file__)) + "/test_data"
+xr.set_options(keep_attrs=True)
 
 
 @pytest.fixture(scope="session")
@@ -145,7 +142,7 @@ def make_nwp_data(shell_path, varname, init_time):
 
 
 @pytest.fixture(scope="session")
-def nwp_ukv_data(test_data_dir, test_t0):
+def nwp_ukv_data(test_t0):
     # The init time was at least 8 hours ago and floor to 3-hour interval
     init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))     
     return make_nwp_data(
@@ -156,7 +153,7 @@ def nwp_ukv_data(test_data_dir, test_t0):
 
 
 @pytest.fixture(scope="session")
-def nwp_ecmwf_data(test_data_dir, test_t0):
+def nwp_ecmwf_data(test_t0):
     # The init time was at least 8 hours ago and floor to 3-hour interval
     init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))              
     return make_nwp_data(
@@ -166,7 +163,7 @@ def nwp_ecmwf_data(test_data_dir, test_t0):
     )
 
 @pytest.fixture(scope="session")
-def cloudcasting_data(test_data_dir, test_t0):
+def cloudcasting_data(test_t0):
      # The init time is the same as test_t0
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_cloudcasting_shell.zarr",
@@ -175,14 +172,14 @@ def cloudcasting_data(test_data_dir, test_t0):
     )
 
 @pytest.fixture(scope="session")
-def config_filename(test_data_dir):
+def config_filename():
     return f"{test_data_dir}/test.yaml"
 
 
-def make_sat_data(shell_data_dir, test_t0, delay_mins, freq_mins):
+def make_sat_data(test_t0, delay_mins, freq_mins):
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(
-        f"{shell_data_dir}/non_hrv_shell.zarr",
+        f"{test_data_dir}/non_hrv_shell.zarr",
     ).compute()
 
     # Expand time dim to be len 36 = 3 hours of 5 minute data
@@ -211,20 +208,20 @@ def make_sat_data(shell_data_dir, test_t0, delay_mins, freq_mins):
 
 
 @pytest.fixture(scope="session")
-def sat_5_data(test_data_dir, test_t0):
-    return make_sat_data(test_data_dir, test_t0, delay_mins=10, freq_mins=5)
+def sat_5_data(test_t0):
+    return make_sat_data(test_t0, delay_mins=10, freq_mins=5)
 
 
 @pytest.fixture(scope="session")
-def sat_5_data_zero_delay(test_data_dir, test_t0):
-    return make_sat_data(test_data_dir, test_t0, delay_mins=0, freq_mins=5)
+def sat_5_data_zero_delay(test_t0):
+    return make_sat_data(test_t0, delay_mins=0, freq_mins=5)
 
 
 @pytest.fixture(scope="session")
-def sat_5_data_delayed(test_data_dir, test_t0):
-    return make_sat_data(test_data_dir, test_t0, delay_mins=120, freq_mins=5)
+def sat_5_data_delayed(test_t0):
+    return make_sat_data(test_t0, delay_mins=120, freq_mins=5)
 
 
 @pytest.fixture(scope="session")
-def sat_15_data(test_data_dir, test_t0):
-    return make_sat_data(test_data_dir, test_t0, delay_mins=0, freq_mins=15)
+def sat_15_data(test_t0):
+    return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
