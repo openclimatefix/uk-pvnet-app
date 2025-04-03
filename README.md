@@ -18,6 +18,7 @@ The following environment variables are used in the app:
 - `DB_URL`: The URL for the database connection.
 - `NWP_UKV_ZARR_PATH`: The path to the UKV NWP data in Zarr format.
 - `NWP_ECMWF_ZARR_PATH`: The path to the ECMWF NWP data in Zarr format.
+- `CLOUDCASTING_ZARR_PATH`: The path to the cloudcasting forecast data in Zarr format.
 - `SATELLITE_ZARR_PATH`: The path to the satellite data in Zarr format.
 
 ### Optional Environment Variables
@@ -57,6 +58,7 @@ Here are some examples of how to set these environment variables:
 export DB_URL="postgresql://user:password@localhost:5432/dbname"
 export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
 export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
+export CLOUDCASTING_ZARR_PATH="s3://bucket/path/to/cloudcasting.zarr"
 export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
 export ALLOW_ADJUSTER="true"
 export ALLOW_SAVE_GSP_SUM="false"

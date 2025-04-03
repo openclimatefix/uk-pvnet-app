@@ -18,7 +18,7 @@ from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3, check_model_r
 from pvnet_app.config import get_nwp_channels, get_union_of_configs, save_yaml_config
 from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.data.satellite import SatelliteDownloader
-from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader
+from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader, CloudcastingDownloader
 from pvnet_app.data.gsp import get_gsp_and_national_capacities
 from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.dataloader import get_dataloader
@@ -95,6 +95,7 @@ def app(
     These variables are optional depending on the models being run:
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
+        - CLOUDCASTING_ZARR_PATH
         - SATELLITE_ZARR_PATH
     The following are optional:
         - SENTRY_DSN, optional link to sentry
@@ -154,6 +155,7 @@ def app(
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
     ecmwf_source_path = os.getenv("NWP_ECMWF_ZARR_PATH", None)
     ukv_source_path = os.getenv("NWP_UKV_ZARR_PATH", None)
+    cloudcasting_source_path = os.getenv("CLOUDCASTING_ZARR_PATH", None)
     sat_source_path_5 = os.getenv("SATELLITE_ZARR_PATH", None)
     sat_source_path_15 = (
         None if (sat_source_path_5 is None) else sat_source_path_5.replace(".zarr", "_15.zarr")
@@ -196,6 +198,7 @@ def app(
             revision=model_config.pvnet.commit,
         )
         data_config_from_model[model_config.name] = data_config_path
+    
     common_all_config = get_union_of_configs(data_config_from_model.values())
 
     # ---------------------------------------------------------------------------
@@ -209,27 +212,60 @@ def app(
         t0=t0,
     )
 
-    # --- Download satellite data
-    logger.info("Downloading satellite data")
+    data_downloaders = []
+
+    # --- Try to download satellite data if any models require it
+    if "satellite" in common_all_config["input_data"]:
+
+        logger.info("Downloading satellite data")
     
-    sat_downloader = SatelliteDownloader(
-        t0=t0,
-        source_path_5=sat_source_path_5,
-        source_path_15=sat_source_path_15,
-        legacy=(not use_ocf_data_sampler), 
-    )
-    sat_downloader.run()
+        sat_downloader = SatelliteDownloader(
+            t0=t0,
+            source_path_5=sat_source_path_5,
+            source_path_15=sat_source_path_15,
+            legacy=(not use_ocf_data_sampler), 
+        )
+        sat_downloader.run()
 
-    # --- Download and process NWP data
-    logger.info("Downloading NWP data")
+        data_downloaders.append(sat_downloader)
 
-    ukv_variables = get_nwp_channels(provider="ukv", nwp_config=common_all_config)
-    ukv_downloader = UKVDownloader(source_path=ukv_source_path, nwp_variables=ukv_variables)
-    ukv_downloader.run()
+    # --- Try to download NWP data if any models require it
+    if "nwp" in common_all_config["input_data"]:
 
-    ecmwf_variables = get_nwp_channels(provider="ecmwf", nwp_config=common_all_config)
-    ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path, nwp_variables=ecmwf_variables)
-    ecmwf_downloader.run()
+        logger.info("Downloading NWP data")
+
+        if "ukv" in common_all_config["input_data"]["nwp"]:
+        
+            ukv_downloader = UKVDownloader(
+                source_path=ukv_source_path,
+                nwp_variables=get_nwp_channels(provider="ukv", nwp_config=common_all_config),
+            )
+            ukv_downloader.run()
+
+            data_downloaders.append(ukv_downloader)
+        
+        if "ecmwf" in common_all_config["input_data"]["nwp"]:
+
+            ecmwf_downloader = ECMWFDownloader(
+                source_path=ecmwf_source_path, 
+                nwp_variables=get_nwp_channels(provider="ecmwf", nwp_config=common_all_config)
+            )
+            ecmwf_downloader.run()
+
+            data_downloaders.append(ecmwf_downloader)
+
+        if "cloudcasting" in common_all_config["input_data"]["nwp"]:
+            
+            cloudcasting_downloader = CloudcastingDownloader(
+                source_path=cloudcasting_source_path, 
+                nwp_variables=get_nwp_channels(
+                    provider="cloudcasting", 
+                    nwp_config=common_all_config
+                )
+            )
+            cloudcasting_downloader.run()
+
+            data_downloaders.append(cloudcasting_downloader)
 
     # ---------------------------------------------------------------------------
     # 2. Set up models
@@ -244,10 +280,9 @@ def app(
 
         # Check if the data available will allow the model to run
         logger.info(f"Checking that the input data for model '{model_config.name}' exists")
-        model_can_run = (
-            sat_downloader.check_model_inputs_available(data_config_path, t0)
-            and ecmwf_downloader.check_model_inputs_available(data_config_path, t0)
-            and ukv_downloader.check_model_inputs_available(data_config_path, t0)
+        model_can_run = all(
+            downloader.check_model_inputs_available(data_config_path, t0)
+            for downloader in data_downloaders
         )
         
         if model_can_run:
@@ -310,9 +345,8 @@ def app(
             forecast_compiler.predict_batch(batch)
 
     # Delete the downloaded data
-    sat_downloader.clean_up()
-    ecmwf_downloader.clean_up()
-    ukv_downloader.clean_up()
+    for downloader in data_downloaders:
+        downloader.clean_up()
 
     # ---------------------------------------------------------------------------
     # Merge batch results to xarray DataArray and make national forecast

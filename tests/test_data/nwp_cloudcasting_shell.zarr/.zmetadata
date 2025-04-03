@@ -278,6 +278,59 @@
         ".zgroup": {
             "zarr_format": 2
         },
+        "init_time/.zarray": {
+            "chunks": [
+                1
+            ],
+            "compressor": {
+                "blocksize": 0,
+                "clevel": 5,
+                "cname": "lz4",
+                "id": "blosc",
+                "shuffle": 1
+            },
+            "dtype": "<i8",
+            "fill_value": null,
+            "filters": null,
+            "order": "C",
+            "shape": [
+                1
+            ],
+            "zarr_format": 2
+        },
+        "init_time/.zattrs": {
+            "_ARRAY_DIMENSIONS": [
+                "init_time"
+            ],
+            "calendar": "proleptic_gregorian",
+            "units": "days since 2025-04-03 09:30:00"
+        },
+        "step/.zarray": {
+            "chunks": [
+                12
+            ],
+            "compressor": {
+                "blocksize": 0,
+                "clevel": 5,
+                "cname": "lz4",
+                "id": "blosc",
+                "shuffle": 1
+            },
+            "dtype": "<i8",
+            "fill_value": null,
+            "filters": null,
+            "order": "C",
+            "shape": [
+                12
+            ],
+            "zarr_format": 2
+        },
+        "step/.zattrs": {
+            "_ARRAY_DIMENSIONS": [
+                "step"
+            ],
+            "units": "minutes"
+        },
         "variable/.zarray": {
             "chunks": [
                 11
@@ -305,7 +358,7 @@
         },
         "x_geostationary/.zarray": {
             "chunks": [
-                680
+                614
             ],
             "compressor": {
                 "blocksize": 0,
@@ -319,7 +372,7 @@
             "filters": null,
             "order": "C",
             "shape": [
-                680
+                614
             ],
             "zarr_format": 2
         },
@@ -332,7 +385,7 @@
         },
         "y_geostationary/.zarray": {
             "chunks": [
-                412
+                372
             ],
             "compressor": {
                 "blocksize": 0,
@@ -346,7 +399,7 @@
             "filters": null,
             "order": "C",
             "shape": [
-                412
+                372
             ],
             "zarr_format": 2
         },
