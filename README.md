@@ -79,7 +79,6 @@ export ENVIRONMENT="production"
 | **pvnet_day_ahead**       | no        | yes     | yes       | no     | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region_day_ahead/tree/263741ebb6b71559d113d799c9a579a973cc24ba) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_summation_uk_national_day_ahead/tree/7a2f26b94ac261160358b224944ef32998bd60ce) |
 | **Legacy pvnet_v2**       | yes       | yes     | yes       | yes    | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/a7fd71727f4cb2b933992b2108638985e24fa5a3) |
 | **Legacy pvnet_ecmwf**    | no        | no      | yes       | yes    | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/c14f7427d9854d63430aa936ce45f55d3818d033) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/4fe6b1441b6dd549292c201ed85eee156ecc220c) |
-| **Legacy pvnet_day_ahead**| yes       | yes     | yes       | yes    | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region_day_ahead/tree/d87565731692a6003e43caac4feaed0f69e79272) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_summation_uk_national_day_ahead/tree/ed60c5d32a020242ca4739dcc6dbc8864f783a08) |
 
 
 ## Validation Checks
