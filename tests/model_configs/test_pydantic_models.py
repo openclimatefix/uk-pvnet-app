@@ -1,4 +1,3 @@
-import pytest
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
