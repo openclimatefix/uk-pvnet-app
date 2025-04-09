@@ -156,7 +156,8 @@ def get_nwp_channels(provider: str, nwp_config: dict) -> None| list[str]:
     """
     nwp_channels = None
     if "nwp" in nwp_config["input_data"]:
-        if provider in nwp_config["input_data"]["nwp"]:
-            nwp_channels = nwp_config["input_data"]["nwp"][provider]["channels"]
+        for label, source in nwp_config["input_data"]["nwp"].items():
+            if source["provider"] == provider:
+                nwp_channels = source["channels"]
     return nwp_channels
 

@@ -230,7 +230,11 @@ def app(
 
         logger.info("Downloading NWP data")
 
-        if "ukv" in common_all_config["input_data"]["nwp"]:
+        required_providers = [
+            source["provider"] for source in common_all_config["input_data"]["nwp"].values()
+        ]
+
+        if "ukv" in required_providers:
         
             ukv_downloader = UKVDownloader(
                 source_path=ukv_source_path,
@@ -240,7 +244,7 @@ def app(
 
             data_downloaders.append(ukv_downloader)
         
-        if "ecmwf" in common_all_config["input_data"]["nwp"]:
+        if "ecmwf" in required_providers:
 
             ecmwf_downloader = ECMWFDownloader(
                 source_path=ecmwf_source_path, 
@@ -250,7 +254,7 @@ def app(
 
             data_downloaders.append(ecmwf_downloader)
 
-        if "cloudcasting" in common_all_config["input_data"]["nwp"]:
+        if "cloudcasting" in required_providers:
             
             cloudcasting_downloader = CloudcastingDownloader(
                 source_path=cloudcasting_source_path, 
