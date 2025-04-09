@@ -106,7 +106,6 @@ def app(
           the model configs so saving of the GSP sum is not used. Defaults to false.
         - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
         - RUN_CRITICAL_MODELS_ONLY, option to run critical models only, defaults to false
-        - USE_OCF_DATA_SAMPLER, option to use ocf_data_sampler, defaults to true
         - FORECAST_VALIDATE_ZIG_ZAG_WARNING, threshold for forecast zig-zag warning,
           defaults to 250 MW.
         - FORECAST_VALIDATE_ZIG_ZAG_ERROR, threshold for forecast zig-zag error on,
@@ -141,7 +140,6 @@ def app(
     # --- Unpack the environment variables
     use_day_ahead_model = get_boolean_env_var("DAY_AHEAD_MODEL", default=False)
     run_critical_models_only = get_boolean_env_var("RUN_CRITICAL_MODELS_ONLY", default=False)
-    use_ocf_data_sampler = get_boolean_env_var("USE_OCF_DATA_SAMPLER", default=True)
     allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
     allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
@@ -178,7 +176,6 @@ def app(
         allow_save_gsp_sum=allow_save_gsp_sum,
         get_critical_only=run_critical_models_only,
         get_day_ahead_only=use_day_ahead_model,
-        use_ocf_data_sampler=use_ocf_data_sampler,
     )
 
     if len(model_configs)==0:
@@ -223,7 +220,6 @@ def app(
             t0=t0,
             source_path_5=sat_source_path_5,
             source_path_15=sat_source_path_15,
-            legacy=(not use_ocf_data_sampler), 
         )
         sat_downloader.run()
 
@@ -294,7 +290,6 @@ def app(
                 t0=t0,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
-                use_legacy=not use_ocf_data_sampler,
             )
 
             # Store the config filename so we can create batches suitable for all models
@@ -322,8 +317,6 @@ def app(
         gsp_ids=gsp_ids,
         batch_size=batch_size,
         num_workers=num_workers,
-        db_url=db_url,
-        use_data_sampler=use_ocf_data_sampler,
     )
 
     # ---------------------------------------------------------------------------

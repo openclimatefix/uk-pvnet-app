@@ -3,7 +3,7 @@ import fsspec
 import torch
 import logging
 
-from ocf_datapipes.batch import NumpyBatch
+from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 
 from pvnet_app.model_configs.pydantic_models import ModelConfig
 

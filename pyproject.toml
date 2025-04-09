@@ -20,15 +20,14 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "PVNet-summation==0.3.2",
+    "PVNet-summation==0.3.4",
     "fsspec[s3]==2025.2.0",
     "huggingface-hub==0.28.1",
     "nowcasting_datamodel==1.5.62",
     "numpy==2.0.0",
-    "ocf_data_sampler==0.1.5",
-    "ocf_datapipes==3.3.56",
+    "ocf_data_sampler==0.2.10",
     "pandas==2.2.3",
-    "pvnet==3.0.50",
+    "pvnet==4.1.0",
     "pydantic==2.5.3",
     "pytorch-lightning==2.3.3",
     "requests==2.32.3",
@@ -42,6 +41,7 @@ dependencies = [
     "xarray==2025.1.2",
     "xesmf==0.8.8", # Requires ESMF to be installed
     "zarr==2.18.3",
+    "numcodecs<0.16",
 ]
 
 [dependency-groups]

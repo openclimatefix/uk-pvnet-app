@@ -8,7 +8,7 @@ from typing_extensions import override
 import fsspec
 import xesmf as xe
 
-from ocf_datapipes.config.load import load_yaml_configuration
+from ocf_data_sampler.config.load import load_yaml_configuration
 
 import numpy as np
 import pandas as pd
@@ -119,12 +119,12 @@ def check_model_nwp_inputs_available(
         # Get the NWP valid times required by the model
         freq = pd.Timedelta(f"{nwp_config.time_resolution_minutes}min")
 
-        req_start_time = (t0 - pd.Timedelta(f"{nwp_config.history_minutes}min")).ceil(freq)
+        req_start_time = (t0 + pd.Timedelta(f"{nwp_config.interval_start_minutes}min")).ceil(freq)
 
-        req_end_time = (t0 + pd.Timedelta(f"{nwp_config.forecast_minutes}min")).ceil(freq) 
+        req_end_time = (t0 + pd.Timedelta(f"{nwp_config.interval_end_minutes}min")).ceil(freq) 
             
         # If we diff accumulated channels in time we'll need one more timestamp
-        if len(nwp_config.nwp_accum_channels)>0:
+        if len(nwp_config.accum_channels)>0:
             req_end_time = req_end_time + freq
 
         required_nwp_times = pd.date_range(start=req_start_time, end=req_end_time, freq=freq)
