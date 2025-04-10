@@ -178,6 +178,10 @@ class NWPDownloader(ABC):
         """Resave the NWP data to the destination path"""
 
         ds["variable"] = ds["variable"].astype(str)
+
+        for var in ds.data_vars:
+            # Remove the chunks from the data variables
+            ds[var].encoding.pop("chunks", None)
         
         # Overwrite the old data
         shutil.rmtree(self.destination_path, ignore_errors=True)
@@ -209,7 +213,7 @@ class NWPDownloader(ABC):
             )
             return
 
-        ds = xr.open_zarr(self.destination_path)
+        ds = xr.open_zarr(self.destination_path).compute()
 
         init_time = pd.to_datetime(ds.init_time.values[0])
         valid_times = init_time + pd.to_timedelta(ds.step)
@@ -515,12 +519,12 @@ class UKVDownloader(NWPDownloader):
 
 class CloudcastingDownloader(NWPDownloader):
 
-    destination_path = nwp_ukv_path
+    destination_path = nwp_cloudcasting_path
     nwp_source = "cloudcasting"
     save_chunk_dict = {
         "step": -1,
-        "x": 100,
-        "y": 100,
+        "x_geostationary": 100,
+        "y_geostationary": 100,
     }
 
     @override

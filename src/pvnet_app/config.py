@@ -1,6 +1,6 @@
 import yaml
 
-from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path, sat_path
+from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path, nwp_cloudcasting_path, sat_path
 
 
 def load_yaml_config(path: str) -> dict:
@@ -32,7 +32,11 @@ def populate_config_with_data_data_filepaths(config: dict) -> dict:
         config: The data config
     """
     production_paths = {
-        "nwp": {"ukv": nwp_ukv_path, "ecmwf": nwp_ecmwf_path},
+        "nwp": {
+            "ukv": nwp_ukv_path, 
+            "ecmwf": nwp_ecmwf_path, 
+            "cloudcasting": nwp_cloudcasting_path,
+        },
         "satellite": sat_path,
     }
 
@@ -49,8 +53,9 @@ def populate_config_with_data_data_filepaths(config: dict) -> dict:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
             if nwp_config[nwp_source]["zarr_path"] != "":
-                assert nwp_source in production_paths["nwp"], f"Missing NWP path: {nwp_source}"
-                nwp_config[nwp_source]["zarr_path"] = production_paths["nwp"][nwp_source]
+                provider = nwp_config[nwp_source]["provider"]
+                assert provider in production_paths["nwp"], f"Missing NWP path: {provider}"
+                nwp_config[nwp_source]["zarr_path"] = production_paths["nwp"][provider]
 
     return config
 
@@ -147,7 +152,7 @@ def get_union_of_configs(config_paths: list[str]) -> dict:
     return common_config
 
 
-def get_nwp_channels(provider: str, nwp_config: dict) -> None| list[str]:
+def get_nwp_channels(provider: str, nwp_config: dict) -> None | list[str]:
     """Get the NWP channels from the NWP config
 
     Args:

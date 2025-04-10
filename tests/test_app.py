@@ -14,7 +14,10 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.app import app
 
 
-def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, db_url):
+def test_app(
+        test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, 
+        cloudcasting_data, db_url
+):
     """Test the app running the intraday models"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -30,6 +33,9 @@ def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_
 
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
+
+        os.environ["CLOUDCASTING_ZARR_PATH"] = temp_nwp_path = "temp_cloudcasting.zarr"
+        cloudcasting_data.to_zarr(temp_nwp_path)
 
         # In production sat zarr is zipped
         os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path = "temp_sat.zarr.zip"
