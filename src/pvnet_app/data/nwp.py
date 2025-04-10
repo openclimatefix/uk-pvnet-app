@@ -106,7 +106,7 @@ def check_model_nwp_inputs_available(
     model_uses_nwp = (
         hasattr(input_config, "nwp") 
         and (input_config.nwp is not None)
-        and (nwp_source in input_config.nwp)
+        and (nwp_source in [c.provider for _, c in input_config.nwp.items()])
     )
 
     if model_uses_nwp and (nwp_valid_times is None):
@@ -114,7 +114,7 @@ def check_model_nwp_inputs_available(
 
     elif model_uses_nwp:
 
-        nwp_config = input_config.nwp[nwp_source]
+        nwp_config = [c for _, c in input_config.nwp.items() if c.provider==nwp_source][0]
 
         # Get the NWP valid times required by the model
         freq = pd.Timedelta(f"{nwp_config.time_resolution_minutes}min")
