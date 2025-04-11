@@ -213,7 +213,7 @@ class NWPDownloader(ABC):
             )
             return
 
-        ds = xr.open_zarr(self.destination_path).compute()
+        ds = xr.open_zarr(self.destination_path)
 
         init_time = pd.to_datetime(ds.init_time.values[0])
         valid_times = init_time + pd.to_timedelta(ds.step)
@@ -530,7 +530,7 @@ class CloudcastingDownloader(NWPDownloader):
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         # The cloudcasting data needs no changes
-        return ds
+        return ds.compute()
     
     @override
     def data_is_okay(self, ds: xr.Dataset) -> bool:
