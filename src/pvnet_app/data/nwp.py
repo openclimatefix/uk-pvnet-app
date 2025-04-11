@@ -8,14 +8,14 @@ from typing_extensions import override
 import fsspec
 import xesmf as xe
 
-from ocf_datapipes.config.load import load_yaml_configuration
+from ocf_data_sampler.config.load import load_yaml_configuration
 
 import numpy as np
 import pandas as pd
 import pyproj
 import xarray as xr
 
-from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path
+from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path, nwp_cloudcasting_path
 
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ def check_model_nwp_inputs_available(
     model_uses_nwp = (
         hasattr(input_config, "nwp") 
         and (input_config.nwp is not None)
-        and (nwp_source in input_config.nwp)
+        and (nwp_source in [c.provider for _, c in input_config.nwp.items()])
     )
 
     if model_uses_nwp and (nwp_valid_times is None):
@@ -114,17 +114,17 @@ def check_model_nwp_inputs_available(
 
     elif model_uses_nwp:
 
-        nwp_config = input_config.nwp[nwp_source]
+        nwp_config = [c for _, c in input_config.nwp.items() if c.provider==nwp_source][0]
 
         # Get the NWP valid times required by the model
         freq = pd.Timedelta(f"{nwp_config.time_resolution_minutes}min")
 
-        req_start_time = (t0 - pd.Timedelta(f"{nwp_config.history_minutes}min")).ceil(freq)
+        req_start_time = (t0 + pd.Timedelta(f"{nwp_config.interval_start_minutes}min")).ceil(freq)
 
-        req_end_time = (t0 + pd.Timedelta(f"{nwp_config.forecast_minutes}min")).ceil(freq) 
+        req_end_time = (t0 + pd.Timedelta(f"{nwp_config.interval_end_minutes}min")).ceil(freq) 
             
         # If we diff accumulated channels in time we'll need one more timestamp
-        if len(nwp_config.nwp_accum_channels)>0:
+        if len(nwp_config.accum_channels)>0:
             req_end_time = req_end_time + freq
 
         required_nwp_times = pd.date_range(start=req_start_time, end=req_end_time, freq=freq)
@@ -178,6 +178,10 @@ class NWPDownloader(ABC):
         """Resave the NWP data to the destination path"""
 
         ds["variable"] = ds["variable"].astype(str)
+
+        for var in ds.data_vars:
+            # Remove the chunks from the data variables
+            ds[var].encoding.pop("chunks", None)
         
         # Overwrite the old data
         shutil.rmtree(self.destination_path, ignore_errors=True)
@@ -418,35 +422,33 @@ class UKVDownloader(NWPDownloader):
         """Change the UKV variable names to match the training data"""
 
         # This is for nwp-consumer>=1.0.0
-        if "um-ukv" in ds.data_vars:
+        logger.info("Renaming the UKV variables")
 
-            logger.info("Renaming the UKV variables")
+        ds = ds.rename({"um-ukv": "UKV"})
 
-            ds = ds.rename({"um-ukv": "UKV"})
+        varname_mapping = {
+            "cloud_cover_high": "hcc",
+            "cloud_cover_low": "lcc",
+            "cloud_cover_medium": "mcc",
+            "cloud_cover_total": "tcc",
+            "snow_depth_gl": "sde",
+            "direct_shortwave_radiation_flux_gl": "sr",
+            "downward_longwave_radiation_flux_gl": "dlwrf",
+            "downward_shortwave_radiation_flux_gl": "dswrf",
+            "downward_ultraviolet_radiation_flux_gl": "duvrs",
+            "relative_humidity_sl": "r",
+            "temperature_sl": "t",
+            "total_precipitation_rate_gl": "prate",
+            "visibility_sl": "vis",
+            "wind_direction_10m": "wdir10",
+            "wind_speed_10m": "si10",
+            "wind_v_component_10m": "v10",
+            "wind_u_component_10m": "u10"
+        }
 
-            varname_mapping = {
-                "cloud_cover_high": "hcc",
-                "cloud_cover_low": "lcc",
-                "cloud_cover_medium": "mcc",
-                "cloud_cover_total": "tcc",
-                "snow_depth_gl": "sde",
-                "direct_shortwave_radiation_flux_gl": "sr",
-                "downward_longwave_radiation_flux_gl": "dlwrf",
-                "downward_shortwave_radiation_flux_gl": "dswrf",
-                "downward_ultraviolet_radiation_flux_gl": "duvrs",
-                "relative_humidity_sl": "r",
-                "temperature_sl": "t",
-                "total_precipitation_rate_gl": "prate",
-                "visibility_sl": "vis",
-                "wind_direction_10m": "wdir10",
-                "wind_speed_10m": "si10",
-                "wind_v_component_10m": "v10",
-                "wind_u_component_10m": "u10"
-            }
-
-            variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
-                
-            ds = ds.assign_coords(variable=variable_coords)
+        variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
+            
+        ds = ds.assign_coords(variable=variable_coords)
 
         return ds
 
@@ -460,42 +462,41 @@ class UKVDownloader(NWPDownloader):
         """
 
         # This is for nwp-consumer>=1.0.0
-        if "latitude" not in ds:
 
-            logger.info("Adding lon-lat coords to the UKV data")
+        logger.info("Adding lon-lat coords to the UKV data")
 
-            ds = ds.rename({'x_laea': 'x', 'y_laea': 'y'})
+        ds = ds.rename({'x_laea': 'x', 'y_laea': 'y'})
 
-            # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
-            laea = pyproj.Proj(
-                proj='laea',
-                lat_0=54.9,
-                lon_0=-2.5,
-                x_0=0.,
-                y_0=0.,
-                ellps="WGS84",
-                datum="WGS84",
-            )
+        # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
+        laea = pyproj.Proj(
+            proj='laea',
+            lat_0=54.9,
+            lon_0=-2.5,
+            x_0=0.,
+            y_0=0.,
+            ellps="WGS84",
+            datum="WGS84",
+        )
 
-            # WGS84 is short for "World Geodetic System 1984". This is a lon-lat coord system
-            wgs84 = pyproj.Proj(f"+init=EPSG:4326")
+        # WGS84 is short for "World Geodetic System 1984". This is a lon-lat coord system
+        wgs84 = pyproj.Proj(f"+init=EPSG:4326")
 
-            laea_to_lon_lat = pyproj.Transformer.from_proj(laea, wgs84, always_xy=True).transform
+        laea_to_lon_lat = pyproj.Transformer.from_proj(laea, wgs84, always_xy=True).transform
 
-            # Calculate longitude and latitude from x_laea and y_laea
-            # - x is an array of shape (455,)
-            # - y is an array of shape (639,)
-            # We need to change x and y to a 2D arrays of shape (455, 639)
-            x, y = ds.x.values, ds.y.values
-            x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
-            y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
+        # Calculate longitude and latitude from x_laea and y_laea
+        # - x is an array of shape (455,)
+        # - y is an array of shape (639,)
+        # We need to change x and y to a 2D arrays of shape (455, 639)
+        x, y = ds.x.values, ds.y.values
+        x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
+        y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
 
-            lons, lats = laea_to_lon_lat(xx=x, yy=y)
+        lons, lats = laea_to_lon_lat(xx=x, yy=y)
 
-            ds = ds.assign_coords(
-                longitude=(["y", "x"], lons),
-                latitude=(["y", "x"], lats),
-            )
+        ds = ds.assign_coords(
+            longitude=(["y", "x"], lons),
+            latitude=(["y", "x"], lats),
+        )
 
         return ds
 
@@ -509,6 +510,27 @@ class UKVDownloader(NWPDownloader):
         ds = self.fix_dtype(ds)
 
         return ds
+    
+    @override
+    def data_is_okay(self, ds: xr.Dataset) -> bool:
+        contains_nans = ds[list(ds.data_vars.keys())[0]].isnull().any().compute().item()
+        return not contains_nans
+
+
+class CloudcastingDownloader(NWPDownloader):
+
+    destination_path = nwp_cloudcasting_path
+    nwp_source = "cloudcasting"
+    save_chunk_dict = {
+        "step": -1,
+        "x_geostationary": 100,
+        "y_geostationary": 100,
+    }
+
+    @override
+    def process(self, ds: xr.Dataset) -> xr.Dataset:
+        # The cloudcasting data needs no changes
+        return ds.compute()
     
     @override
     def data_is_okay(self, ds: xr.Dataset) -> bool:
