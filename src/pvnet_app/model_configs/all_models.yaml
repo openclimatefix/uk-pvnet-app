@@ -97,6 +97,38 @@ models:
     save_gsp_to_recent: False
     uses_satellite_data: False
 
+  # Uses 2NWPs + cloudcasting
+  - name: pvnet-cloudcasting
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        commit: 0a68812722c2edf2a6b167ffbcbb37d5466fadfc
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        commit: de60f79aa7aa46cd9e1c96cb8154a55ba4e3c9c4
+    is_critical: False
+    is_day_ahead: False
+    use_adjuster: False
+    save_gsp_sum: False
+    verbose_logging: False
+    save_gsp_to_recent: False
+    uses_satellite_data: True
+
+  # Only uses cloudcasting
+  - name: pvnet-cloudcasting-only
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        commit: f506747aabd1c4a543e436af3fe1ea3372d32840
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        commit: 0240ad989f58a0df46d6779224ba4e9fbf9e31b0
+    is_critical: False
+    is_day_ahead: False
+    use_adjuster: False
+    save_gsp_sum: False
+    verbose_logging: False
+    save_gsp_to_recent: False
+    uses_satellite_data: True
+
   # Day-ahead model which does not use satellite data
   - name: pvnet_day_ahead
     pvnet:
