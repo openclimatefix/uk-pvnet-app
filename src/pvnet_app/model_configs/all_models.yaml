@@ -24,7 +24,7 @@ models:
         commit: bd82eeef5644c8ef26ac053c81b5199b72b1015a
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        commit: 476a2b800e9ed31298b539f17e937276e3225c32
+        commit: 3b26e5783996267dff9dd8f2fc0600c5f0abb164
     is_critical: True
     is_day_ahead: False
     use_adjuster: True
@@ -56,7 +56,7 @@ models:
         commit: 384046d8e628af92918f042a682e6d6ac59f0899
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        commit: 120dbf8795bcaf6c829f19b21762a17add4b92eb
+        commit: 18ab73446dfe701fdac58c94cbf9d01680fb92a5
     is_critical: False
     is_day_ahead: False
     use_adjuster: False
@@ -104,7 +104,7 @@ models:
         commit: 0a68812722c2edf2a6b167ffbcbb37d5466fadfc
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        commit: de60f79aa7aa46cd9e1c96cb8154a55ba4e3c9c4
+        commit: 844acb3a44801fb4e79d9971c3e07b3c0fdf98bc
     is_critical: False
     is_day_ahead: False
     use_adjuster: False
