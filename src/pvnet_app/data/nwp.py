@@ -51,7 +51,6 @@ def regrid_nwp_data(
         method: The regridding method to use
         nwp_source: The source of the NWP data (only used for logging messages)
     """
-    logger.info(f"Regridding{nwp_source} to expected grid to {target_coords_path}")
 
     # These are the coords we are aiming for
     ds_target_coords = xr.load_dataset(target_coords_path)
@@ -64,25 +63,21 @@ def regrid_nwp_data(
 
     if not needs_regridding:
         logger.info(f"No regridding required for {nwp_source} - skipping this step")
-        return
+        return ds
 
-    logger.info(f"Regridding {nwp_source} to expected grid")
-
-    # Regrid in RAM efficient way by chunking first. Each step is regridded separately
-    regrid_chunk_dict = {
-        "step": 1,
-        "latitude": -1,
-        "longitude": -1,
-        "x": -1,
-        "y": -1,
-    }
-
-    ds_rechunked = ds.chunk(
-        {k: regrid_chunk_dict[k] for k in list(ds.xindexes) if k in regrid_chunk_dict}
-    )
+    logger.info(f"Regridding {nwp_source} to expected grid to {target_coords_path}")
 
     regridder = xe.Regridder(ds, ds_target_coords, method=method)
-    return regridder(ds_rechunked).compute(scheduler="single-threaded")
+
+    # Regrid in a loop to keep RAM usage lower
+    ds_list = []
+    for step in ds.step:
+
+        # Copy to make sure the data is C-contiguous for efficient regridding
+        ds_step = ds.sel(step=step).copy(deep=True)
+        ds_list.append(regridder(ds_step))
+        
+    return xr.concat(ds_list, dim="step")
 
 
 def check_model_nwp_inputs_available(
@@ -141,7 +136,6 @@ def check_model_nwp_inputs_available(
         available = True
 
     return available
-
 
 
 class NWPDownloader(ABC):
@@ -213,7 +207,7 @@ class NWPDownloader(ABC):
             )
             return
 
-        ds = xr.open_zarr(self.destination_path)
+        ds = xr.open_zarr(self.destination_path).compute()
 
         init_time = pd.to_datetime(ds.init_time.values[0])
         valid_times = init_time + pd.to_timedelta(ds.step)
@@ -257,7 +251,6 @@ class NWPDownloader(ABC):
             nwp_source=self.nwp_source,
             nwp_valid_times=self.valid_times,
         ) 
-
 
 
 class ECMWFDownloader(NWPDownloader):
@@ -462,7 +455,6 @@ class UKVDownloader(NWPDownloader):
         """
 
         # This is for nwp-consumer>=1.0.0
-
         logger.info("Adding lon-lat coords to the UKV data")
 
         ds = ds.rename({'x_laea': 'x', 'y_laea': 'y'})
@@ -530,7 +522,7 @@ class CloudcastingDownloader(NWPDownloader):
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         # The cloudcasting data needs no changes
-        return ds.compute()
+        return ds
     
     @override
     def data_is_okay(self, ds: xr.Dataset) -> bool:
