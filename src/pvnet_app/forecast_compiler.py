@@ -172,7 +172,6 @@ class ForecastCompiler:
         self.sun_down_masks += [sun_down_mask]
 
         # Log max prediction
-        self.log_info(f"GSP IDs: {these_gsp_ids}")
         self.log_info(f"Max prediction: {np.max(preds, axis=1)}")
 
 
