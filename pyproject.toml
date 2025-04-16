@@ -76,6 +76,7 @@ where = ["src"]
 
 [tool.setuptools-git-versioning]
 enabled = true
+dirty_template = "{tag}"
 
 # --- LINTING AND TYPING CONFIGURATION --- #
 
