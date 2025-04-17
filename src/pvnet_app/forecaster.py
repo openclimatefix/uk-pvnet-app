@@ -34,7 +34,7 @@ _model_mismatch_msg = (
 )
 
 
-class ForecastCompiler:
+class Forecaster:
     """Class for making and compiling solar forecasts from for all GB GSPs and national total"""
 
     def __init__(
@@ -70,11 +70,6 @@ class ForecastCompiler:
         self.save_gsp_sum = model_config.save_gsp_sum
         self.save_gsp_to_recent = model_config.save_gsp_to_recent
         self.verbose_logging = model_config.verbose_logging
-
-        # Create stores for the predictions
-        self.normed_preds = []
-        self.gsp_ids_each_batch = []
-        self.sun_down_masks = []
 
         # Load the GSP and summation models
         self.model, self.summation_model = self.load_model(
@@ -141,63 +136,32 @@ class ForecastCompiler:
     
 
     @torch.no_grad
-    def predict_batch(self, batch: NumpyBatch) -> None:
-        """Make predictions for a batch and store results internally"""
+    def predict(self, batch: NumpyBatch) -> None:
+        """Make predictions for the batch and store results internally"""
+
         self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
 
+        gsp_ids = batch["gsp_id"]
+        # The dataloader normalises solar elevation data to the range [0, 1]
+        elevation = (batch["solar_elevation"] - 0.5) * 180
+        
+        self.log_info(f"GSPs: {gsp_ids}")
+
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
-
-        # Store GSP IDs for this batch for reordering later
-        these_gsp_ids = batch["gsp_id"].cpu().numpy()
-
-        self.gsp_ids_each_batch += [these_gsp_ids]
-
-        self.log_info(f"Predicting for GSPs: {these_gsp_ids}")
-
+        
         # Run batch through model
-        preds = self.model(batch).detach().cpu().numpy()
-
-        # Calculate unnormalised elevation and sun-dowm mask
-        self.log_info("Computing sundown mask")
-
-        # The new dataloader normalises the data to [0, 1]
-        elevation = (batch["solar_elevation"].cpu().numpy() - 0.5) * 180
+        normed_preds = self.model(batch).detach().cpu().numpy()
 
         # We only need elevation mask for forecasted values, not history
-        elevation = elevation[:, -preds.shape[1]:]
-        sun_down_mask = elevation < MIN_DAY_ELEVATION
+        elevation = elevation[:, -normed_preds.shape[1]:]
+        sun_down_masks = elevation < MIN_DAY_ELEVATION
 
-        # Store predictions internally
-        self.normed_preds += [preds]
-        self.sun_down_masks += [sun_down_mask]
-
-        # Log max prediction
-        self.log_info(f"Max prediction: {np.max(preds, axis=1)}")
-
-
-    @torch.no_grad
-    def compile_forecasts(self) -> None:
-        """Compile all forecasts internally in a single DataArray
-
-        Steps:
-        - Compile all the GSP level forecasts
-        - Make national forecast
-        - Compile all forecasts into a DataArray stored inside the object as `da_abs_all`
-        """
-        # Compile results from all batches
-        normed_preds = np.concatenate(self.normed_preds)
-        sun_down_masks = np.concatenate(self.sun_down_masks)
-        gsp_ids = np.concatenate(self.gsp_ids_each_batch)
-
-        # Reorder GSPs which can end up shuffled if multiprocessing is used
-        inds = gsp_ids.argsort()
-
-        normed_preds = normed_preds[inds]
-        sun_down_masks = sun_down_masks[inds]
-        gsp_ids = gsp_ids[inds]
-
-        # Merge batch results to xarray DataArray
-        da_normed = self.preds_to_dataarray(normed_preds, self.model.output_quantiles, gsp_ids)
+        # Convert GSP results to xarray DataArray
+        da_normed = self.preds_to_dataarray(
+            normed_preds, 
+            self.model.output_quantiles, 
+            gsp_ids,
+        )
 
         da_sundown_mask = xr.DataArray(
             data=sun_down_masks,
@@ -211,6 +175,7 @@ class ForecastCompiler:
         # Multiply normalised forecasts by capacities and clip negatives
         self.log_info(f"Converting to absolute MW using {self.gsp_capacities}")
         da_abs = da_normed.clip(0, None) * self.gsp_capacities.values[:, None, None]
+        
         max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
         self.log_info(f"Maximum predictions: {max_preds}")
 
