@@ -21,7 +21,7 @@ from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader, CloudcastingDownl
 from pvnet_app.data.gsp import get_gsp_and_national_capacities
 from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.dataset import get_dataset
-from pvnet_app.forecast_compiler import ForecastCompiler
+from pvnet_app.forecaster import Forecaster
 from pvnet_app.validate_forecast import validate_forecast
 from pvnet_app.consts import __version__
 
@@ -257,7 +257,7 @@ def app(
     # 2. Set up models
 
     # Prepare all the models which can be run
-    forecast_compilers = {}
+    forecasters = {}
     used_data_config_paths = []
     for model_config in model_configs:
 
@@ -274,7 +274,7 @@ def app(
         if model_can_run:
             logger.info(f"The input data for model '{model_config.name}' is available")
             # Set up a forecast compiler for the model
-            forecast_compilers[model_config.name] = ForecastCompiler(
+            forecasters[model_config.name] = Forecaster(
                 model_config=model_config,
                 device=device,
                 t0=t0,
@@ -287,7 +287,7 @@ def app(
         else:
             logger.warning(f"The model {model_config.name} cannot be run with input data available")
 
-    if len(forecast_compilers) == 0:
+    if len(forecasters) == 0:
         raise Exception("No models were compatible with the available input data.")
 
     # Find the config with values suitable for running all models
@@ -317,30 +317,23 @@ def app(
 
     if (s3_batch_save_dir is not None):
         # Save the batch under the name of the first model
-        model_name = next(iter(forecast_compilers))
+        model_name = next(iter(forecasters))
         save_batch_to_s3(batch, model_name, s3_batch_save_dir) 
 
-    for forecast_compiler in forecast_compilers.values():
-        forecast_compiler.predict_batch(batch)
+    for forecaster in forecasters.values():
+        forecaster.predict(batch)
 
     # Delete the downloaded data
     for downloader in data_downloaders:
         downloader.clean_up()
 
     # ---------------------------------------------------------------------------
-    # Merge batch results to xarray DataArray and make national forecast
-    logger.info("Processing raw predictions to DataArray")
-
-    for forecast_compiler in forecast_compilers.values():
-        forecast_compiler.compile_forecasts()
-
-    # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
     logger.info("Validating forecasts")
-    for k in list(forecast_compilers.keys()):
+    for k in list(forecasters.keys()):
 
         national_forecast = (
-            forecast_compilers[k].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
+            forecasters[k].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
         ).to_series()
 
         forecast_okay = validate_forecast(
@@ -356,16 +349,16 @@ def app(
             logger.warning(f"Forecast for model {k} failed validation")
             if filter_bad_forecasts:
                 # This forecast will not be saved
-                del forecast_compilers[k]
+                del forecasters[k]
 
-    if len(forecast_compilers) == 0:
+    if len(forecasters) == 0:
         raise Exception("No models passed the forecast validation checks")
 
 
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
-        return next(iter(forecast_compilers.values())).da_abs_all
+        return next(iter(forecasters.values())).da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to database
@@ -373,14 +366,14 @@ def app(
 
     with db_connection.get_session() as session:
         with session.no_autoflush:
-            for forecast_compiler in forecast_compilers.values():
-                forecast_compiler.log_forecast_to_database(session=session)
+            for forecaster in forecasters.values():
+                forecaster.log_forecast_to_database(session=session)
 
     logger.info("Finished forecast")
 
     if raise_model_failure in ["any", "critical"]:
         check_model_runs_finished(
-            completed_forecasts=list(forecast_compilers.keys()),
+            completed_forecasts=list(forecasters.keys()),
             model_configs=model_configs, 
             raise_if_missing=raise_model_failure,
         )
