@@ -33,6 +33,23 @@ models:
     save_gsp_to_recent: True
     uses_satellite_data: True
 
+  # Currently this model uses a 30 minute satellite delay
+  # This uses the new PVNet model but the old summation model
+  - name: pvnet_v2_oldnew_combined # This name is important as it used for blending
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        commit: bd82eeef5644c8ef26ac053c81b5199b72b1015a
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        commit: 01ca2b6e37a71deb446bb90471b44a1851d3e43f
+    is_critical: True
+    is_day_ahead: False
+    use_adjuster: False
+    save_gsp_sum: False
+    verbose_logging: False
+    save_gsp_to_recent: False
+    uses_satellite_data: True
+
   # Only uses ECMWF data
   - name: pvnet_ecmwf # This name is important as it used for blending
     pvnet:
@@ -105,6 +122,23 @@ models:
     summation:
         repo: openclimatefix/pvnet_v2_summation
         commit: 844acb3a44801fb4e79d9971c3e07b3c0fdf98bc
+    is_critical: False
+    is_day_ahead: False
+    use_adjuster: False
+    save_gsp_sum: False
+    verbose_logging: False
+    save_gsp_to_recent: False
+    uses_satellite_data: True
+
+  # Currently this model uses a 30 minute satellite delay
+  # This PVNet+cloudcasting model uses an old summation model
+  - name: pvnet-cloudcasting-old-sum # This name is important as it used for blending
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        commit: 0a68812722c2edf2a6b167ffbcbb37d5466fadfc
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        commit: 01ca2b6e37a71deb446bb90471b44a1851d3e43f
     is_critical: False
     is_day_ahead: False
     use_adjuster: False
