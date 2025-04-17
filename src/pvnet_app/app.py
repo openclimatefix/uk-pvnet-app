@@ -5,7 +5,6 @@ import os
 import tempfile
 from importlib.metadata import PackageNotFoundError, version
 
-import dask
 import pandas as pd
 import sentry_sdk
 import torch
@@ -21,7 +20,7 @@ from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader, CloudcastingDownloader
 from pvnet_app.data.gsp import get_gsp_and_national_capacities
 from pvnet_app.data.batch_validation import check_batch
-from pvnet_app.dataloader import get_dataloader
+from pvnet_app.dataset import get_dataset
 from pvnet_app.forecast_compiler import ForecastCompiler
 from pvnet_app.validate_forecast import validate_forecast
 from pvnet_app.consts import __version__
@@ -66,9 +65,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Forecast made for these GSP IDs and summed to national with ID=0
 all_gsp_ids = list(range(1, 318))
 
-# Batch size used to make forecasts for all GSPs
-batch_size = 10
-
 # ---------------------------------------------------------------------------
 # APP MAIN
 
@@ -77,7 +73,6 @@ def app(
     t0: None | pd.Timestamp = None,
     gsp_ids: list[int] = all_gsp_ids,
     write_predictions: bool = True,
-    num_workers: int = -1,
 ):
     """Inference function to run PVNet.
 
@@ -87,8 +82,6 @@ def app(
             to national.
         write_predictions (bool): Whether to write prediction to the database. Else returns as
             DataArray for local testing.
-        num_workers (int): Number of workers to use to load batches of data. When set to default
-            value of -1, it will use one less than the number of CPU cores workers.
 
     This app requires these environmental variables to be available:
         - DB_URL
@@ -127,15 +120,9 @@ def app(
     if t0 is None:
         t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor("30min")
     else:
-        t0 = t0.floor("30min")
+        t0 = pd.Timestamp(t0).floor("30min")
 
     assert len(gsp_ids)>0, "No GSP IDs provided"
-
-    if num_workers == -1:
-        num_workers = os.cpu_count() - 1
-    if num_workers > 0:
-        # Without this line the dataloader will hang if multiple workers are used
-        dask.config.set(scheduler="single-threaded")
 
     # --- Unpack the environment variables
     use_day_ahead_model = get_boolean_env_var("DAY_AHEAD_MODEL", default=False)
@@ -164,7 +151,6 @@ def app(
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Making forecast for init time: {t0}")
     logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
-    logger.info(f"Using {num_workers} workers")
     logger.info(f"Using day ahead model: {use_day_ahead_model}")
     logger.info(f"Running critical models only: {run_critical_models_only}")
     logger.info(f"Allow adjuster: {allow_adjuster}")
@@ -315,31 +301,27 @@ def app(
     # Set up data loader
     logger.info("Creating DataLoader")
 
-    dataloader = get_dataloader(
+    pvnet_dataset = get_dataset(
         config_filename=common_config_path,
-        t0=t0,
         gsp_ids=gsp_ids,
-        batch_size=batch_size,
-        num_workers=num_workers,
     )
 
     # ---------------------------------------------------------------------------
     # Make predictions
     logger.info("Processing batches")
 
-    for i, batch in enumerate(dataloader):
-        logger.info(f"Predicting for batch: {i}")
+    batch = pvnet_dataset.get_sample(t0)
 
-        # Do basic validation of the batch: Will raise error if the batch passes the checks
-        check_batch(batch)
+    # Do basic validation of the batch: Will raise error if the batch passes the checks
+    check_batch(batch)
 
-        if (s3_batch_save_dir is not None) and i == 0:
-            # Save the batch under the name of the first model
-            model_name = next(iter(forecast_compilers))
-            save_batch_to_s3(batch, model_name, s3_batch_save_dir) 
+    if (s3_batch_save_dir is not None):
+        # Save the batch under the name of the first model
+        model_name = next(iter(forecast_compilers))
+        save_batch_to_s3(batch, model_name, s3_batch_save_dir) 
 
-        for forecast_compiler in forecast_compilers.values():
-            forecast_compiler.predict_batch(batch)
+    for forecast_compiler in forecast_compilers.values():
+        forecast_compiler.predict_batch(batch)
 
     # Delete the downloaded data
     for downloader in data_downloaders:
@@ -357,12 +339,12 @@ def app(
     logger.info("Validating forecasts")
     for k in list(forecast_compilers.keys()):
 
-        natioanl_forecast = (
+        national_forecast = (
             forecast_compilers[k].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
         ).to_series()
 
         forecast_okay = validate_forecast(
-            national_forecast=natioanl_forecast,
+            national_forecast=national_forecast,
             national_capacity=national_capacity,
             zip_zag_warning_threshold=zig_zag_warning_threshold,
             zig_zag_error_threshold=zig_zag_error_threshold,

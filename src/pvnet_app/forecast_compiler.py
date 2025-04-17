@@ -71,11 +71,6 @@ class ForecastCompiler:
         self.save_gsp_to_recent = model_config.save_gsp_to_recent
         self.verbose_logging = model_config.verbose_logging
 
-        # Create stores for the predictions
-        self.normed_preds = []
-        self.gsp_ids_each_batch = []
-        self.sun_down_masks = []
-
         # Load the GSP and summation models
         self.model, self.summation_model = self.load_model(
             model_name,
@@ -148,11 +143,9 @@ class ForecastCompiler:
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
         # Store GSP IDs for this batch for reordering later
-        these_gsp_ids = batch["gsp_id"].cpu().numpy()
+        self.gsp_ids = batch["gsp_id"].cpu().numpy()
 
-        self.gsp_ids_each_batch += [these_gsp_ids]
-
-        self.log_info(f"Predicting for GSPs: {these_gsp_ids}")
+        self.log_info(f"Predicting for GSPs: {self.gsp_ids}")
 
         # Run batch through model
         preds = self.model(batch).detach().cpu().numpy()
@@ -168,8 +161,8 @@ class ForecastCompiler:
         sun_down_mask = elevation < MIN_DAY_ELEVATION
 
         # Store predictions internally
-        self.normed_preds += [preds]
-        self.sun_down_masks += [sun_down_mask]
+        self.normed_preds = preds
+        self.sun_down_masks = sun_down_mask
 
         # Log max prediction
         self.log_info(f"Max prediction: {np.max(preds, axis=1)}")
@@ -184,20 +177,17 @@ class ForecastCompiler:
         - Make national forecast
         - Compile all forecasts into a DataArray stored inside the object as `da_abs_all`
         """
-        # Compile results from all batches
-        normed_preds = np.concatenate(self.normed_preds)
-        sun_down_masks = np.concatenate(self.sun_down_masks)
-        gsp_ids = np.concatenate(self.gsp_ids_each_batch)
 
-        # Reorder GSPs which can end up shuffled if multiprocessing is used
-        inds = gsp_ids.argsort()
-
-        normed_preds = normed_preds[inds]
-        sun_down_masks = sun_down_masks[inds]
-        gsp_ids = gsp_ids[inds]
+        normed_preds = self.normed_preds
+        sun_down_masks = self.sun_down_masks
+        gsp_ids = self.gsp_ids
 
         # Merge batch results to xarray DataArray
-        da_normed = self.preds_to_dataarray(normed_preds, self.model.output_quantiles, gsp_ids)
+        da_normed = self.preds_to_dataarray(
+            normed_preds, 
+            self.model.output_quantiles, 
+            gsp_ids,
+        )
 
         da_sundown_mask = xr.DataArray(
             data=sun_down_masks,
