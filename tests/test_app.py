@@ -53,7 +53,7 @@ def test_app(
         # These imports need to come after the environ vars have been set
         from pvnet_app.app import app
 
-        app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=0)
+        app(t0=test_t0, gsp_ids=list(range(1, 318)))
 
     all_models = get_all_models(get_critical_only=False)
 
@@ -111,7 +111,7 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
-        app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
+        app(t0=test_t0)
 
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run
@@ -171,7 +171,7 @@ def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
-        app(t0=test_t0, gsp_ids=list(range(1, 318)), num_workers=2)
+        app(t0=test_t0)
 
     all_models = get_all_models(get_day_ahead_only=True)
 

@@ -4,7 +4,7 @@ import torch
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
-from pvnet_app.forecast_compiler import ForecastCompiler
+from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
@@ -21,8 +21,8 @@ def test_model_loading():
         summation_name = model_config.summation.repo if model_config.summation else None
         summation_version = model_config.summation.commit if model_config.summation else None
         
-        # Load models via ForecastCompiler
-        pvnet_model, summation_model = ForecastCompiler.load_model(
+        # Load models via Forecaster
+        pvnet_model, summation_model = Forecaster.load_model(
             model_name=model_name,
             model_version=model_version,
             summation_name=summation_name,
