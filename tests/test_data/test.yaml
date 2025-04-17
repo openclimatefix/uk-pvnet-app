@@ -1,124 +1,94 @@
 general:
   description: Config for training the saved PVNet model
   name: PVNet current
-git: null
 input_data:
-  default_forecast_minutes: 480
-  default_history_minutes: 120
   gsp:
-    dropout_fraction: 0.0
-    dropout_timedeltas_minutes: null
-    forecast_minutes: 480
-    gsp_image_size_pixels_height: 64
-    gsp_image_size_pixels_width: 64
-    gsp_meters_per_pixel: 2000
-    gsp_zarr_path: PLACEHOLDER.zarr
-    history_minutes: 120
-    is_live: false
-    live_interpolate_minutes: 60
-    live_load_extra_minutes: 60
-    log_level: DEBUG
-    metadata_only: false
-    n_gsp_per_example: 32
+    dropout_fraction: 0
+    dropout_timedeltas_minutes: []
+    interval_end_minutes: 480
+    interval_start_minutes: -120
     time_resolution_minutes: 30
-  hrvsatellite: null
+    zarr_path: PLACEHOLDER.zarr
   nwp:
     ecmwf:
-      dropout_fraction: 1.0
-      dropout_timedeltas_minutes:
-      - -60
-      forecast_minutes: 480
-      history_minutes: 120
-      index_by_id: false
-      log_level: DEBUG
-      max_staleness_minutes: null
-      nwp_accum_channels:
+      accum_channels:
       - dswrf
       - dlwrf
-      - sr
-      - duvrs
-      nwp_channels:
+      channels:
       - t2m
       - dswrf
       - dlwrf
-      - hcc
-      - mcc
-      - lcc
-      - tcc
-      - sde
-      - sr
-      - duvrs
-      - u10
-      - v10
-      nwp_image_size_pixels_height: 12
-      nwp_image_size_pixels_width: 12
-      nwp_meters_per_pixel: 2000
-      nwp_provider: ecmwf
-      nwp_zarr_path: PLACEHOLDER.zarr
-      time_resolution_minutes: 60
-      x_dim_name: x_osgb
-      y_dim_name: y_osgb
-    ukv:
       dropout_fraction: 1.0
       dropout_timedeltas_minutes:
-      - -60
-      forecast_minutes: 480
-      history_minutes: 120
-      index_by_id: false
-      log_level: DEBUG
+      - -360
+      image_size_pixels_height: 12
+      image_size_pixels_width: 12
+      interval_end_minutes: 480
+      interval_start_minutes: -120
       max_staleness_minutes: null
-      nwp_accum_channels: []
-      nwp_channels:
-      - dlwrf
-      - dswrf
-      - hcc
-      - lcc
-      - mcc
-      - prate
-      - r
-      - sde
-      - si10
-      - t
-      - vis
-      nwp_image_size_pixels_height: 24
-      nwp_image_size_pixels_width: 24
-      nwp_meters_per_pixel: 2000
-      nwp_provider: ukv
-      nwp_zarr_path: PLACEHOLDER.zarr
+      normalisation_constants:
+        diff_dlwrf:
+          mean: 1136464.0
+          std: 131942.03125
+        diff_dswrf:
+          mean: 420584.6875
+          std: 715366.3125
+        t2m:
+          mean: 283.48333740234375
+          std: 3.692270040512085
+      provider: ecmwf
       time_resolution_minutes: 60
-      x_dim_name: x_osgb
-      y_dim_name: y_osgb
-  opticalflow: null
-  pv: null
+      zarr_path: PLACEHOLDER.zarr
+    ukv:
+      channels:
+      - t
+      - dswrf
+      - dlwrf
+      dropout_fraction: 1.0
+      dropout_timedeltas_minutes:
+      - -180
+      image_size_pixels_height: 24
+      image_size_pixels_width: 24
+      interval_end_minutes: 480
+      interval_start_minutes: -120
+      max_staleness_minutes: null
+      normalisation_constants:
+        dlwrf:
+          mean: 325.03130139
+          std: 39.45988077
+        dswrf:
+          mean: 111.28265039
+          std: 190.47216887
+        t:
+          mean: 283.64913206
+          std: 4.38818501
+      provider: ukv
+      time_resolution_minutes: 60
+      zarr_path: PLACEHOLDER.zarr
   satellite:
-    dropout_fraction: 0.2
-    dropout_timedeltas_minutes:
-    - -5
-    - -10
-    - -15
-    forecast_minutes: 0
-    history_minutes: 90
-    is_live: false
-    live_delay_minutes: 30
-    log_level: DEBUG
-    satellite_channels:
+    channels:
     - IR_016
-    - IR_039
-    - IR_087
-    - IR_097
-    - IR_108
-    - IR_120
-    - IR_134
-    - VIS006
     - VIS008
     - WV_062
-    - WV_073
-    satellite_image_size_pixels_height: 24
-    satellite_image_size_pixels_width: 24
-    satellite_meters_per_pixel: 6000
-    satellite_zarr_path: PLACEHOLDER.zarr
+    dropout_fraction: 0.0
+    dropout_timedeltas_minutes: []
+    image_size_pixels_height: 24
+    image_size_pixels_width: 24
+    interval_end_minutes: -30
+    interval_start_minutes: -60
+    normalisation_constants:
+      IR_016:
+        mean: 0.17594202
+        std: 0.21462157
+      VIS008:
+        mean: 0.11426069
+        std: 0.13090034
+      WV_062:
+        mean: 0.7359355
+        std: 0.16111417
     time_resolution_minutes: 5
-  sensor: null
-  sun: null
-  topographic: null
-  wind: null
+    zarr_path: PLACEHOLDER.zarr
+  solar_position:
+    interval_end_minutes: 480
+    interval_start_minutes: -120
+    time_resolution_minutes: 30

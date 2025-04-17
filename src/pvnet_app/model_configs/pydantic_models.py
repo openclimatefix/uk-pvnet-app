@@ -45,10 +45,6 @@ class ModelConfig(BaseModel):
         True, 
         description="If this model uses satellite data (currently this is only used in tests)"
     )
-    uses_ocf_data_sampler: bool = Field(
-        True,
-        description="If this model uses ocf-data-sampler. Else uses ocf_datapipes",
-    )
 
 
 class ModelConfigCollection(BaseModel):
@@ -62,8 +58,8 @@ class ModelConfigCollection(BaseModel):
     @field_validator("models")
     @classmethod
     def name_must_be_unique(cls, v: list[ModelConfig]) -> list[ModelConfig]:
-        """Ensure that all model names are unique, respect to using ocf_data_sampler or not"""
-        names = [(model.name, model.uses_ocf_data_sampler) for model in v]
+        """Ensure that all model names are unique"""
+        names = [model.name for model in v]
 
         if len(names) != len(set(names)):
             raise Exception(f"Model names must be unique, names are {names}")
@@ -75,7 +71,6 @@ def get_all_models(
     allow_save_gsp_sum: bool = True,
     get_critical_only: bool = False,
     get_day_ahead_only: bool = False,
-    use_ocf_data_sampler: bool = True,
 ) -> list[ModelConfig]:
     """Returns all the models for a given client
 
@@ -84,7 +79,6 @@ def get_all_models(
         allow_save_gsp_sum: If set to false, all models will have save_gsp_sum set to false
         get_critical_only: If only the critical models should be returned
         get_day_ahead_only: If only the day-ahead model should be returned
-        use_ocf_data_sampler: If only the ocf-data-sampler models should be returned
     """
     
     filename = files("pvnet_app.model_configs").joinpath("all_models.yaml")
@@ -119,23 +113,11 @@ def get_all_models(
         log.info("Filtering to intra-day models")
         filtered_models = [model for model in filtered_models if not model.is_day_ahead]
 
-    if use_ocf_data_sampler:
-        log.info("Filtering to models which use ocf-data-sampler")
-        filtered_models = [model for model in filtered_models if model.uses_ocf_data_sampler]
-    else:
-        log.info("Filtering to models which use ocf_datapipes")
-        filtered_models = [model for model in filtered_models if not model.uses_ocf_data_sampler]
-
     # We should always have at least one model 
     if len(filtered_models)==0:
         raise Exception("No models found")
 
-    selected_model_info = [
-        (model.name, f"uses_ocf_data_sampler={model.uses_ocf_data_sampler}")
-        for model in filtered_models
-    ]
+    selected_model_info = [model.name for model in filtered_models]
     log.info(f"Selected models: {selected_model_info}")
-
-
 
     return filtered_models
