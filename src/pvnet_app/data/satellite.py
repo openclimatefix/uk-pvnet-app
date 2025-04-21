@@ -66,7 +66,8 @@ def fill_1d_bool_gaps(x, max_gap):
 
 
 def interpolate_missing_satellite_timestamps(
-    ds: xr.Dataset, max_gap: pd.Timedelta,
+    ds: xr.Dataset,
+    max_gap: pd.Timedelta,
 ) -> xr.Dataset:
     """Linearly interpolate missing satellite timestamps
 
@@ -123,7 +124,8 @@ def interpolate_missing_satellite_timestamps(
 
         if not valid_fill_times_xr.all():
             not_infilled_times = valid_fill_times_xr.where(
-                ~valid_fill_times_xr, drop=True,
+                ~valid_fill_times_xr,
+                drop=True,
             )
             logger.info(
                 "After interpolation the following times are still missing:\n"
@@ -230,7 +232,9 @@ def check_model_satellite_inputs_available(
 
         # Check if any of the expected datetimes are missing
         missing_time_steps = np.setdiff1d(
-            expected_datetimes, sat_datetimes, assume_unique=True,
+            expected_datetimes,
+            sat_datetimes,
+            assume_unique=True,
         )
 
         available = len(missing_time_steps) == 0

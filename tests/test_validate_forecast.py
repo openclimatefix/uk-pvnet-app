@@ -57,7 +57,8 @@ def test_validate_forecast_above_110percent():
     """Test that validate_forecast returns False when forecast is above 110% of capacity"""
 
     national_forecast = pd.Series(
-        np.array([60]), index=pd.to_datetime(["2025-01-01 00:00"]),
+        np.array([60]),
+        index=pd.to_datetime(["2025-01-01 00:00"]),
     )
 
     # 60 MW > 1.1 * 50 MW => should raise an Exception

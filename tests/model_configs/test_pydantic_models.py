@@ -18,7 +18,8 @@ def test_get_all_models():
 def test_get_all_models_get_critical_only(use_ocf_data_sampler):
     """Test for getting all the critcal models"""
     models = get_all_models(
-        get_critical_only=True, use_ocf_data_sampler=use_ocf_data_sampler,
+        get_critical_only=True,
+        use_ocf_data_sampler=use_ocf_data_sampler,
     )
     assert len(models) == 2
     assert all(m.is_critical for m in models)

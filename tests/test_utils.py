@@ -10,7 +10,10 @@ def test_check_model_runs_finished():
 
     model_configs = [
         ModelConfig(
-            name="pvnet_v2", is_critical=True, pvnet=null_commit, summation=null_commit,
+            name="pvnet_v2",
+            is_critical=True,
+            pvnet=null_commit,
+            summation=null_commit,
         ),
         ModelConfig(
             name="pvnet_test",
@@ -25,13 +28,17 @@ def test_check_model_runs_finished():
 
     # This should not raise an exception since we only check critical models
     check_model_runs_finished(
-        completed_forecasts, model_configs, raise_if_missing="critical",
+        completed_forecasts,
+        model_configs,
+        raise_if_missing="critical",
     )
 
     # This should raise an exception since we are checking all models
     with pytest.raises(Exception):
         check_model_runs_finished(
-            completed_forecasts, model_configs, raise_if_missing="any",
+            completed_forecasts,
+            model_configs,
+            raise_if_missing="any",
         )
 
     # 2. In this scenario, the critical model has failed but the non-critical model has run
@@ -40,13 +47,17 @@ def test_check_model_runs_finished():
     # This should raise an exception since the critical model has not been run
     with pytest.raises(Exception):
         check_model_runs_finished(
-            completed_forecasts, model_configs, raise_if_missing="critical",
+            completed_forecasts,
+            model_configs,
+            raise_if_missing="critical",
         )
 
     # This should raise an exception since a model has not been run
     with pytest.raises(Exception):
         check_model_runs_finished(
-            completed_forecasts, model_configs, raise_if_missing="any",
+            completed_forecasts,
+            model_configs,
+            raise_if_missing="any",
         )
 
     # 3. In this scenario, both models have been run
@@ -54,8 +65,12 @@ def test_check_model_runs_finished():
 
     # These should not raise an exception since all models have been run
     check_model_runs_finished(
-        completed_forecasts, model_configs, raise_if_missing="critical",
+        completed_forecasts,
+        model_configs,
+        raise_if_missing="critical",
     )
     check_model_runs_finished(
-        completed_forecasts, model_configs, raise_if_missing="any",
+        completed_forecasts,
+        model_configs,
+        raise_if_missing="any",
     )

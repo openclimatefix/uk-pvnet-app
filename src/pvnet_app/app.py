@@ -143,7 +143,8 @@ def app(
     # --- Unpack the environment variables
     use_day_ahead_model = get_boolean_env_var("DAY_AHEAD_MODEL", default=False)
     run_critical_models_only = get_boolean_env_var(
-        "RUN_CRITICAL_MODELS_ONLY", default=False,
+        "RUN_CRITICAL_MODELS_ONLY",
+        default=False,
     )
     use_ocf_data_sampler = get_boolean_env_var("USE_OCF_DATA_SAMPLER", default=True)
     allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
@@ -236,13 +237,15 @@ def app(
 
     ukv_variables = get_nwp_channels(provider="ukv", nwp_config=common_all_config)
     ukv_downloader = UKVDownloader(
-        source_path=ukv_source_path, nwp_variables=ukv_variables,
+        source_path=ukv_source_path,
+        nwp_variables=ukv_variables,
     )
     ukv_downloader.run()
 
     ecmwf_variables = get_nwp_channels(provider="ecmwf", nwp_config=common_all_config)
     ecmwf_downloader = ECMWFDownloader(
-        source_path=ecmwf_source_path, nwp_variables=ecmwf_variables,
+        source_path=ecmwf_source_path,
+        nwp_variables=ecmwf_variables,
     )
     ecmwf_downloader.run()
 

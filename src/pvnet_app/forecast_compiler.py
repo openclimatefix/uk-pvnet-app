@@ -144,7 +144,9 @@ class ForecastCompiler:
 
             if sum_expected_gsp_model != this_gsp_model:
                 logger.warning(
-                    _model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model),
+                    _model_mismatch_msg.format(
+                        *this_gsp_model, *sum_expected_gsp_model,
+                    ),
                 )
 
         return model, sum_model
@@ -227,7 +229,9 @@ class ForecastCompiler:
 
         # Merge batch results to xarray DataArray
         da_normed = self.preds_to_dataarray(
-            normed_preds, self.model.output_quantiles, gsp_ids,
+            normed_preds,
+            self.model.output_quantiles,
+            gsp_ids,
         )
 
         da_sundown_mask = xr.DataArray(

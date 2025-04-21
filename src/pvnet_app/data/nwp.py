@@ -127,12 +127,16 @@ def check_model_nwp_inputs_available(
             req_end_time = req_end_time + freq
 
         required_nwp_times = pd.date_range(
-            start=req_start_time, end=req_end_time, freq=freq,
+            start=req_start_time,
+            end=req_end_time,
+            freq=freq,
         )
 
         # Check if any of the expected datetimes are missing
         missing_time_steps = np.setdiff1d(
-            required_nwp_times, nwp_valid_times, assume_unique=True,
+            required_nwp_times,
+            nwp_valid_times,
+            assume_unique=True,
         )
 
         available = len(missing_time_steps) == 0
@@ -482,7 +486,9 @@ class UKVDownloader(NWPDownloader):
             wgs84 = pyproj.Proj("+init=EPSG:4326")
 
             laea_to_lon_lat = pyproj.Transformer.from_proj(
-                laea, wgs84, always_xy=True,
+                laea,
+                wgs84,
+                always_xy=True,
             ).transform
 
             # Calculate longitude and latitude from x_laea and y_laea

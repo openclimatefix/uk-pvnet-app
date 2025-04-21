@@ -23,7 +23,8 @@ class ModelConfig(BaseModel):
     name: str = Field(..., description="The name of the model")
     pvnet: HuggingFaceCommit = Field(..., description="The PVNet model location")
     summation: HuggingFaceCommit = Field(
-        ..., description="The summation model location",
+        ...,
+        description="The summation model location",
     )
 
     use_adjuster: bool = Field(False, description="Whether to use the adjuster")
@@ -32,7 +33,8 @@ class ModelConfig(BaseModel):
         description="Whether to save the sum of GSPs as welll as the national estimate",
     )
     verbose_logging: bool = Field(
-        False, description="Whether to log verbose output for the model",
+        False,
+        description="Whether to log verbose output for the model",
     )
     save_gsp_to_recent: bool = Field(
         False,

@@ -14,7 +14,12 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
 def test_app(
-    test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, db_url,
+    test_t0,
+    db_session,
+    nwp_ukv_data,
+    nwp_ecmwf_data,
+    sat_5_data_zero_delay,
+    db_url,
 ):
     """Test the app running the intraday models"""
 
@@ -163,7 +168,11 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
 # Test for new DA model with data sampler utilisation
 # To note - Satellite omitted
 def test_app_day_ahead_data_sampler(
-    test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url,
+    test_t0,
+    db_session,
+    nwp_ukv_data,
+    nwp_ecmwf_data,
+    db_url,
 ):
     """Test the app running the day ahead model"""
 

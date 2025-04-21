@@ -31,7 +31,8 @@ def save_to_zarr_zip(ds: xr.Dataset, filename: str) -> None:
 
 
 def timesteps_match_expected_freq(
-    sat_path: str, expected_freq_mins: int | list[int],
+    sat_path: str,
+    expected_freq_mins: int | list[int],
 ) -> bool:
     """Check that the satellite data at the given path has the expected frequency of timesteps.
 
@@ -267,13 +268,19 @@ def test_check_model_satellite_inputs_available(config_filename):
 
     t0 = pd.Timestamp("2023-01-01 00:00")
     sat_datetime_1 = pd.date_range(
-        t0 - pd.Timedelta("120min"), t0 - pd.Timedelta("5min"), freq="5min",
+        t0 - pd.Timedelta("120min"),
+        t0 - pd.Timedelta("5min"),
+        freq="5min",
     )
     sat_datetime_2 = pd.date_range(
-        t0 - pd.Timedelta("120min"), t0 - pd.Timedelta("15min"), freq="5min",
+        t0 - pd.Timedelta("120min"),
+        t0 - pd.Timedelta("15min"),
+        freq="5min",
     )
     sat_datetime_3 = pd.date_range(
-        t0 - pd.Timedelta("120min"), t0 - pd.Timedelta("35min"), freq="5min",
+        t0 - pd.Timedelta("120min"),
+        t0 - pd.Timedelta("35min"),
+        freq="5min",
     )
     sat_datetime_4 = pd.to_datetime(
         [t for t in sat_datetime_1 if t != t0 - pd.Timedelta("30min")],
@@ -285,13 +292,19 @@ def test_check_model_satellite_inputs_available(config_filename):
     assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_1)
     assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_2)
     assert not check_model_satellite_inputs_available(
-        config_filename, t0, sat_datetime_3,
+        config_filename,
+        t0,
+        sat_datetime_3,
     )
     assert not check_model_satellite_inputs_available(
-        config_filename, t0, sat_datetime_4,
+        config_filename,
+        t0,
+        sat_datetime_4,
     )
     assert not check_model_satellite_inputs_available(
-        config_filename, t0, sat_datetime_5,
+        config_filename,
+        t0,
+        sat_datetime_5,
     )
 
 
@@ -341,7 +354,8 @@ def test_interpolate_missing_satellite_timestamps():
     ).to_dataset(name="data")
 
     ds_interp = interpolate_missing_satellite_timestamps(
-        ds, max_gap=pd.Timedelta("15min"),
+        ds,
+        max_gap=pd.Timedelta("15min"),
     )
 
     # The function interpolates to 5 minute intervals but will only interpolate between

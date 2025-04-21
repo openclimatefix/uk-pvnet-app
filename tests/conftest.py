@@ -97,7 +97,8 @@ def populate_db_session_with_input_data(session, test_t0):
             gsp_yield_sql = GSPYield(
                 datetime_utc=date.to_pydatetime().replace(tzinfo=UTC),
                 solar_generation_kw=np.random.randint(
-                    low=0, high=installed_capacity_mw * 1000,
+                    low=0,
+                    high=installed_capacity_mw * 1000,
                 ),
                 capacity_mwp=installed_capacity_mw,
             ).to_orm()
