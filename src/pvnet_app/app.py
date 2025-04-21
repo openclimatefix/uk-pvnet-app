@@ -119,10 +119,8 @@ def app(
           "any" it will raise an exception if any model fails. If set to "critical" it will raise
           an exception if any critical model fails. If not set, it will not raise an exception.
     """
-
     # ---------------------------------------------------------------------------
     # 0. Basic set up
-
     # If inference datetime is None, round down to last 30 minutes
     if t0 is None:
         t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor("30min")
