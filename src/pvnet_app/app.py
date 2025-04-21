@@ -15,6 +15,7 @@ from typing import Union
 
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
+
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3, check_model_runs_finished
@@ -81,7 +82,7 @@ def app(
     gsp_ids: list[int] = all_gsp_ids,
     write_predictions: bool = True,
     num_workers: int = -1,
-) -> Union[xr.DataArray, None]:
+) -> xr.DataArray | None:
     """Inference function to run PVNet.
 
     Args:
@@ -151,7 +152,7 @@ def app(
     zig_zag_warning_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_WARNING", 250))
     zig_zag_error_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_ERROR", 500))
     sun_elevation_lower_limit = float(os.getenv("FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT", 10))
-    
+
     db_url = os.environ["DB_URL"] # Will raise KeyError if not set
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
     ecmwf_source_path = os.getenv("NWP_ECMWF_ZARR_PATH", None)
@@ -160,7 +161,7 @@ def app(
     sat_source_path_15 = (
         None if (sat_source_path_5 is None) else sat_source_path_5.replace(".zarr", "_15.zarr")
     )
-    
+
     # --- Log version and variables
     logger.info(f"Using `pvnet` library version: {__pvnet_version__}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
@@ -213,7 +214,7 @@ def app(
 
     # --- Download satellite data
     logger.info("Downloading satellite data")
-    
+
     sat_downloader = SatelliteDownloader(
         t0=t0,
         source_path_5=sat_source_path_5,
@@ -251,7 +252,7 @@ def app(
             and ecmwf_downloader.check_model_inputs_available(data_config_path, t0)
             and ukv_downloader.check_model_inputs_available(data_config_path, t0)
         )
-        
+
         if model_can_run:
             logger.info(f"The input data for model '{model_config.name}' is available")
             # Set up a forecast compiler for the model
@@ -360,17 +361,16 @@ def app(
     # Write predictions to database
     logger.info("Writing to database")
 
-    with db_connection.get_session() as session:
-        with session.no_autoflush:
-            for forecast_compiler in forecast_compilers.values():
-                forecast_compiler.log_forecast_to_database(session=session)
+    with db_connection.get_session() as session, session.no_autoflush:
+        for forecast_compiler in forecast_compilers.values():
+            forecast_compiler.log_forecast_to_database(session=session)
 
     logger.info("Finished forecast")
 
     if raise_model_failure in ["any", "critical"]:
         check_model_runs_finished(
             completed_forecasts=list(forecast_compilers.keys()),
-            model_configs=model_configs, 
+            model_configs=model_configs,
             raise_if_missing=raise_model_failure,
         )
 
