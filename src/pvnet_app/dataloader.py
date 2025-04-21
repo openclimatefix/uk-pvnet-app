@@ -1,16 +1,16 @@
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
-
 from ocf_data_sampler.numpy_sample.collate import stack_np_samples_into_batch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKRegionalDataset
-
 from ocf_datapipes.batch import BatchKey, NumpyBatch
-from ocf_datapipes.batch import stack_np_examples_into_batch as legacy_stack_np_examples_into_batch
+from ocf_datapipes.batch import (
+    stack_np_examples_into_batch as legacy_stack_np_examples_into_batch,
+)
 from ocf_datapipes.training.pvnet import construct_sliced_data_pipeline
 from ocf_datapipes.utils import Location
 from ocf_datapipes.utils.eso import get_gsp_shape_from_eso
-
 from torch.utils.data import DataLoader
 from torch.utils.data.datapipes.iter import IterableWrapper
 
@@ -31,7 +31,7 @@ def get_data_sampler_dataloader(
     modify_data_config_for_production(
         input_path=config_filename,
         output_path=modified_data_config_filename,
-        reformat_config=True
+        reformat_config=True,
     )
 
     dataset = PVNetUKRegionalDataset(
@@ -138,7 +138,7 @@ def get_dataloader(
     use_data_sampler: bool,
 ) -> DataLoader:
     """Construct the dataloader for the given configuration
-    
+
     Args:
         config_filename: The path to the configuration file
         t0: The init-time of the forecast
@@ -148,21 +148,20 @@ def get_dataloader(
         db_url: The URL of the database to use (for legacy usage only)
         use_data_sampler: Whether to use ocf-data-sampler. Else uses ocf_datapipes.
     """
-    
     if use_data_sampler:
         return get_data_sampler_dataloader(
-            config_filename=config_filename, 
-            t0=t0, 
-            gsp_ids=gsp_ids, 
-            batch_size=batch_size, 
-            num_workers=num_workers
+            config_filename=config_filename,
+            t0=t0,
+            gsp_ids=gsp_ids,
+            batch_size=batch_size,
+            num_workers=num_workers,
         )
     else:
         return get_datapipes_dataloader(
-            config_filename=config_filename, 
-            t0=t0, 
-            gsp_ids=gsp_ids, 
-            batch_size=batch_size, 
+            config_filename=config_filename,
+            t0=t0,
+            gsp_ids=gsp_ids,
+            batch_size=batch_size,
             num_workers=num_workers,
             db_url=db_url,
         )

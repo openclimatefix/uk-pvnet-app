@@ -6,18 +6,14 @@ import fsspec
 import numpy as np
 import pandas as pd
 import xarray as xr
-
-from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
-from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
 from ocf_data_sampler.load.utils import make_spatial_coords_increasing
-
+from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
+from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
 from ocf_datapipes.config.load import load_yaml_configuration
 
 from pvnet_app.consts import sat_path
 
 logger = logging.getLogger(__name__)
-
-
 
 
 def get_satellite_timestamps(zarr_path: str) -> pd.DatetimeIndex:
@@ -69,19 +65,20 @@ def fill_1d_bool_gaps(x, max_gap):
     return np.logical_or(should_fill, x)
 
 
-def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedelta) -> xr.Dataset:
+def interpolate_missing_satellite_timestamps(
+    ds: xr.Dataset, max_gap: pd.Timedelta,
+) -> xr.Dataset:
     """Linearly interpolate missing satellite timestamps
 
-    The max gap is inclusive of timestamps either side. E.g. if max gap is 15 minutes and the  
-    satellite includes timestamps 12:00 and 12:15, then 12:05 and 12:10 will be filled. If the max 
-    gap was 10 minutes, then none of the timestamps would be filled. A max gap if 5 minutes will do 
+    The max gap is inclusive of timestamps either side. E.g. if max gap is 15 minutes and the
+    satellite includes timestamps 12:00 and 12:15, then 12:05 and 12:10 will be filled. If the max
+    gap was 10 minutes, then none of the timestamps would be filled. A max gap if 5 minutes will do
     nothing since the normal spacing is already 5 minutes.
-    
+
     Args:
         ds: The satellite data
-        max_gap: The maximum gap size which will be filled via interpolation. 
+        max_gap: The maximum gap size which will be filled via interpolation.
     """
-
     # If any of these times are missing, we will try to interpolate them
     dense_times = pd.date_range(ds.time.values.min(), ds.time.values.max(), freq="5min")
 
@@ -95,7 +92,9 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
 
     # If less than 2 of the buffer requested times are present we cannot infill
     elif timestamp_available.sum() < 2:
-        logger.warning("Cannot run interpolate infilling with less than 2 time steps available")
+        logger.warning(
+            "Cannot run interpolate infilling with less than 2 time steps available",
+        )
         return ds
 
     else:
@@ -123,7 +122,9 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
             )
 
         if not valid_fill_times_xr.all():
-            not_infilled_times = valid_fill_times_xr.where(~valid_fill_times_xr, drop=True)
+            not_infilled_times = valid_fill_times_xr.where(
+                ~valid_fill_times_xr, drop=True,
+            )
             logger.info(
                 "After interpolation the following times are still missing:\n"
                 f"{not_infilled_times.time.values}",
@@ -133,8 +134,8 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
 
 
 def extend_satellite_data_with_nans(
-    ds: xr.Dataset, 
-    t0: pd.Timestamp, 
+    ds: xr.Dataset,
+    t0: pd.Timestamp,
     limit: pd.Timedelta = pd.Timedelta("3h"),
 ) -> xr.Dataset:
     """Fill missing satellite timestamps with NaNs
@@ -162,14 +163,14 @@ def extend_satellite_data_with_nans(
 
         # We will fill the data with NaNs for these timestamps
         fill_times = pd.date_range(
-            sat_max_time + pd.Timedelta("5min"), 
-            sat_max_time+fill_timedelta, 
-            freq="5min"
+            sat_max_time + pd.Timedelta("5min"),
+            sat_max_time + fill_timedelta,
+            freq="5min",
         )
 
         # Extend the data with NaNs
         ds = ds.reindex(time=np.concatenate([ds.time, fill_times]), fill_value=np.nan)
-    
+
     return ds
 
 
@@ -193,9 +194,8 @@ def check_model_satellite_inputs_available(
     available = True
 
     # Only check if using satellite data
-    model_uses_satellite = (
-        hasattr(input_config, "satellite") 
-        and (input_config.satellite is not None)
+    model_uses_satellite = hasattr(input_config, "satellite") and (
+        input_config.satellite is not None
     )
 
     # In case the model does not require satellite
@@ -229,19 +229,23 @@ def check_model_satellite_inputs_available(
         )
 
         # Check if any of the expected datetimes are missing
-        missing_time_steps = np.setdiff1d(expected_datetimes, sat_datetimes, assume_unique=True)
+        missing_time_steps = np.setdiff1d(
+            expected_datetimes, sat_datetimes, assume_unique=True,
+        )
 
         available = len(missing_time_steps) == 0
 
         if len(missing_time_steps) > 0:
-            logger.info(f"Some satellite timesteps for {t0=} missing: \n{missing_time_steps}")
+            logger.info(
+                f"Some satellite timesteps for {t0=} missing: \n{missing_time_steps}",
+            )
 
     return available
 
 
 def get_pvnet_satellite_spatial_bounds(
-    ds: xr.Dataset, 
-    width_pixels: int = 24, 
+    ds: xr.Dataset,
+    width_pixels: int = 24,
     height_pixels: int = 24,
 ) -> dict[str, slice]:
     """Get the spatial extent of the satellite data used in PVNet
@@ -254,11 +258,10 @@ def get_pvnet_satellite_spatial_bounds(
     Returns:
         dict[str, slice]: The spatial slice of the dataset used byb PVNet
     """
-
     # Cut down the slice for efficiency and reorder the coordinates if needed
     da = make_spatial_coords_increasing(
-        ds.data.isel(time=0, variable=0).copy(deep=True), 
-        x_coord="x_geostationary", 
+        ds.data.isel(time=0, variable=0).copy(deep=True),
+        x_coord="x_geostationary",
         y_coord="y_geostationary",
     )
 
@@ -272,14 +275,14 @@ def get_pvnet_satellite_spatial_bounds(
     ymax = -np.inf
 
     for location in locations:
-        
+
         da_slice = select_spatial_slice_pixels(
             da,
             location,
             width_pixels=width_pixels,
             height_pixels=height_pixels,
         )
-        
+
         xmin = min(xmin, da_slice.x_geostationary.min().item())
         xmax = max(xmax, da_slice.x_geostationary.max().item())
         ymin = min(ymin, da_slice.y_geostationary.min().item())
@@ -295,13 +298,13 @@ def get_pvnet_satellite_spatial_bounds(
         yslice = slice(ymin, ymax)
     else:
         yslice = slice(ymax, ymin)
-        
+
     return {"x_geostationary": xslice, "y_geostationary": yslice}
 
 
 def contains_too_many_of_value(
-    ds: xr.Dataset, 
-    value: float, 
+    ds: xr.Dataset,
+    value: float,
     threshold: float,
 ) -> bool:
     """Check if the input data contains more than a certain fraction of a given value.
@@ -311,7 +314,6 @@ def contains_too_many_of_value(
         value: The value to check for
         threshold: The maximum fraction of the value allowed
     """
-
     logger.info(f"Checking satellite data for value ({value})")
 
     too_many_values = False
@@ -327,10 +329,10 @@ def contains_too_many_of_value(
     if fraction_values.max() > threshold:
         logger.warning(
             f"Satellite data contains values {value} greater than {threshold:.2%} of the time"
-            f"{fraction_values.to_series().to_string()}"
+            f"{fraction_values.to_series().to_string()}",
         )
 
-        too_many_values=True
+        too_many_values = True
 
     return too_many_values
 
@@ -338,9 +340,9 @@ def contains_too_many_of_value(
 def scale_satellite_data(ds: xr.Dataset) -> xr.Dataset:
     """Scale the satellite data to be between 0 and 1.
 
-    The production satellite data is scaled between 0 and 1023. This function scales it to be 
+    The production satellite data is scaled between 0 and 1023. This function scales it to be
     between 0 and 1 as in the training data.
-    
+
     Args:
         ds: The satellite data
     """
@@ -353,11 +355,12 @@ class SatelliteDownloader:
     destination_path_15: str = "sat_15_min.zarr.zip"
     destination_path: str = sat_path
 
-    def __init__(self, 
-        t0: pd.Timestamp, 
-        source_path_5: str | None, 
-        source_path_15: str | None,  
-        legacy: bool = False
+    def __init__(
+        self,
+        t0: pd.Timestamp,
+        source_path_5: str | None,
+        source_path_15: str | None,
+        legacy: bool = False,
     ):
         self.t0 = t0
         self.source_path_5 = source_path_5
@@ -371,7 +374,6 @@ class SatelliteDownloader:
         Returns:
             bool: Whether satellite data was available to download
         """
-
         # Set variable to track whether the satellite download is successful
         data_available = False
 
@@ -396,7 +398,6 @@ class SatelliteDownloader:
                 logger.info("No 15-minute data available")
 
         return data_available
-    
 
     def choose_and_load_satellite_data(self) -> xr.Dataset:
         """Select from the 5 and 15-minutely satellite data for the most recent data"""
@@ -440,20 +441,19 @@ class SatelliteDownloader:
         else:
             logger.info("Using 15-minutely data.")
             ds = xr.open_zarr(self.destination_path_15).compute()
-        
+
         return ds
-    
+
     @staticmethod
     def data_is_okay(ds: xr.Dataset) -> bool:
         """Apply quality checks to the satellite data
-        
+
         Args:
             ds: The satellite data
 
         Returns:
             bool: Whether the data passes the quality checks
         """
-
         # Slice the data to the spatial extent used in PVNet
         spatial_slice = get_pvnet_satellite_spatial_bounds(ds)
         ds = ds.sel(spatial_slice)
@@ -462,10 +462,9 @@ class SatelliteDownloader:
         # Note that in the UK, even at night, the values are not zero
         too_many_zeros = contains_too_many_of_value(ds, value=0, threshold=0.1)
         return (not too_many_nans) and (not too_many_zeros)
-        
-    
+
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-        """"Apply all processing steps to the satellite data in order to match the training data
+        """ "Apply all processing steps to the satellite data in order to match the training data
 
         Args:
             ds: The satellite data
@@ -473,30 +472,27 @@ class SatelliteDownloader:
         Returns:
             xr.Dataset: The processed satellite data
         """
-
         # Interpolate missing satellite timestamps
         ds = interpolate_missing_satellite_timestamps(ds, max_gap=pd.Timedelta("15min"))
 
         if not self.legacy:
-            # Scale the satellite data if not legacy. The legacy dataloader does production data 
+            # Scale the satellite data if not legacy. The legacy dataloader does production data
             # scaling inside it. The new dataloader does not
             ds = scale_satellite_data(ds)
 
         # Store the available satellite timestamps before we extend with NaNs
         self.valid_times = pd.to_datetime(ds.time.values)
 
-        # Extend the satellite data with NaNs if needed by the model and record the delay of most 
+        # Extend the satellite data with NaNs if needed by the model and record the delay of most
         # recent non-nan timestamp
         ds = extend_satellite_data_with_nans(ds, t0=self.t0)
 
         return ds
 
-
     def resave(self, ds: xr.Dataset) -> None:
         """Resave the satellite data to the destination path"""
-
         ds["variable"] = ds["variable"].astype(str)
-        
+
         # Overwrite the old data
         shutil.rmtree(self.destination_path, ignore_errors=True)
 
@@ -513,20 +509,18 @@ class SatelliteDownloader:
 
         ds.chunk(save_chunk_dict).to_zarr(self.destination_path)
 
-
     def run(self) -> None:
         """Download, process, and save the satellite data"""
-
-        logger.info(f"Downloading and processing the satellite data")
+        logger.info("Downloading and processing the satellite data")
         data_available = self.download_data()
 
         if not data_available:
             logger.warning("No satellite data available for download")
             return
-        
+
         # Select the most recent satellite data and load it into memory
         ds = self.choose_and_load_satellite_data()
-        
+
         if self.data_is_okay(ds):
             ds = self.process(ds).compute()
             self.resave(ds)
@@ -534,14 +528,13 @@ class SatelliteDownloader:
         else:
             logger.warning("Satellite data did not pass quality checks.")
 
-    
     def check_model_inputs_available(
         self,
         data_config_filename: str,
         t0: pd.Timestamp,
     ) -> bool:
         """Check if the satellite data the model needs is available
-        
+
         Args:
             data_config_filename: The path to the data configuration file
             t0: The init-time of the forecast
@@ -550,9 +543,13 @@ class SatelliteDownloader:
             data_config_filename=data_config_filename,
             t0=t0,
             sat_datetimes=self.valid_times,
-        ) 
-    
+        )
+
     def clean_up(self) -> None:
         """Remove the downloaded data"""
-        for path in [self.destination_path, self.destination_path_5, self.destination_path_15]:
+        for path in [
+            self.destination_path,
+            self.destination_path_5,
+            self.destination_path_15,
+        ]:
             shutil.rmtree(path, ignore_errors=True)

@@ -5,7 +5,7 @@ from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path, sat_path
 
 def load_yaml_config(path: str) -> dict:
     """Load config file from path
-    
+
     Args:
         path: The path to the config file
     """
@@ -16,7 +16,7 @@ def load_yaml_config(path: str) -> dict:
 
 def save_yaml_config(config: dict, path: str) -> None:
     """Save config file to path
-    
+
     Args:
         config: The config to save
         path: The path to save the config file
@@ -42,15 +42,21 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
     for source in ["gsp", "satellite"]:
         if source in config["input_data"]:
             if config["input_data"][source][f"{source}_zarr_path"] != "":
-                config["input_data"][source][f"{source}_zarr_path"] = production_paths[source]
+                config["input_data"][source][f"{source}_zarr_path"] = production_paths[
+                    source
+                ]
 
     # NWP is nested so much be treated separately
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config.keys():
             if nwp_config[nwp_source]["nwp_zarr_path"] != "":
-                assert nwp_source in production_paths["nwp"], f"Missing NWP path: {nwp_source}"
-                nwp_config[nwp_source]["nwp_zarr_path"] = production_paths["nwp"][nwp_source]
+                assert (
+                    nwp_source in production_paths["nwp"]
+                ), f"Missing NWP path: {nwp_source}"
+                nwp_config[nwp_source]["nwp_zarr_path"] = production_paths["nwp"][
+                    nwp_source
+                ]
 
     return config
 
@@ -108,7 +114,7 @@ def reformat_config_data_sampler(config: dict) -> dict:
             update_config(
                 rename_pairs=rename_pairs,
                 config=satellite_config,
-                remove_keys=["live_delay_minutes"]
+                remove_keys=["live_delay_minutes"],
             )
 
     # NWP is nested so must be treated separately
@@ -144,13 +150,18 @@ def reformat_config_data_sampler(config: dict) -> dict:
         rename_pairs=[],
         config=config["input_data"],
         change_history_minutes=False,
-        remove_keys=["default_forecast_minutes", "default_history_minutes"]
+        remove_keys=["default_forecast_minutes", "default_history_minutes"],
     )
 
     return config
 
 
-def update_config(rename_pairs: list, config: dict, change_history_minutes: bool = True, remove_keys=None):
+def update_config(
+    rename_pairs: list,
+    config: dict,
+    change_history_minutes: bool = True,
+    remove_keys=None,
+):
     """Update the config in place with rename pairs, and remove keys if they exist
 
     1. Rename keys in the config
@@ -175,14 +186,13 @@ def update_config(rename_pairs: list, config: dict, change_history_minutes: bool
 
     if remove_keys is not None:
         for key in remove_keys:
-            if key in config:
-                del config[key]
+            config.pop(key, None)
 
 
 def modify_data_config_for_production(
-    input_path: str, 
-    output_path: str, 
-    gsp_path: str = "", 
+    input_path: str,
+    output_path: str,
+    gsp_path: str = "",
     reformat_config: bool = False,
 ) -> None:
     """Resave the data config with the data source filepaths and dropouts overwritten
@@ -231,7 +241,9 @@ def get_union_of_configs(config_paths: list[str]) -> dict:
 
             else:
                 # Add satellite to common config if not there already
-                common_config["input_data"]["satellite"] = config["input_data"]["satellite"]
+                common_config["input_data"]["satellite"] = config["input_data"][
+                    "satellite"
+                ]
 
         if "nwp" in config["input_data"]:
 
@@ -248,7 +260,7 @@ def get_union_of_configs(config_paths: list[str]) -> dict:
     return common_config
 
 
-def get_nwp_channels(provider: str, nwp_config: dict) -> None| list[str]:
+def get_nwp_channels(provider: str, nwp_config: dict) -> None | list[str]:
     """Get the NWP channels from the NWP config
 
     Args:
@@ -260,4 +272,3 @@ def get_nwp_channels(provider: str, nwp_config: dict) -> None| list[str]:
         if provider in nwp_config["input_data"]["nwp"]:
             nwp_channels = nwp_config["input_data"]["nwp"][provider]["nwp_channels"]
     return nwp_channels
-

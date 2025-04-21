@@ -9,11 +9,13 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 
-from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.app import app
+from pvnet_app.model_configs.pydantic_models import get_all_models
 
 
-def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, db_url):
+def test_app(
+    test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, db_url,
+):
     """Test the app running the intraday models"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -66,8 +68,13 @@ def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_
     assert "10" in forecasts[0].forecast_values[0].properties
 
     # 318 GSPs * 16 time steps in forecast
-    assert len(db_session.query(ForecastValueSQL).all()) == expected_forecast_results * 16
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_forecast_results * 16
+    assert (
+        len(db_session.query(ForecastValueSQL).all()) == expected_forecast_results * 16
+    )
+    assert (
+        len(db_session.query(ForecastValueLatestSQL).all())
+        == expected_forecast_results * 16
+    )
 
     expected_forecast_results = 0
     for model_config in all_models:
@@ -77,7 +84,10 @@ def test_app(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_
         expected_forecast_results += 317 * model_config.save_gsp_to_recent
         expected_forecast_results += model_config.save_gsp_sum  # optional Sum of GSPs
 
-    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
+    assert (
+        len(db_session.query(ForecastValueSevenDaysSQL).all())
+        == expected_forecast_results * 16
+    )
 
 
 def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
@@ -128,8 +138,13 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     assert "10" in forecasts[0].forecast_values[0].properties
 
     # 318 GSPs * 16 time steps in forecast
-    assert len(db_session.query(ForecastValueSQL).all()) == expected_forecast_results * 16
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_forecast_results * 16
+    assert (
+        len(db_session.query(ForecastValueSQL).all()) == expected_forecast_results * 16
+    )
+    assert (
+        len(db_session.query(ForecastValueLatestSQL).all())
+        == expected_forecast_results * 16
+    )
 
     expected_forecast_results = 0
     for model_config in all_models:
@@ -139,12 +154,17 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
         expected_forecast_results += 317 * model_config.save_gsp_to_recent
         expected_forecast_results += model_config.save_gsp_sum  # optional Sum of GSPs
 
-    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
+    assert (
+        len(db_session.query(ForecastValueSevenDaysSQL).all())
+        == expected_forecast_results * 16
+    )
 
 
 # Test for new DA model with data sampler utilisation
 # To note - Satellite omitted
-def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
+def test_app_day_ahead_data_sampler(
+    test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url,
+):
     """Test the app running the day ahead model"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:

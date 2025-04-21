@@ -1,7 +1,7 @@
 import os
 import tempfile
 
-from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader
+from pvnet_app.data.nwp import ECMWFDownloader, UKVDownloader
 
 
 def test_download_nwp(nwp_ukv_data, nwp_ecmwf_data):
@@ -23,13 +23,14 @@ def test_download_nwp(nwp_ukv_data, nwp_ecmwf_data):
         ecmwf_downloader.run()
 
 
-def test_check_model_nwp_inputs_available(config_filename, test_t0, nwp_ukv_data, nwp_ecmwf_data):
-
+def test_check_model_nwp_inputs_available(
+    config_filename, test_t0, nwp_ukv_data, nwp_ecmwf_data,
+):
 
     temp_ukv_path = "temp_nwp_ukv.zarr"
     temp_ecmwf_path = "temp_nwp_ecmwf.zarr"
 
-    # Test in a case where all inputs are available
+    # Test in a case where all inputs are available
     with tempfile.TemporaryDirectory() as tmpdirname:
 
         os.chdir(tmpdirname)
@@ -48,7 +49,6 @@ def test_check_model_nwp_inputs_available(config_filename, test_t0, nwp_ukv_data
         assert ukv_downloader.check_model_inputs_available(config_filename, test_t0)
         assert ecmwf_downloader.check_model_inputs_available(config_filename, test_t0)
 
-
     # Test in a case where no NWP data is available
     with tempfile.TemporaryDirectory() as tmpdirname:
 
@@ -62,7 +62,9 @@ def test_check_model_nwp_inputs_available(config_filename, test_t0, nwp_ukv_data
 
         # No inputs are available so these should return False
         assert not ukv_downloader.check_model_inputs_available(config_filename, test_t0)
-        assert not ecmwf_downloader.check_model_inputs_available(config_filename, test_t0)
+        assert not ecmwf_downloader.check_model_inputs_available(
+            config_filename, test_t0,
+        )
 
     # Test in a case where NWP data is available but not all the required time steps
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -81,7 +83,6 @@ def test_check_model_nwp_inputs_available(config_filename, test_t0, nwp_ukv_data
 
         # Some steps are missing so these should return False
         assert not ukv_downloader.check_model_inputs_available(config_filename, test_t0)
-        assert not ecmwf_downloader.check_model_inputs_available(config_filename, test_t0)
-
-        
-
+        assert not ecmwf_downloader.check_model_inputs_available(
+            config_filename, test_t0,
+        )
