@@ -21,10 +21,9 @@ def test_get_all_models_get_critical_only(use_ocf_data_sampler):
     assert all(m.is_critical for m in models)
 
 
-@pytest.mark.parametrize("use_ocf_data_sampler", [True, False])
-def test_get_all_models_get_day_ahead_only(use_ocf_data_sampler):
+def test_get_all_models_get_day_ahead_only():
     """Test for getting all the day ahead models"""
-    models = get_all_models(get_day_ahead_only=True, use_ocf_data_sampler=use_ocf_data_sampler)
+    models = get_all_models(get_day_ahead_only=True, use_ocf_data_sampler=True)
     assert len(models) == 1
     assert models[0].is_day_ahead
 

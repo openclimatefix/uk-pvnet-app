@@ -111,7 +111,7 @@ models:
     summation:
         repo: openclimatefix/pvnet_summation_uk_national_day_ahead
         commit: 7a2f26b94ac261160358b224944ef32998bd60ce
-    is_critical: False
+    is_critical: True
     is_day_ahead: True
     use_adjuster: True
     save_gsp_sum: True
@@ -157,20 +157,3 @@ models:
     save_gsp_to_recent: False
     uses_ocf_data_sampler: False
     uses_satellite_data: False
-
-  # Legacy day-ahead model which uses satellite data
-  - name: pvnet_day_ahead
-    pvnet:
-        repo: openclimatefix/pvnet_uk_region_day_ahead
-        commit: d87565731692a6003e43caac4feaed0f69e79272
-    summation:
-        repo: openclimatefix/pvnet_summation_uk_national_day_ahead
-        commit: ed60c5d32a020242ca4739dcc6dbc8864f783a08
-    is_critical: False
-    is_day_ahead: True
-    use_adjuster: True
-    ALLOW_SAVE_GSP_SUM: True
-    verbose_logging: True
-    save_gsp_to_recent: True
-    uses_ocf_data_sampler: False
-    uses_satellite_data: True

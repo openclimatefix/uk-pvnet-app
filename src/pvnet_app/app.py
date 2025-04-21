@@ -14,8 +14,8 @@ from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
-from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3
-from pvnet_app.config import get_union_of_configs, save_yaml_config
+from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3, check_model_runs_finished
+from pvnet_app.config import get_nwp_channels, get_union_of_configs, save_yaml_config
 from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader
@@ -115,6 +115,9 @@ def app(
         - FILTER_BAD_FORECASTS, option to filter out bad forecasts. If set to true and the forecast 
           fails the validation checks, it will not be saved. Defaults to false, where all forecasts
           are saved even if they fail the checks.
+        - RAISE_MODEL_FAILURE: Option to raise an exception if a model fails to run. If set to
+          "any" it will raise an exception if any model fails. If set to "critical" it will raise
+          an exception if any critical model fails. If not set, it will not raise an exception.
     """
 
     # ---------------------------------------------------------------------------
@@ -141,6 +144,7 @@ def app(
     allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
     allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
+    raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
 
     zig_zag_warning_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
     zig_zag_error_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
@@ -183,6 +187,17 @@ def app(
 
     temp_dir = tempfile.TemporaryDirectory()
 
+    # 0. Get Model configs
+    data_config_from_model = {}
+    for model_config in model_configs:
+        # First load the data config
+        data_config_path = PVNetBaseModel.get_data_config(
+            model_config.pvnet.repo,
+            revision=model_config.pvnet.commit,
+        )
+        data_config_from_model[model_config.name] = data_config_path
+    common_all_config = get_union_of_configs(data_config_from_model.values())
+
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
@@ -205,15 +220,16 @@ def app(
     )
     sat_downloader.run()
 
-
     # --- Download and process NWP data
     logger.info("Downloading NWP data")
 
-    ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path)
-    ecmwf_downloader.run()
-
-    ukv_downloader = UKVDownloader(source_path=ukv_source_path)
+    ukv_variables = get_nwp_channels(provider="ukv", nwp_config=common_all_config)
+    ukv_downloader = UKVDownloader(source_path=ukv_source_path, nwp_variables=ukv_variables)
     ukv_downloader.run()
+
+    ecmwf_variables = get_nwp_channels(provider="ecmwf", nwp_config=common_all_config)
+    ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path, nwp_variables=ecmwf_variables)
+    ecmwf_downloader.run()
 
     # ---------------------------------------------------------------------------
     # 2. Set up models
@@ -222,11 +238,9 @@ def app(
     forecast_compilers = {}
     used_data_config_paths = []
     for model_config in model_configs:
+
         # First load the data config
-        data_config_path = PVNetBaseModel.get_data_config(
-            model_config.pvnet.repo,
-            revision=model_config.pvnet.commit,
-        )
+        data_config_path = data_config_from_model[model_config.name]
 
         # Check if the data available will allow the model to run
         logger.info(f"Checking that the input data for model '{model_config.name}' exists")
@@ -345,11 +359,18 @@ def app(
     logger.info("Writing to database")
 
     with db_connection.get_session() as session:
-        for forecast_compiler in forecast_compilers.values():
-            forecast_compiler.log_forecast_to_database(session=session)
+        with session.no_autoflush:
+            for forecast_compiler in forecast_compilers.values():
+                forecast_compiler.log_forecast_to_database(session=session)
 
     logger.info("Finished forecast")
-    
+
+    if raise_model_failure in ["any", "critical"]:
+        check_model_runs_finished(
+            completed_forecasts=list(forecast_compilers.keys()),
+            model_configs=model_configs, 
+            raise_if_missing=raise_model_failure,
+        )
 
 if __name__ == "__main__":
     typer.run(app)

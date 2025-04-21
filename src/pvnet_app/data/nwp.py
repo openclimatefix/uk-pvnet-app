@@ -6,14 +6,17 @@ from abc import ABC, abstractmethod
 from typing_extensions import override
 
 import fsspec
-import numpy as np
-import pandas as pd
-import xarray as xr
 import xesmf as xe
 
 from ocf_datapipes.config.load import load_yaml_configuration
 
+import numpy as np
+import pandas as pd
+import pyproj
+import xarray as xr
+
 from pvnet_app.consts import nwp_ecmwf_path, nwp_ukv_path
+
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +150,11 @@ class NWPDownloader(ABC):
     nwp_source: str = None
     save_chunk_dict: dict = None
 
-    def __init__(self, source_path: str | None):
+    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None):
         self.source_path = source_path
+        self.nwp_variables = nwp_variables
+        # Initially no valid times are available. This will only change is the data can be 
+        # downloaded, processed, and saved successfully
         self.valid_times = None
     
     @abstractmethod
@@ -156,6 +162,17 @@ class NWPDownloader(ABC):
         """"Apply all processing steps to the NWP data in order to match the training data"""
         pass
 
+    @abstractmethod
+    def data_is_okay(self, ds: xr.Dataset) -> bool:
+        """Apply quality checks to the NWP data
+        
+        Args:
+            ds: The NWP data
+
+        Returns:
+            bool: Whether the data passes the quality checks
+        """
+        pass
 
     def resave(self, ds: xr.Dataset) -> None:
         """Resave the NWP data to the destination path"""
@@ -166,6 +183,14 @@ class NWPDownloader(ABC):
         shutil.rmtree(self.destination_path, ignore_errors=True)
         ds.chunk(self.save_chunk_dict).to_zarr(self.destination_path)
 
+    def filter_variables(self, ds: xr.Dataset) -> xr.Dataset:
+        """Filter the NWP data to only include the variables needed by the models"""
+
+        if self.nwp_variables is not None:
+            logger.info(f"Selecting variables: {self.nwp_variables} from {ds.variable.values}")
+            ds = ds.sel(variable=self.nwp_variables)
+
+        return ds
 
     def run(self) -> None:
         """Download, process, and save the NWP data"""
@@ -184,14 +209,25 @@ class NWPDownloader(ABC):
             )
             return
 
-        ds = xr.open_zarr(self.destination_path).compute()
+        ds = xr.open_zarr(self.destination_path)
+
+        init_time = pd.to_datetime(ds.init_time.values[0])
+        valid_times = init_time + pd.to_timedelta(ds.step)
+        logger.info(
+            f"{self.nwp_source} has init-time {init_time} and valid times: {valid_times}"
+        )
+
+        # Check the data is okay before processing
+        if not self.data_is_okay(ds):
+            logger.warning(f"{self.nwp_source} NWP data did not pass quality checks.")
+            return
 
         ds = self.process(ds)
-
-        # Store the valid times for the NWP data
-        self.valid_times = pd.to_datetime(ds.init_time.values[0]) + pd.to_timedelta(ds.step)
-
         self.resave(ds)
+
+        # Only store the valid_times if the NWP data has been successfully downloaded, 
+        # quality checked, and processed. Else valid_times will be None
+        self.valid_times = valid_times            
 
 
     def clean_up(self) -> None:
@@ -326,12 +362,21 @@ class ECMWFDownloader(NWPDownloader):
         # This regridding explicitly puts the data on the exact same grid as in training
         # Regridding must be done before .extend_to_shetlands() is called
         ds = self.remove_nans(ds)
+        ds = self.rename_variables(ds)
+        ds = self.filter_variables(ds)
         ds = self.regrid(ds)
         ds = self.extend_to_shetlands(ds)
-        ds = self.rename_variables(ds)
 
         return ds
     
+    @override
+    def data_is_okay(self, ds: xr.Dataset) -> bool:
+        # Need to slice off known nans first
+        ds = self.remove_nans(ds)
+        contains_nans = ds[list(ds.data_vars.keys())[0]].isnull().any().compute().item()
+        return not contains_nans
+
+
 
 class UKVDownloader(NWPDownloader):
 
@@ -368,10 +413,104 @@ class UKVDownloader(NWPDownloader):
         """
         return ds.astype(np.float16)
 
+    @staticmethod
+    def rename_variables(ds):
+        """Change the UKV variable names to match the training data"""
+
+        # This is for nwp-consumer>=1.0.0
+        if "um-ukv" in ds.data_vars:
+
+            logger.info("Renaming the UKV variables")
+
+            ds = ds.rename({"um-ukv": "UKV"})
+
+            varname_mapping = {
+                "cloud_cover_high": "hcc",
+                "cloud_cover_low": "lcc",
+                "cloud_cover_medium": "mcc",
+                "cloud_cover_total": "tcc",
+                "snow_depth_gl": "sde",
+                "direct_shortwave_radiation_flux_gl": "sr",
+                "downward_longwave_radiation_flux_gl": "dlwrf",
+                "downward_shortwave_radiation_flux_gl": "dswrf",
+                "downward_ultraviolet_radiation_flux_gl": "duvrs",
+                "relative_humidity_sl": "r",
+                "temperature_sl": "t",
+                "total_precipitation_rate_gl": "prate",
+                "visibility_sl": "vis",
+                "wind_direction_10m": "wdir10",
+                "wind_speed_10m": "si10",
+                "wind_v_component_10m": "v10",
+                "wind_u_component_10m": "u10"
+            }
+
+            variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
+                
+            ds = ds.assign_coords(variable=variable_coords)
+
+        return ds
+
+    @staticmethod
+    def add_lon_lat_coords(ds: xr.Dataset) -> xr.Dataset:
+        """Add latitude and longitude coords to the UKV data
+        
+        The training UKV data is on a regular OSGB grid but the live data is on a Lambert Azimuthal
+        Equal Area grid. We need to add longitudes and latitudes coords so we can regrid the data
+        to the training grid.
+        """
+
+        # This is for nwp-consumer>=1.0.0
+        if "latitude" not in ds:
+
+            logger.info("Adding lon-lat coords to the UKV data")
+
+            ds = ds.rename({'x_laea': 'x', 'y_laea': 'y'})
+
+            # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
+            laea = pyproj.Proj(
+                proj='laea',
+                lat_0=54.9,
+                lon_0=-2.5,
+                x_0=0.,
+                y_0=0.,
+                ellps="WGS84",
+                datum="WGS84",
+            )
+
+            # WGS84 is short for "World Geodetic System 1984". This is a lon-lat coord system
+            wgs84 = pyproj.Proj(f"+init=EPSG:4326")
+
+            laea_to_lon_lat = pyproj.Transformer.from_proj(laea, wgs84, always_xy=True).transform
+
+            # Calculate longitude and latitude from x_laea and y_laea
+            # - x is an array of shape (455,)
+            # - y is an array of shape (639,)
+            # We need to change x and y to a 2D arrays of shape (455, 639)
+            x, y = ds.x.values, ds.y.values
+            x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
+            y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
+
+            lons, lats = laea_to_lon_lat(xx=x, yy=y)
+
+            ds = ds.assign_coords(
+                longitude=(["y", "x"], lons),
+                latitude=(["y", "x"], lats),
+            )
+
+        return ds
+
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
 
+        ds = self.rename_variables(ds)
+        ds = self.filter_variables(ds)
+        ds = self.add_lon_lat_coords(ds)
         ds = self.regrid(ds)
         ds = self.fix_dtype(ds)
 
         return ds
+    
+    @override
+    def data_is_okay(self, ds: xr.Dataset) -> bool:
+        contains_nans = ds[list(ds.data_vars.keys())[0]].isnull().any().compute().item()
+        return not contains_nans

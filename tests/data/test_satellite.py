@@ -208,7 +208,7 @@ def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0)
         assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
 
 
-def test_run_zeros_in_sat_data(sat_15_data_small, test_t0):
+def test_run_zeros_in_sat_data(sat_15_data, test_t0):
     """Check that the satellite data is considered invalid if it contains too many zeros"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -216,7 +216,7 @@ def test_run_zeros_in_sat_data(sat_15_data_small, test_t0):
         os.chdir(tmpdirname)
 
         # Make half the values zeros
-        ds = sat_15_data_small.copy(deep=True)
+        ds = sat_15_data.copy(deep=True)
         ds.data[::2] = 0
 
         # Make satellite data available
@@ -233,7 +233,7 @@ def test_run_zeros_in_sat_data(sat_15_data_small, test_t0):
         assert sat_downloader.valid_times is None
 
 
-def test_run_nan_in_sat_data(sat_15_data_small, test_t0):
+def test_run_nan_in_sat_data(sat_15_data, test_t0):
     """Check that the satellite data is considered invalid if it contains too many NaNs"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -241,7 +241,7 @@ def test_run_nan_in_sat_data(sat_15_data_small, test_t0):
         os.chdir(tmpdirname)
 
         # Make half the values zeros
-        ds = sat_15_data_small.copy(deep=True)
+        ds = sat_15_data.copy(deep=True)
         ds.data[::2] = np.nan
 
         # Make satellite data available

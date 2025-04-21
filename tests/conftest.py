@@ -216,8 +216,3 @@ def sat_5_data_delayed(test_t0):
 @pytest.fixture(scope="session")
 def sat_15_data(test_t0):
     return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
-
-
-@pytest.fixture(scope="session")
-def sat_15_data_small(sat_15_data):
-    return sat_15_data.isel(x_geostationary=slice(0, 10), y_geostationary=slice(0, 10))

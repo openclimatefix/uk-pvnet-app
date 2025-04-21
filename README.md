@@ -45,7 +45,9 @@ The following environment variables are used in the app:
   we expect positive forecast values. Defaults to 10 degrees.
 - `FILTER_BAD_FORECASTS`: If set to true and the forecast fails validation checks, it will not be 
   saved. Defaults to false, where all forecasts are saved even if they fail the checks.
-
+- `RAISE_MODEL_FAILURE`: Option to raise an exception if a model fails to run. If set to "any" it 
+  will raise an exception if any model fails. If set to "critical" it will raise an exception if any
+  critical model fails. If not set, it will not raise an exception.
 
 ### Examples
 
@@ -78,7 +80,6 @@ export USE_OCF_DATA_SAMPLER="true"
 | **pvnet_day_ahead**       | no        | yes     | yes       | no     | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region_day_ahead/tree/263741ebb6b71559d113d799c9a579a973cc24ba) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_summation_uk_national_day_ahead/tree/7a2f26b94ac261160358b224944ef32998bd60ce) |
 | **Legacy pvnet_v2**       | yes       | yes     | yes       | yes    | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/aa73cdafd1db8df3c8b7f5ecfdb160989e7639ac) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/a7fd71727f4cb2b933992b2108638985e24fa5a3) |
 | **Legacy pvnet_ecmwf**    | no        | no      | yes       | yes    | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region/tree/c14f7427d9854d63430aa936ce45f55d3818d033) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_v2_summation/tree/4fe6b1441b6dd549292c201ed85eee156ecc220c) |
-| **Legacy pvnet_day_ahead**| yes       | yes     | yes       | yes    | [HF Link](https://huggingface.co/openclimatefix/pvnet_uk_region_day_ahead/tree/d87565731692a6003e43caac4feaed0f69e79272) | [Summation HF Link](https://huggingface.co/openclimatefix/pvnet_summation_uk_national_day_ahead/tree/ed60c5d32a020242ca4739dcc6dbc8864f783a08) |
 
 
 ## Validation Checks
@@ -93,17 +94,17 @@ data that the model expects.
 
 We check:
 - Whether 5 minute and/or 15 minute satellite data is available
-- We check if there are any NaNs in the satellite data, if there are, an error is raised
-- We check if there are more that 10% zeros in the satellite data, if there are, an error is raised
-- We check whether there are any missing timestamps in the satellite data. We linearly interpolate
+- If more than 5% of satellite data is NaN - if so the satellite data is treated as missing
+- If more that 10% of satellite data is zero - if so the satellite data is treated as missing
+- Whether there are any missing timestamps in the satellite data. We linearly interpolate
 any gaps less that 15 minutes.
-- We check whether the exact timestamps that the model expects are all available after infilling
+- Whether the exact timestamps that the model expects are all available after infilling and checks
 
 ### NWP data
 
 We check:
+- If the NWP data contains any NaNs - if so that NWP source is treated as missing
 - Whether the exact timestamps that the model expects from each NWP are available
-
 
 ### ML batch checks
 

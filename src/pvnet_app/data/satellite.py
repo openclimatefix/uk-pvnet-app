@@ -6,11 +6,18 @@ import fsspec
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
+from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
+from ocf_data_sampler.load.utils import make_spatial_coords_increasing
+
 from ocf_datapipes.config.load import load_yaml_configuration
 
 from pvnet_app.consts import sat_path
 
 logger = logging.getLogger(__name__)
+
+
 
 
 def get_satellite_timestamps(zarr_path: str) -> pd.DatetimeIndex:
@@ -148,8 +155,8 @@ def extend_satellite_data_with_nans(
 
         if delay > limit:
             logger.warning(
-                "The satellite data is delayed by more than {limit}. "
-                "Will only infill {limit} forward from the latest satellite timestamp.",
+                f"The satellite data is delayed by more than {limit}. "
+                f"Will only infill {limit} forward from the latest satellite timestamp.",
             )
         fill_timedelta = min(delay, limit)
 
@@ -230,6 +237,66 @@ def check_model_satellite_inputs_available(
             logger.info(f"Some satellite timesteps for {t0=} missing: \n{missing_time_steps}")
 
     return available
+
+
+def get_pvnet_satellite_spatial_bounds(
+    ds: xr.Dataset, 
+    width_pixels: int = 24, 
+    height_pixels: int = 24,
+) -> dict[str, slice]:
+    """Get the spatial extent of the satellite data used in PVNet
+
+    Args:
+        da: The satellite data
+        width_pixels: The width of the spatial slice in pixels
+        height_pixels: The height of the spatial slice in pixels
+
+    Returns:
+        dict[str, slice]: The spatial slice of the dataset used byb PVNet
+    """
+
+    # Cut down the slice for efficiency and reorder the coordinates if needed
+    da = make_spatial_coords_increasing(
+        ds.data.isel(time=0, variable=0).copy(deep=True), 
+        x_coord="x_geostationary", 
+        y_coord="y_geostationary",
+    )
+
+    # We will loop over all the GSP locations and find the min and max x and y coordinates
+    # This gives us a bounding box used by PVNet
+    locations = get_gsp_locations()
+
+    xmin = np.inf
+    xmax = -np.inf
+    ymin = np.inf
+    ymax = -np.inf
+
+    for location in locations:
+        
+        da_slice = select_spatial_slice_pixels(
+            da,
+            location,
+            width_pixels=width_pixels,
+            height_pixels=height_pixels,
+        )
+        
+        xmin = min(xmin, da_slice.x_geostationary.min().item())
+        xmax = max(xmax, da_slice.x_geostationary.max().item())
+        ymin = min(ymin, da_slice.y_geostationary.min().item())
+        ymax = max(ymax, da_slice.y_geostationary.max().item())
+
+    # Allow for coords to be reversed
+    if ds.x_geostationary[-1] > ds.x_geostationary[0]:
+        xslice = slice(xmin, xmax)
+    else:
+        xslice = slice(xmax, xmin)
+
+    if ds.y_geostationary[-1] > ds.y_geostationary[0]:
+        yslice = slice(ymin, ymax)
+    else:
+        yslice = slice(ymax, ymin)
+        
+    return {"x_geostationary": xslice, "y_geostationary": yslice}
 
 
 def contains_too_many_of_value(
@@ -386,7 +453,12 @@ class SatelliteDownloader:
         Returns:
             bool: Whether the data passes the quality checks
         """
-        too_many_nans = contains_too_many_of_value(ds, value=np.nan, threshold=0.1)
+
+        # Slice the data to the spatial extent used in PVNet
+        spatial_slice = get_pvnet_satellite_spatial_bounds(ds)
+        ds = ds.sel(spatial_slice)
+
+        too_many_nans = contains_too_many_of_value(ds, value=np.nan, threshold=0.05)
         # Note that in the UK, even at night, the values are not zero
         too_many_zeros = contains_too_many_of_value(ds, value=0, threshold=0.1)
         return (not too_many_nans) and (not too_many_zeros)
