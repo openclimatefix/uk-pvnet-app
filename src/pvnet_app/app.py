@@ -78,7 +78,7 @@ def app(
     gsp_ids: list[int] = all_gsp_ids,
     write_predictions: bool = True,
     num_workers: int = -1,
-):
+) -> Union[xr.DataArray, None]:
     """Inference function to run PVNet.
 
     Args:
