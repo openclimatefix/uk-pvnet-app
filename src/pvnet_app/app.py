@@ -10,6 +10,7 @@ import pandas as pd
 import sentry_sdk
 import torch
 import typer
+
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
@@ -127,7 +128,8 @@ def app(
     else:
         t0 = t0.floor("30min")
 
-    assert len(gsp_ids)>0, "No GSP IDs provided"
+    if len(gsp_ids) == 0:
+        raise ValueError("No GSP IDs provided")
 
     if num_workers == -1:
         num_workers = os.cpu_count() - 1
