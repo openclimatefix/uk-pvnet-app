@@ -10,6 +10,8 @@ import pandas as pd
 import sentry_sdk
 import torch
 import typer
+import xarrat as xr
+from typing import Union
 
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
@@ -50,7 +52,7 @@ logging.getLogger("aiobotocore").setLevel(logging.ERROR)
 
 # Sentry
 sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"), 
+    dsn=os.getenv("SENTRY_DSN"),
     environment=os.getenv("ENVIRONMENT", "local"),
     traces_sample_rate=1,
 )
@@ -100,9 +102,9 @@ def app(
     The following are optional:
         - SENTRY_DSN, optional link to sentry
         - ENVIRONMENT, the environment this is running in, defaults to local
-        - ALLOW_ADJUSTER: Option to allow the adjuster to be used. If false this overwrites the 
+        - ALLOW_ADJUSTER: Option to allow the adjuster to be used. If false this overwrites the
           adjuster option in the model configs so it is not used. Defaults to true.
-        - ALLOW_SAVE_GSP_SUM: Option to allow model to save the GSP sum. If false this overwrites 
+        - ALLOW_SAVE_GSP_SUM: Option to allow model to save the GSP sum. If false this overwrites
           the model configs so saving of the GSP sum is not used. Defaults to false.
         - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
         - RUN_CRITICAL_MODELS_ONLY, option to run critical models only, defaults to false
@@ -113,7 +115,7 @@ def app(
           defaults to 500 MW.
         - FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT, when the solar elevation is above this,
           we expect positive forecast values. Defaults to 10 degrees.
-        - FILTER_BAD_FORECASTS, option to filter out bad forecasts. If set to true and the forecast 
+        - FILTER_BAD_FORECASTS, option to filter out bad forecasts. If set to true and the forecast
           fails the validation checks, it will not be saved. Defaults to false, where all forecasts
           are saved even if they fail the checks.
         - RAISE_MODEL_FAILURE: Option to raise an exception if a model fails to run. If set to
@@ -146,9 +148,9 @@ def app(
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
     raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
 
-    zig_zag_warning_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_WARNING', 250))
-    zig_zag_error_threshold = float(os.getenv('FORECAST_VALIDATE_ZIG_ZAG_ERROR', 500))
-    sun_elevation_lower_limit = float(os.getenv('FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT', 10))
+    zig_zag_warning_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_WARNING", 250))
+    zig_zag_error_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_ERROR", 500))
+    sun_elevation_lower_limit = float(os.getenv("FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT", 10))
     
     db_url = os.environ["DB_URL"] # Will raise KeyError if not set
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
