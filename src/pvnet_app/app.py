@@ -45,12 +45,12 @@ logger = logging.getLogger()
 # Get rid of the verbose sqlalchemy logs
 logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
 # Turn off logs from aiobotocore
-logging.getLogger("aiobotocore").setLevel(logging.ERROR)  
+logging.getLogger("aiobotocore").setLevel(logging.ERROR)
 
 # Sentry
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"), 
-    environment=os.getenv("ENVIRONMENT", "local"), 
+    environment=os.getenv("ENVIRONMENT", "local"),
     traces_sample_rate=1,
 )
 
