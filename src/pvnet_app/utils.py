@@ -1,8 +1,8 @@
+import logging
 import os
+
 import fsspec
 import torch
-import logging
-
 from ocf_datapipes.batch import NumpyBatch
 
 from pvnet_app.model_configs.pydantic_models import ModelConfig
@@ -26,7 +26,7 @@ def get_boolean_env_var(env_var: str, default: bool) -> bool:
         return env_var_value == "true"
     else:
         return default
-    
+
 
 def save_batch_to_s3(batch: NumpyBatch, model_name: str, s3_directory: str):
     """Saves a batch to a local file and uploads it to S3.
@@ -42,42 +42,53 @@ def save_batch_to_s3(batch: NumpyBatch, model_name: str, s3_directory: str):
     try:
         fs = fsspec.open(s3_directory).fs
         fs.put(save_batch, f"{s3_directory}/{save_batch}")
-        logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}")
+        logger.info(
+            f"Saved first batch for model {model_name} to {s3_directory}/{save_batch}",
+        )
         os.remove(save_batch)
     except Exception as e:
-        logger.error(f"Failed to save batch to {s3_directory}/{save_batch} with error {e}")
+        logger.error(
+            f"Failed to save batch to {s3_directory}/{save_batch} with error {e}",
+        )
 
 
 def check_model_runs_finished(
-    completed_forecasts: list[str], 
-    model_configs: list[ModelConfig], 
+    completed_forecasts: list[str],
+    model_configs: list[ModelConfig],
     raise_if_missing: str,
 ) -> None:
     """Check if the required models have been run and raise an exception if not.
-    
+
     Args:
         completed_forecasts: List of forecast names which have been completed
         model_configs: List of model configurations
         raise_if_missing: If set to "any", any missing model will raise an exception.
             If set to "critical", only missing critical models will raise an exception.
     """
-    
     if raise_if_missing == "any":
         required_forecasts = set([model_config.name for model_config in model_configs])
         failed_forecasts = required_forecasts - set(completed_forecasts)
         message = "The following models failed to run"
-    
+
     elif raise_if_missing == "critical":
         required_forecasts = set(
-            [model_config.name for model_config in model_configs if model_config.is_critical]
+            [
+                model_config.name
+                for model_config in model_configs
+                if model_config.is_critical
+            ],
         )
         failed_forecasts = required_forecasts - set(completed_forecasts)
         message = "The following critical models failed to run"
-    
+
     else:
-        raise ValueError(f"Invalid value for raise_if_missing: {raise_if_missing}. "
-                         f"Should be 'any' or 'critical'")
-    
+        raise ValueError(
+            f"Invalid value for raise_if_missing: {raise_if_missing}. "
+            f"Should be 'any' or 'critical'",
+        )
+
     if len(failed_forecasts) > 0:
-        raise Exception(f"{message}: {failed_forecasts}. "
-                        f"Completed forecasts: {completed_forecasts}")
+        raise Exception(
+            f"{message}: {failed_forecasts}. "
+            f"Completed forecasts: {completed_forecasts}",
+        )
