@@ -27,7 +27,7 @@ dependencies = [
     "numpy==2.0.0",
     "numcodecs==0.15.1",
     "ocf_data_sampler==0.1.5",
-    "ocf_datapipes==3.3.56",
+    "ocf_datapipes==3.3.58",
     "pandas==2.2.3",
     "pvnet==3.0.50",
     "pydantic==2.5.3",
