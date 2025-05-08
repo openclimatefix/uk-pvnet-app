@@ -158,7 +158,7 @@ class NWPDownloader(ABC):
         self.valid_times = None
     
     @abstractmethod
-    def process(self, ds: xr.Dataset) -> xr.Dataset:
+    def process(self, ds: xr.Dataset, regrid: bool = True) -> xr.Dataset:
         """"Apply all processing steps to the NWP data in order to match the training data"""
         pass
 
@@ -192,7 +192,7 @@ class NWPDownloader(ABC):
 
         return ds
 
-    def run(self) -> None:
+    def run(self, regrid: bool = True) -> None:
         """Download, process, and save the NWP data"""
 
         logger.info(f"Downloading and processing the {self.nwp_source} data")
@@ -222,7 +222,7 @@ class NWPDownloader(ABC):
             logger.warning(f"{self.nwp_source} NWP data did not pass quality checks.")
             return
 
-        ds = self.process(ds)
+        ds = self.process(ds, regrid=regrid)
         self.resave(ds)
 
         # Only store the valid_times if the NWP data has been successfully downloaded, 
@@ -357,14 +357,15 @@ class ECMWFDownloader(NWPDownloader):
         return ds
     
     @override
-    def process(self, ds: xr.Dataset) -> xr.Dataset:
+    def process(self, ds: xr.Dataset, regrid: bool = True) -> xr.Dataset:
 
         # This regridding explicitly puts the data on the exact same grid as in training
         # Regridding must be done before .extend_to_shetlands() is called
         ds = self.remove_nans(ds)
         ds = self.rename_variables(ds)
         ds = self.filter_variables(ds)
-        ds = self.regrid(ds)
+        if regrid:
+            ds = self.regrid(ds)
         ds = self.extend_to_shetlands(ds)
 
         return ds
