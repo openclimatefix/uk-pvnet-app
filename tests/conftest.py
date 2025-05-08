@@ -133,7 +133,7 @@ def make_nwp_data(shell_path, varname, test_t0):
 
     # Add data to dataset
     ds[varname] = xr.DataArray(
-        np.zeros([len(ds[c]) for c in ds.xindexes]),
+        np.ones([len(ds[c]) for c in ds.xindexes]),
         coords=[ds[c] for c in ds.xindexes],
     )
 
