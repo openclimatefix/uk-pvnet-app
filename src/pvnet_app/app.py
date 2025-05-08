@@ -228,7 +228,11 @@ def app(
     ukv_downloader.run()
 
     ecmwf_variables = get_nwp_channels(provider="ecmwf", nwp_config=common_all_config)
-    ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path, nwp_variables=ecmwf_variables, regrid=False if use_day_ahead_model else True)
+    ecmwf_downloader = ECMWFDownloader(
+        source_path=ecmwf_source_path,
+        nwp_variables=ecmwf_variables,
+        regrid_data=False if use_day_ahead_model else True,
+    )
     ecmwf_downloader.run()
 
     # ---------------------------------------------------------------------------
