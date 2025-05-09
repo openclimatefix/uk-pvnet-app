@@ -157,6 +157,7 @@ class NWPDownloader(ABC):
         # Initially no valid times are available. This will only change is the data can be 
         # downloaded, processed, and saved successfully
         self.valid_times = None
+        # please note that we can only turn off regriding for ECMWF data. The UKV data is always regridded
         self.regrid_data = regrid_data
     
     @abstractmethod
@@ -267,14 +268,19 @@ class ECMWFDownloader(NWPDownloader):
         "latitude": 50,
         "longitude": 50,
     }
-    
-    @staticmethod
-    def regrid(ds: xr.Dataset) -> xr.Dataset:
+
+    def regrid(self, ds: xr.Dataset) -> xr.Dataset:
         """Regrid the ECMWF data to the target grid
         
         In training the ECMWF was at twice the resolution as we have available in production. This
         regridding step will put the data on the same grid as the training data
         """
+
+        if not self.regrid_data:
+            logger.info(f"Not regridding")
+            ds = ds.transpose("init_time", "step", "variable", "longitude", "latitude")
+            return ds.compute(scheduler="single-threaded")
+
         return regrid_nwp_data(
             ds=ds,
             target_coords_path=files("pvnet_app.data").joinpath("nwp_ecmwf_target_coords.nc"),
@@ -371,12 +377,7 @@ class ECMWFDownloader(NWPDownloader):
         ds = self.remove_nans(ds)
         ds = self.rename_variables(ds)
         ds = self.filter_variables(ds)
-        if self.regrid_data:
-            ds = self.regrid(ds)
-        else:
-            ds = ds.transpose("init_time", "step", "variable", "longitude", "latitude")
-            ds = ds.compute(scheduler="single-threaded")
-
+        ds = self.regrid(ds)
         ds = self.extend_to_shetlands(ds)
 
         return ds
@@ -517,8 +518,7 @@ class UKVDownloader(NWPDownloader):
         ds = self.rename_variables(ds)
         ds = self.filter_variables(ds)
         ds = self.add_lon_lat_coords(ds)
-        if self.regrid_data:
-            ds = self.regrid(ds)
+        ds = self.regrid(ds)
         ds = self.fix_dtype(ds)
 
         return ds
