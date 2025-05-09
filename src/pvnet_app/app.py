@@ -231,7 +231,7 @@ def app(
     ecmwf_downloader = ECMWFDownloader(
         source_path=ecmwf_source_path,
         nwp_variables=ecmwf_variables,
-        regrid_data=False if use_day_ahead_model else True,
+        regrid_data=not use_day_ahead_model,
     )
     ecmwf_downloader.run()
 
