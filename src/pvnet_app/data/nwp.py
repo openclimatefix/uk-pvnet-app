@@ -149,7 +149,7 @@ class NWPDownloader(ABC):
     destination_path: str = None
     nwp_source: str = None
     save_chunk_dict: dict = None
-    regrid_data : bool = True
+    regrid_data: bool = True
 
     def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None, regrid_data: bool = True):
         self.source_path = source_path
@@ -157,7 +157,7 @@ class NWPDownloader(ABC):
         # Initially no valid times are available. This will only change is the data can be 
         # downloaded, processed, and saved successfully
         self.valid_times = None
-        # please note that we can only turn off regriding for ECMWF data. The UKV data is always regridded
+        # Please note that we can only turn off regridding for ECMWF data. The UKV data is always regridded
         self.regrid_data = regrid_data
     
     @abstractmethod
