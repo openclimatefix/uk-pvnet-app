@@ -297,7 +297,7 @@ class ECMWFDownloader(NWPDownloader):
 
         logger.info("Extending the ECMWF data to reach the shetlands")
 
-        # we get data in live at 0.1, but some of the older models were trained using 0.05 data
+        # We get data in live at 0.1, but some of the older models were trained using 0.05 data
         if self.regrid_data:
             step = 0.05
         else:
