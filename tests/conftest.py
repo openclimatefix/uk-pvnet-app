@@ -71,7 +71,7 @@ def db_session(db_connection):
 def populate_db_session_with_input_data(session, test_t0):
     """Populate a session with input data for testing"""
 
-    num_gsps = 317
+    num_gsps = 342
     total_capacity_mw = 17_000
 
     gsp_yields = []
