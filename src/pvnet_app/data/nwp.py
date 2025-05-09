@@ -282,8 +282,7 @@ class ECMWFDownloader(NWPDownloader):
             nwp_source="ECMWF",
         )
 
-    @staticmethod
-    def extend_to_shetlands(ds: xr.Dataset) -> xr.Dataset:
+    def extend_to_shetlands(self, ds: xr.Dataset) -> xr.Dataset:
         """Extend the ECMWF data to reach the shetlands (with NaNS) as in the training data
         
         The training data stopped at 60 degrees latitude but was extended with NaNs to reach the 
