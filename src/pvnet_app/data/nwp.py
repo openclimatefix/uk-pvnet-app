@@ -374,6 +374,10 @@ class ECMWFDownloader(NWPDownloader):
         ds = self.filter_variables(ds)
         if self.regrid_data:
             ds = self.regrid(ds)
+        else:
+            ds = ds.transpose("init_time", "step", "variable", "longitude", "latitude")
+            ds = ds.compute(scheduler="single-threaded")
+
         ds = self.extend_to_shetlands(ds)
 
         return ds
