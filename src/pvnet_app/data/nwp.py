@@ -292,9 +292,15 @@ class ECMWFDownloader(NWPDownloader):
 
         logger.info("Extending the ECMWF data to reach the shetlands")
 
+        # we get data in live at 0.1, but some of the older models were trained using 0.05 data
+        if self.regrid_data:
+            step = 0.05
+        else:
+            step = 0.1
+
         # The data must be extended to reach the shetlands. This will fill missing lats with NaNs
         # and reflects what the model saw in training
-        return ds.reindex(latitude=np.concatenate([np.arange(62, 60, -0.05), ds.latitude.values]))
+        return ds.reindex(latitude=np.concatenate([np.arange(62, 60, -step), ds.latitude.values]))
 
     @staticmethod
     def rename_variables(ds):
