@@ -5,7 +5,7 @@
 
 [![ease of contribution: medium](https://img.shields.io/badge/ease%20of%20contribution:%20medium-f4900c)](https://github.com/openclimatefix#how-easy-is-it-to-get-involved)
 
-Internal OCF application to run [PVNet](https://github.com/openclimatefix/PVNet) models and (optionally) [PVNet summation](https://github.com/openclimatefix/PVNet-summation) models for the UK in a live environment. This involves accessing weather data stored in AWS S3 buckets, processing and loading this data using either our `ocf-data-sampler` or `ocf_datapipes` libraries, pulling pre-trained models from HuggingFace and then producing solar PV power forecasts for the UK by feeding the processed weather data into the model. 
+Internal OCF application to run [PVNet](https://github.com/openclimatefix/PVNet) models and (optionally) [PVNet summation](https://github.com/openclimatefix/PVNet-summation) models for the UK in a live environment. This involves accessing weather data stored in AWS S3 buckets, processing and loading this data using either our `ocf-data-sampler`, pulling pre-trained models from HuggingFace and then producing solar PV power forecasts for the UK by feeding the processed weather data into the model. 
 
 The app supports multiple model versions being deployed to live environments and these can be ran with specific configurations which are set via environment variables.
 
@@ -18,6 +18,7 @@ The following environment variables are used in the app:
 - `DB_URL`: The URL for the database connection.
 - `NWP_UKV_ZARR_PATH`: The path to the UKV NWP data in Zarr format.
 - `NWP_ECMWF_ZARR_PATH`: The path to the ECMWF NWP data in Zarr format.
+- `CLOUDCASTING_ZARR_PATH`: The path to the cloudcasting forecast data in Zarr format.
 - `SATELLITE_ZARR_PATH`: The path to the satellite data in Zarr format.
 
 ### Optional Environment Variables
@@ -26,7 +27,6 @@ The following environment variables are used in the app:
 
 - `RUN_CRITICAL_MODELS_ONLY`: Option to run critical models only. Defaults to false.
 - `DAY_AHEAD_MODEL`: Option to use day ahead model. Defaults to false.
-- `USE_OCF_DATA_SAMPLER`: Option to use OCF data sampler. Defaults to true.
 
 #### These control the saved results
 
@@ -57,6 +57,7 @@ Here are some examples of how to set these environment variables:
 export DB_URL="postgresql://user:password@localhost:5432/dbname"
 export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
 export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
+export CLOUDCASTING_ZARR_PATH="s3://bucket/path/to/cloudcasting.zarr"
 export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
 export ALLOW_ADJUSTER="true"
 export ALLOW_SAVE_GSP_SUM="false"
@@ -64,8 +65,6 @@ export RUN_CRITICAL_MODELS_ONLY="true"
 export DAY_AHEAD_MODEL="false"
 export SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
 export ENVIRONMENT="production"
-export USE_ECMWF_ONLY="false"
-export USE_OCF_DATA_SAMPLER="true"
 ```
 
 ## ML Models Used for PVNet

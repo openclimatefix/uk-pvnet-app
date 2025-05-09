@@ -2,11 +2,9 @@
     "metadata": {
         ".zattrs": {
             "_data_attrs": {
-                "Conventions": "CF-1.7",
-                "GRIB_centre": "ecmf",
-                "GRIB_centreDescription": "European Centre for Medium-Range Weather Forecasts",
-                "GRIB_subCentre": 0,
-                "institution": "European Centre for Medium-Range Weather Forecasts"
+                "coord_system": "{\"geodesic_ellipsiodal\": {\"crs\": \"EPSG:4326\"}}",
+                "produced_by": "nwp-consumer 1.1.20.post2+git.9b566866 at 2025-04-03 07:10",
+                "variables": "{\"cloud_cover_high\": {\"description\": \"Fraction of grid square covered by high-level cloud. Defined as the ratio of the area of the grid square covered by high-level (>6km) cloud to the square's total area.\", \"units\": \"UI\"}, \"cloud_cover_low\": {\"description\": \"Fraction of grid square covered by low-level cloud. Defined as the ratio of the area of the grid square covered by low-level (<2km) cloud to the square's total area.\", \"units\": \"UI\"}, \"cloud_cover_medium\": {\"description\": \"Fraction of grid square covered by medium-level cloud. Defined as the ratio of the area of the grid square covered by medium-level (2-6km) cloud to the square's total area.\", \"units\": \"UI\"}, \"cloud_cover_total\": {\"description\": \"Fraction of grid square covered by any cloud. Defined as the ratio of the area of the grid square covered by any cloud to the square's total area.\", \"units\": \"UI\"}, \"direct_shortwave_radiation_flux_gl\": {\"description\": \"Direct shortwave radiation flux at ground level. Defined as the mean amount of unscattered solar radiation incident ona surface plane perpendicular to the direction of the sun expected over the next hour.\", \"units\": \"W/m^2\"}, \"downward_longwave_radiation_flux_gl\": {\"description\": \"Downward longwave radiation flux at ground level. Defined as the mean amount of thermal radiation incident on the surface expected over the next hour.\", \"units\": \"W/m^2\"}, \"downward_shortwave_radiation_flux_gl\": {\"description\": \"Downward shortwave radiation flux at ground level. Defined as the mean amount of solar radiation incident on the surface expected over the next hour.This is made up of both direct and diffuse radiation.\", \"units\": \"W/m^2\"}, \"downward_ultraviolet_radiation_flux_gl\": {\"description\": \"Downward ultraviolet radiation flux at ground level. Defined as the mean amount of ultraviolet radiation incident on the surface expected over the next hour.\", \"units\": \"W/m^2\"}, \"snow_depth_gl\": {\"description\": \"Depth of snow on the ground.\", \"units\": \"m\"}, \"temperature_sl\": {\"description\": \"Temperature at screen level\", \"units\": \"C\"}, \"total_precipitation_rate_gl\": {\"description\": \"Total precipitation rate at ground level. Defined as the rate at which liquid is deposited on the ground including rain, snow, and hail.\", \"units\": \"kg/m^2/s\"}, \"visibility_sl\": {\"description\": \"Visibility at screen level. Defined as the distance at which an object can be seen horizontally in daylight conditions.\", \"units\": \"m\"}, \"wind_u_component_100m\": {\"description\": \"U component of wind at 100m above ground level. Defined as the horizontal speed of the wind in the eastward direction.\", \"units\": \"m/s\"}, \"wind_u_component_10m\": {\"description\": \"U component of wind at 10m above ground level. Defined as the horizontal speed of the wind in the eastward direction.\", \"units\": \"m/s\"}, \"wind_u_component_200m\": {\"description\": \"U component of wind at 200m above ground level. Defined as the horizontal speed of the wind in the eastward direction.\", \"units\": \"m/s\"}, \"wind_v_component_100m\": {\"description\": \"V component of wind at 100m above ground level. Defined as the horizontal speed of the wind in the northward direction.\", \"units\": \"m/s\"}, \"wind_v_component_10m\": {\"description\": \"V component of wind at 10m above ground level. Defined as the horizontal speed of the wind in the northward direction.\", \"units\": \"m/s\"}, \"wind_v_component_200m\": {\"description\": \"V component of wind at 200m above ground level. Defined as the horizontal speed of the wind in the northward direction.\", \"units\": \"m/s\"}}"
             }
         },
         ".zgroup": {
@@ -37,9 +35,7 @@
                 "init_time"
             ],
             "calendar": "proleptic_gregorian",
-            "long_name": "initial time of forecast",
-            "standard_name": "forecast_reference_time",
-            "units": "nanoseconds since 1970-01-01"
+            "units": "days since 2025-04-03 00:00:00"
         },
         "latitude/.zarray": {
             "chunks": [
@@ -64,11 +60,7 @@
         "latitude/.zattrs": {
             "_ARRAY_DIMENSIONS": [
                 "latitude"
-            ],
-            "long_name": "latitude",
-            "standard_name": "latitude",
-            "stored_direction": "decreasing",
-            "units": "degrees_north"
+            ]
         },
         "longitude/.zarray": {
             "chunks": [
@@ -93,14 +85,11 @@
         "longitude/.zattrs": {
             "_ARRAY_DIMENSIONS": [
                 "longitude"
-            ],
-            "long_name": "longitude",
-            "standard_name": "longitude",
-            "units": "degrees_east"
+            ]
         },
         "step/.zarray": {
             "chunks": [
-                89
+                85
             ],
             "compressor": {
                 "blocksize": 0,
@@ -114,7 +103,7 @@
             "filters": null,
             "order": "C",
             "shape": [
-                89
+                85
             ],
             "zarr_format": 2
         },
@@ -122,8 +111,6 @@
             "_ARRAY_DIMENSIONS": [
                 "step"
             ],
-            "long_name": "time since forecast_reference_time",
-            "standard_name": "forecast_period",
             "units": "hours"
         },
         "variable/.zarray": {
@@ -137,9 +124,13 @@
                 "id": "blosc",
                 "shuffle": 1
             },
-            "dtype": "<U38",
+            "dtype": "|O",
             "fill_value": null,
-            "filters": null,
+            "filters": [
+                {
+                    "id": "vlen-utf8"
+                }
+            ],
             "order": "C",
             "shape": [
                 18
