@@ -234,7 +234,8 @@ def app(
 
             ecmwf_downloader = ECMWFDownloader(
                 source_path=ecmwf_source_path, 
-                nwp_variables=get_nwp_channels(provider="ecmwf", nwp_config=common_all_config)
+                nwp_variables=get_nwp_channels(provider="ecmwf", nwp_config=common_all_config),
+                regrid_data=not use_day_ahead_model,
             )
             ecmwf_downloader.run()
 

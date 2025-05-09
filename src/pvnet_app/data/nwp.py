@@ -143,13 +143,16 @@ class NWPDownloader(ABC):
     destination_path: str = None
     nwp_source: str = None
     save_chunk_dict: dict = None
+    regrid_data: bool = True
 
-    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None):
+    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None, regrid_data: bool = True):
         self.source_path = source_path
         self.nwp_variables = nwp_variables
         # Initially no valid times are available. This will only change is the data can be 
         # downloaded, processed, and saved successfully
         self.valid_times = None
+        # Please note that we can only turn off regridding for ECMWF data. The UKV data is always regridded
+        self.regrid_data = regrid_data
     
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
@@ -262,14 +265,19 @@ class ECMWFDownloader(NWPDownloader):
         "latitude": 50,
         "longitude": 50,
     }
-    
-    @staticmethod
-    def regrid(ds: xr.Dataset) -> xr.Dataset:
+
+    def regrid(self, ds: xr.Dataset) -> xr.Dataset:
         """Regrid the ECMWF data to the target grid
         
         In training the ECMWF was at twice the resolution as we have available in production. This
         regridding step will put the data on the same grid as the training data
         """
+
+        if not self.regrid_data:
+            logger.info(f"Not regridding")
+            ds = ds.transpose("init_time", "step", "variable", "longitude", "latitude")
+            return ds.compute(scheduler="single-threaded")
+
         return regrid_nwp_data(
             ds=ds,
             target_coords_path=files("pvnet_app.data").joinpath("nwp_ecmwf_target_coords.nc"),
@@ -277,8 +285,7 @@ class ECMWFDownloader(NWPDownloader):
             nwp_source="ECMWF",
         )
 
-    @staticmethod
-    def extend_to_shetlands(ds: xr.Dataset) -> xr.Dataset:
+    def extend_to_shetlands(self, ds: xr.Dataset) -> xr.Dataset:
         """Extend the ECMWF data to reach the shetlands (with NaNS) as in the training data
         
         The training data stopped at 60 degrees latitude but was extended with NaNs to reach the 
@@ -287,9 +294,15 @@ class ECMWFDownloader(NWPDownloader):
 
         logger.info("Extending the ECMWF data to reach the shetlands")
 
+        # We get data in live at 0.1, but some of the older models were trained using 0.05 data
+        if self.regrid_data:
+            step = 0.05
+        else:
+            step = 0.1
+
         # The data must be extended to reach the shetlands. This will fill missing lats with NaNs
         # and reflects what the model saw in training
-        return ds.reindex(latitude=np.concatenate([np.arange(62, 60, -0.05), ds.latitude.values]))
+        return ds.reindex(latitude=np.concatenate([np.arange(62, 60, -step), ds.latitude.values]))
 
     @staticmethod
     def rename_variables(ds):
