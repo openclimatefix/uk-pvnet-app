@@ -1,4 +1,4 @@
-"""App to run inference for PVNet multiple models."""
+"""Application to run inference for PVNet multiple models."""
 
 import logging
 import os
