@@ -39,6 +39,7 @@ dependencies = [
     "torchvision @ https://download.pytorch.org/whl/cpu/torchvision-0.18.1%2Bcpu-cp312-cp312-linux_x86_64.whl ; platform_system == 'Linux' and platform_machine == 'x86_64'",
     "typer==0.15.1",
     "xarray==2025.1.2",
+    "dask==2025.4.1",
     "xesmf==0.8.8", # Requires ESMF to be installed
     "zarr==2.18.3",
     "numcodecs<0.16",
