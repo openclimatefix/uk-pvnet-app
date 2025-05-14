@@ -26,6 +26,7 @@ dependencies = [
     "nowcasting_datamodel==1.6.1",
     "numpy==2.0.0",
     "ocf_data_sampler==0.2.12",
+    "numcodecs==0.15.1",
     "pandas==2.2.3",
     "pvnet==4.1.0",
     "pydantic==2.5.3",
