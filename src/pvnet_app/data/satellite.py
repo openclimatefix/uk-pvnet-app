@@ -11,7 +11,7 @@ from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
 from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
 from ocf_data_sampler.load.utils import make_spatial_coords_increasing
 
-from ocf_datapipes.config.load import load_yaml_configuration
+from ocf_data_sampler.config.load import load_yaml_configuration
 
 from pvnet_app.consts import sat_path
 
@@ -210,21 +210,23 @@ def check_model_satellite_inputs_available(
     elif model_uses_satellite:
 
         # Take into account how recently the model tries to slice satellite data from
-        max_sat_delay_allowed_mins = input_config.satellite.live_delay_minutes
+        # interval_[start/end]_minutes is relative to t0 so negative means before t0
+        interval_start_minutes = input_config.satellite.interval_start_minutes
+        interval_end_minutes = input_config.satellite.interval_end_minutes
 
-        # Take into account the dropout the model was trained with, if any
+        # Take into account the dropout the model was trained with
+        # If the model was trained with dropout, we can allow the satellite data to be
+        # delayed by most negative dropout time
         if input_config.satellite.dropout_fraction > 0:
-            max_sat_delay_allowed_mins = max(
-                max_sat_delay_allowed_mins,
-                np.abs(input_config.satellite.dropout_timedeltas_minutes).max(),
+            interval_end_minutes = min(
+                interval_end_minutes, 
+                np.array(input_config.satellite.dropout_timedeltas_minutes).min()
             )
 
-        # Get all expected datetimes
-        history_minutes = input_config.satellite.history_minutes
 
         expected_datetimes = pd.date_range(
-            t0 - pd.Timedelta(f"{int(history_minutes)}min"),
-            t0 - pd.Timedelta(f"{int(max_sat_delay_allowed_mins)}min"),
+            t0 + pd.Timedelta(f"{int(interval_start_minutes)}min"),
+            t0 + pd.Timedelta(f"{int(interval_end_minutes)}min"),
             freq="5min",
         )
 
@@ -357,12 +359,10 @@ class SatelliteDownloader:
         t0: pd.Timestamp, 
         source_path_5: str | None, 
         source_path_15: str | None,  
-        legacy: bool = False
     ):
         self.t0 = t0
         self.source_path_5 = source_path_5
         self.source_path_15 = source_path_15
-        self.legacy = legacy
         self.valid_times = None
 
     def download_data(self) -> bool:
@@ -477,10 +477,8 @@ class SatelliteDownloader:
         # Interpolate missing satellite timestamps
         ds = interpolate_missing_satellite_timestamps(ds, max_gap=pd.Timedelta("15min"))
 
-        if not self.legacy:
-            # Scale the satellite data if not legacy. The legacy dataloader does production data 
-            # scaling inside it. The new dataloader does not
-            ds = scale_satellite_data(ds)
+        # Scale the data to be between 0 and 1 like in training
+        ds = scale_satellite_data(ds)
 
         # Store the available satellite timestamps before we extend with NaNs
         self.valid_times = pd.to_datetime(ds.time.values)
