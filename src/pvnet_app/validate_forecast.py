@@ -10,7 +10,7 @@ logger = logging.getLogger()
 RELATIVE_MAX_FORECAST = 1.1
 
 # A forecast is bad if above this absolute value
-# Note: The all time peak generation as of 2025-03-03 was 11.5 GW
+# Note: The all time peak generation as of 2025-05-20 was 13.2 GW
 #  - See https://www.solar.sheffield.ac.uk/pvlive/
 ABSOLUTE_MAX_FORECAST = 15_000
 
