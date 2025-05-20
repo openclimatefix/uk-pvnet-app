@@ -234,10 +234,8 @@ class Forecaster:
     ) -> xr.DataArray:
         """Put numpy array of predictions into a dataarray"""
         if output_quantiles is not None:
-            output_labels = [
-                f"forecast_mw_plevel_{int(q*100):02}" for q in output_quantiles]
-            output_labels[output_labels.index(
-                "forecast_mw_plevel_50")] = "forecast_mw"
+            output_labels = [f"forecast_mw_plevel_{int(q*100):02}" for q in output_quantiles]
+            output_labels[output_labels.index("forecast_mw_plevel_50")] = "forecast_mw"
         else:
             output_labels = ["forecast_mw"]
             preds = preds[..., np.newaxis]
