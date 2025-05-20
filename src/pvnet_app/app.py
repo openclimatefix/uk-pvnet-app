@@ -68,14 +68,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def app(
-    t0: None | pd.Timestamp = None,
+    t0: str | None = None,
     gsp_ids: list[int] | None = None,
     write_predictions: bool = True,
 ):
     """Inference function to run PVNet.
 
     Args:
-        t0 (datetime): Datetime at which forecast is made
+        t0 (str): Datetime at which forecast is made
         gsp_ids (array_like): List of gsp_ids to make predictions for. This list of GSPs are summed
             to national.
         write_predictions (bool): Whether to write prediction to the database. Else returns as
