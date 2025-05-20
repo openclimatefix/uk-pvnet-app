@@ -300,7 +300,7 @@ class Forecaster:
         if self.save_gsp_sum:
             # Compute the sum if we are logging the sum of GSPs independently
             da_abs_sum_gsps = (
-                self.da_abs_all.sel(gsp_id=slice(1, 317))
+                self.da_abs_all.sel(gsp_id=slice(1, None))
                 .sum(dim="gsp_id")
                 # Only select the central forecast for the GSP sum. The sums of different p-levels
                 # are not a meaningful qauntities
