@@ -187,6 +187,7 @@ def app(
     # 1. Prepare data sources
 
     if gsp_ids is None:
+        # "20220314" defaults to the old version of the GSP boundaries
         gsp_boundaries_version = (
             common_all_config["input_data"]["gsp"].get("boundaries_version", "20220314")
         )
