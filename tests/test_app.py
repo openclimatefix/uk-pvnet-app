@@ -1,6 +1,5 @@
 import os
 import tempfile
-import pytest
 
 import zarr
 from nowcasting_datamodel.models.forecast import (
@@ -12,6 +11,8 @@ from nowcasting_datamodel.models.forecast import (
 
 from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.app import app
+
+NUM_GSPS = 331
 
 
 def test_app(
@@ -50,19 +51,16 @@ def test_app(
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
-        # These imports need to come after the environ vars have been set
-        from pvnet_app.app import app
-
-        app(t0=test_t0, gsp_ids=list(range(1, 318)))
+        app(t0=test_t0)
 
     all_models = get_all_models(get_critical_only=False)
 
     # Check correct number of forecasts have been made
-    # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
+    # (Number of GSPs + 1 National + maybe GSP-sum) forecasts
     # Forecast made with multiple models
     expected_forecast_results = 0
     for model_config in all_models:
-        expected_forecast_results += 318 + model_config.save_gsp_sum
+        expected_forecast_results += NUM_GSPS + 1 + model_config.save_gsp_sum
 
     forecasts = db_session.query(ForecastSQL).all()
     # Doubled for historic and forecast
@@ -81,7 +79,7 @@ def test_app(
         # National
         expected_forecast_results += 1
         # GSP
-        expected_forecast_results += 317 * model_config.save_gsp_to_recent
+        expected_forecast_results += NUM_GSPS * model_config.save_gsp_to_recent
         expected_forecast_results += model_config.save_gsp_sum  # optional Sum of GSPs
 
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
@@ -119,11 +117,9 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     all_models = [model for model in all_models if not model.uses_satellite_data]
 
     # Check correct number of forecasts have been made
-    # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
-    # Forecast made with multiple models
     expected_forecast_results = 0
     for model_config in all_models:
-        expected_forecast_results += 318 + model_config.save_gsp_sum
+        expected_forecast_results += (NUM_GSPS + 1) + model_config.save_gsp_sum
 
     forecasts = db_session.query(ForecastSQL).all()
     # Doubled for historic and forecast
@@ -142,14 +138,13 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
         # National
         expected_forecast_results += 1
         # GSP
-        expected_forecast_results += 317 * model_config.save_gsp_to_recent
+        expected_forecast_results += NUM_GSPS * model_config.save_gsp_to_recent
         expected_forecast_results += model_config.save_gsp_sum  # optional Sum of GSPs
 
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
 
 # Test for new DA model with data sampler utilisation
-@pytest.mark.skip(reason="The day ahead model is not up to date with data-sampler and PVNet")
 def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     """Test the app running the day ahead model"""
 
@@ -176,11 +171,9 @@ def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf
     all_models = get_all_models(get_day_ahead_only=True)
 
     # Check correct number of forecasts have been made
-    # (317 GSPs + 1 National + maybe GSP-sum) = 318 or 319 forecasts
-    # Forecast made with multiple models
     expected_forecast_results = 0
     for model_config in all_models:
-        expected_forecast_results += 318 + model_config.save_gsp_sum
+        expected_forecast_results += NUM_GSPS + 1 + model_config.save_gsp_sum
 
     forecasts = db_session.query(ForecastSQL).all()
     # Doubled for historic and forecast

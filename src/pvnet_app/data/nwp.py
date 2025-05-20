@@ -143,16 +143,13 @@ class NWPDownloader(ABC):
     destination_path: str = None
     nwp_source: str = None
     save_chunk_dict: dict = None
-    regrid_data: bool = True
 
-    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None, regrid_data: bool = True):
+    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None):
         self.source_path = source_path
         self.nwp_variables = nwp_variables
         # Initially no valid times are available. This will only change is the data can be 
         # downloaded, processed, and saved successfully
         self.valid_times = None
-        # Please note that we can only turn off regridding for ECMWF data. The UKV data is always regridded
-        self.regrid_data = regrid_data
     
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
@@ -230,11 +227,9 @@ class NWPDownloader(ABC):
         # quality checked, and processed. Else valid_times will be None
         self.valid_times = valid_times            
 
-
     def clean_up(self) -> None:
         """Remove the downloaded data"""
         shutil.rmtree(self.destination_path, ignore_errors=True)
-    
     
     def check_model_inputs_available(
         self,
@@ -266,44 +261,6 @@ class ECMWFDownloader(NWPDownloader):
         "longitude": 50,
     }
 
-    def regrid(self, ds: xr.Dataset) -> xr.Dataset:
-        """Regrid the ECMWF data to the target grid
-        
-        In training the ECMWF was at twice the resolution as we have available in production. This
-        regridding step will put the data on the same grid as the training data
-        """
-
-        if not self.regrid_data:
-            logger.info(f"Not regridding")
-            ds = ds.transpose("init_time", "step", "variable", "longitude", "latitude")
-            return ds.compute(scheduler="single-threaded")
-
-        return regrid_nwp_data(
-            ds=ds,
-            target_coords_path=files("pvnet_app.data").joinpath("nwp_ecmwf_target_coords.nc"),
-            method="conservative",  # this is needed to avoid zeros around edges of ECMWF data
-            nwp_source="ECMWF",
-        )
-
-    def extend_to_shetlands(self, ds: xr.Dataset) -> xr.Dataset:
-        """Extend the ECMWF data to reach the shetlands (with NaNS) as in the training data
-        
-        The training data stopped at 60 degrees latitude but was extended with NaNs to reach the 
-        Shetlands. We repeat this here.
-        """
-
-        logger.info("Extending the ECMWF data to reach the shetlands")
-
-        # We get data in live at 0.1, but some of the older models were trained using 0.05 data
-        if self.regrid_data:
-            step = 0.05
-        else:
-            step = 0.1
-
-        # The data must be extended to reach the shetlands. This will fill missing lats with NaNs
-        # and reflects what the model saw in training
-        return ds.reindex(latitude=np.concatenate([np.arange(62, 60, -step), ds.latitude.values]))
-
     @staticmethod
     def rename_variables(ds):
         """Rename the ECMWF variables to match the training data
@@ -324,7 +281,7 @@ class ECMWFDownloader(NWPDownloader):
             "cloud_cover_low": "lcc",
             "cloud_cover_medium": "mcc",
             "cloud_cover_total": "tcc",
-            "snow_depth_gl": "sde",
+            "snow_depth_gl": "sd",
             "direct_shortwave_radiation_flux_gl": "sr",
             "downward_longwave_radiation_flux_gl": "dlwrf",
             "downward_shortwave_radiation_flux_gl": "dswrf",
@@ -347,42 +304,17 @@ class ECMWFDownloader(NWPDownloader):
         ds = ds.assign_coords(variable=variable_coords)
         
         return ds
-
-    @staticmethod
-    def remove_nans(ds: xr.Dataset) -> xr.Dataset:
-        """Remove the NaNs introduced the the NWP consumer bug
-
-        - The last step of the ECMWF data is NaN
-        - All data above 60 degrees latitude is NaN
-        
-        See: https://github.com/openclimatefix/nwp-consumer/issues/218
-        """
-
-        logger.info("Removing data above 60 latitude")
-        ds = ds.where(ds.latitude <= 60, drop=True)
-
-        logger.info("Removing data after step 84, step 85 is nan")
-        ds = ds.isel(step=slice(None, 84))
-
-        return ds
     
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
 
-        # This regridding explicitly puts the data on the exact same grid as in training
-        # Regridding must be done before .extend_to_shetlands() is called
-        ds = self.remove_nans(ds)
         ds = self.rename_variables(ds)
         ds = self.filter_variables(ds)
-        ds = self.regrid(ds)
-        ds = self.extend_to_shetlands(ds)
 
         return ds
     
     @override
     def data_is_okay(self, ds: xr.Dataset) -> bool:
-        # Need to slice off known nans first
-        ds = self.remove_nans(ds)
         contains_nans = ds[list(ds.data_vars.keys())[0]].isnull().any().compute().item()
         return not contains_nans
 
