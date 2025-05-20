@@ -21,10 +21,10 @@ models:
   - name: pvnet_v2 # This name is important as it used for blending
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        commit: bd82eeef5644c8ef26ac053c81b5199b72b1015a
+        commit: e459e16784339a530b51e73cff7cd5cdc234a177
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        commit: 3b26e5783996267dff9dd8f2fc0600c5f0abb164
+        commit: 44954c6adb7a63c12c6b2271a14738c37965e6cb
     is_critical: True
     is_day_ahead: False
     use_adjuster: True
@@ -33,31 +33,14 @@ models:
     save_gsp_to_recent: True
     uses_satellite_data: True
 
-  # Currently this model uses a 30 minute satellite delay
-  # This uses the new PVNet model but the old summation model
-  - name: pvnet_v2_oldnew_combined # This name is important as it used for blending
-    pvnet:
-        repo: openclimatefix/pvnet_uk_region
-        commit: bd82eeef5644c8ef26ac053c81b5199b72b1015a
-    summation:
-        repo: openclimatefix/pvnet_v2_summation
-        commit: 01ca2b6e37a71deb446bb90471b44a1851d3e43f
-    is_critical: True
-    is_day_ahead: False
-    use_adjuster: False
-    save_gsp_sum: False
-    verbose_logging: False
-    save_gsp_to_recent: False
-    uses_satellite_data: True
-
   # Only uses ECMWF data
   - name: pvnet_ecmwf # This name is important as it used for blending
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        commit: d952abf2c5be6c3a2d7f678ece3f026bec7f8f61
+        commit: 11433898ec779ed5b8026ce84a2d330fad162402
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        commit: 11115c7aca9f9f81d1b50abfcddeb02f43dcf0ae
+        commit: ee5b1192ba464d502dd5d04cced19e60fea9d624
     is_critical: True
     is_day_ahead: False
     use_adjuster: False
@@ -65,31 +48,15 @@ models:
     verbose_logging: False
     save_gsp_to_recent: False
     uses_satellite_data: False
-  
-  # This model uses 2NWP + 0 minute satellite delay
-  - name: pvnet-sat0
-    pvnet:
-        repo: openclimatefix/pvnet_uk_region
-        commit: 384046d8e628af92918f042a682e6d6ac59f0899
-    summation:
-        repo: openclimatefix/pvnet_v2_summation
-        commit: 18ab73446dfe701fdac58c94cbf9d01680fb92a5
-    is_critical: False
-    is_day_ahead: False
-    use_adjuster: False
-    save_gsp_sum: False
-    verbose_logging: False
-    save_gsp_to_recent: False
-    uses_satellite_data: True
 
-  # Only uses satellite data
-  - name: pvnet-sat0-only
+  # Only uses satellite data with 30 minute delay
+  - name: pvnet-sat-only
     pvnet:
       repo: openclimatefix/pvnet_uk_region
-      commit: cc904e92609e9e7e3788b0c57de22e6b2e4794c3
+      commit: 1d4d1fa05a50a2893a5eb002050f45d5bca9d094
     summation:
       repo: openclimatefix/pvnet_v2_summation
-      commit: 6ee6d02bb37fa3b7a1ecb140ab018bbfe67f04e2
+      commit: 5a6117a8c34c353e0910549cbb5de2ca02c6ba88
     is_critical: False
     is_day_ahead: False
     use_adjuster: False
@@ -102,10 +69,10 @@ models:
   - name: pvnet-ukv-only
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        commit: 79960195c9ce2c01189476788017c7b8c28f2817
+        commit: 6feaa986a6bed3cc6c7961c6bf9e92fb15acca6a
     summation:
         repo: openclimatefix/pvnet_v2_summation
-        commit: c08f193bda079c835d01d0511790a952c27f7411
+        commit: 175a71206cf89a2d8fcd180cfa60d132590f12cb
     is_critical: False
     is_day_ahead: False
     use_adjuster: False
@@ -114,63 +81,14 @@ models:
     save_gsp_to_recent: False
     uses_satellite_data: False
 
-  # Uses 2NWPs + cloudcasting
-  - name: pvnet-cloudcasting
-    pvnet:
-        repo: openclimatefix/pvnet_uk_region
-        commit: 0a68812722c2edf2a6b167ffbcbb37d5466fadfc
-    summation:
-        repo: openclimatefix/pvnet_v2_summation
-        commit: 844acb3a44801fb4e79d9971c3e07b3c0fdf98bc
-    is_critical: False
-    is_day_ahead: False
-    use_adjuster: False
-    save_gsp_sum: False
-    verbose_logging: False
-    save_gsp_to_recent: False
-    uses_satellite_data: True
-
-  # Currently this model uses a 30 minute satellite delay
-  # This PVNet+cloudcasting model uses an old summation model
-  - name: pvnet-cloudcasting-old-sum # This name is important as it used for blending
-    pvnet:
-        repo: openclimatefix/pvnet_uk_region
-        commit: 0a68812722c2edf2a6b167ffbcbb37d5466fadfc
-    summation:
-        repo: openclimatefix/pvnet_v2_summation
-        commit: 01ca2b6e37a71deb446bb90471b44a1851d3e43f
-    is_critical: False
-    is_day_ahead: False
-    use_adjuster: False
-    save_gsp_sum: False
-    verbose_logging: False
-    save_gsp_to_recent: False
-    uses_satellite_data: True
-
-  # Only uses cloudcasting
-  - name: pvnet-cloudcasting-only
-    pvnet:
-        repo: openclimatefix/pvnet_uk_region
-        commit: f506747aabd1c4a543e436af3fe1ea3372d32840
-    summation:
-        repo: openclimatefix/pvnet_v2_summation
-        commit: 0240ad989f58a0df46d6779224ba4e9fbf9e31b0
-    is_critical: False
-    is_day_ahead: False
-    use_adjuster: False
-    save_gsp_sum: False
-    verbose_logging: False
-    save_gsp_to_recent: False
-    uses_satellite_data: True
-
   # Day-ahead model which does not use satellite data
   - name: pvnet_day_ahead
     pvnet:
         repo: openclimatefix/pvnet_uk_region_day_ahead
-        commit: 263741ebb6b71559d113d799c9a579a973cc24ba
+        commit: e12f7d7c16a00c41b03aecb787a7e992fbd4235b
     summation:
         repo: openclimatefix/pvnet_summation_uk_national_day_ahead
-        commit: 7a2f26b94ac261160358b224944ef32998bd60ce
+        commit: 0b2f1c18823c3299920a289d1c555eb4c8ee70c9
     is_critical: True
     is_day_ahead: True
     use_adjuster: True

@@ -20,14 +20,14 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "PVNet-summation==0.3.4",
+    "PVNet-summation==0.3.7",
     "fsspec[s3]==2025.2.0",
     "huggingface-hub==0.28.1",
     "nowcasting_datamodel==1.6.2",
     "numpy==2.0.0",
-    "ocf_data_sampler==0.2.12",
+    "ocf_data_sampler==0.2.22",
     "pandas==2.2.3",
-    "pvnet==4.1.0",
+    "pvnet==4.1.14",
     "pydantic==2.5.3",
     "pytorch-lightning==2.3.3",
     "requests==2.32.3",

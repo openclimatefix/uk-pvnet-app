@@ -12,6 +12,7 @@ import typer
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
+from ocf_data_sampler.load.gsp import get_gsp_boundaries
 
 from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3, check_model_runs_finished
 from pvnet_app.config import get_nwp_channels, get_union_of_configs, save_yaml_config
@@ -62,22 +63,19 @@ sentry_sdk.set_tag("version", __version__)
 # Model will use GPU if available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Forecast made for these GSP IDs and summed to national with ID=0
-all_gsp_ids = list(range(1, 318))
-
 # ---------------------------------------------------------------------------
 # APP MAIN
 
 
 def app(
-    t0: None | pd.Timestamp = None,
-    gsp_ids: list[int] = all_gsp_ids,
+    t0: str | None = None,
+    gsp_ids: list[int] | None = None,
     write_predictions: bool = True,
 ):
     """Inference function to run PVNet.
 
     Args:
-        t0 (datetime): Datetime at which forecast is made
+        t0 (str): Datetime at which forecast is made
         gsp_ids (array_like): List of gsp_ids to make predictions for. This list of GSPs are summed
             to national.
         write_predictions (bool): Whether to write prediction to the database. Else returns as
@@ -122,7 +120,8 @@ def app(
     else:
         t0 = pd.Timestamp(t0).floor("30min")
 
-    assert len(gsp_ids)>0, "No GSP IDs provided"
+    if gsp_ids is not None:
+        assert len(gsp_ids)>0, "No GSP IDs provided"
 
     # --- Unpack the environment variables
     use_day_ahead_model = get_boolean_env_var("DAY_AHEAD_MODEL", default=False)
@@ -187,6 +186,13 @@ def app(
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
+    if gsp_ids is None:
+        # "20220314" defaults to the old version of the GSP boundaries
+        gsp_boundaries_version = (
+            common_all_config["input_data"]["gsp"].get("boundaries_version", "20220314")
+        )
+        gsp_ids = get_gsp_boundaries(version=gsp_boundaries_version).iloc[1:].index.tolist()
+
     # --- Get capacities from the database
     logger.info("Loading capacities from the database")
     gsp_capacities, national_capacity = get_gsp_and_national_capacities(
@@ -235,7 +241,6 @@ def app(
             ecmwf_downloader = ECMWFDownloader(
                 source_path=ecmwf_source_path,
                 nwp_variables=get_nwp_channels(provider="ecmwf", nwp_config=common_all_config),
-                regrid_data=not use_day_ahead_model,
             )
             ecmwf_downloader.run()
             
