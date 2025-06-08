@@ -383,6 +383,9 @@ def app(
             model_configs=model_configs, 
             raise_if_missing=raise_model_failure,
         )
-
-if __name__ == "__main__":
+        
+def run():
     typer.run(app)
+    
+if __name__ == "__main__":
+    run()
