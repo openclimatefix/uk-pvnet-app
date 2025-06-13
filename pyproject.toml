@@ -23,7 +23,7 @@ dependencies = [
     "PVNet-summation==0.3.7",
     "fsspec[s3]==2025.2.0",
     "huggingface-hub==0.28.1",
-    "nowcasting_datamodel==1.6.2",
+    "nowcasting_datamodel==1.7.2",
     "numpy==2.0.0",
     "ocf_data_sampler==0.2.22",
     "pandas==2.2.3",
