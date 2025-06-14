@@ -127,11 +127,13 @@ def check_forecast_positive_during_daylight(
 
     # Check if forecast values are > 0 when sun elevation is over the threshold
     daylight_mask = solpos["elevation"] > sun_elevation_lower_limit
-
+    Timestamps = national_forecast[daylight_mask & (national_forecast <= 0)].index
+    Timestamps_str = ", ".join([str(t) for t in Timestamps])
     if not (national_forecast[daylight_mask] > 0).all():
         logger.warning(
             f"{model_name}: Forecast values must be > 0 when sun elevation > "
             f"{sun_elevation_lower_limit} degree."
+            f"Timestamps: {Timestamps_str}"
         )
         forecast_okay = False
     
