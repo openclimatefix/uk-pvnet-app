@@ -81,7 +81,7 @@ def check_forecast_fluctuations(
 
     diff = np.diff(national_forecast.values)
 
-    def zig_zag_over_threshold(threshold)->bool:
+    def zig_zag_over_threshold(threshold:float)->bool:
         return (
             (diff[0:-2] > threshold)  # forecast goes up
             & (diff[1:-1] < -threshold)  # goes down

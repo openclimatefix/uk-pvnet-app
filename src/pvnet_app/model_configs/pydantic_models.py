@@ -70,7 +70,7 @@ class ModelConfigCollection(BaseModel):
     @field_validator("models")
     @classmethod
     def name_must_be_unique(cls, v: list[ModelConfig]) -> list[ModelConfig]:
-        """Ensure that all model names are unique, respect to using ocf_data_sampler or not"""
+        """Ensure that all model names are unique, respect to using ocf_data_sampler or not."""
         names = [(model.name, model.uses_ocf_data_sampler) for model in v]
 
         if len(names) != len(set(names)):

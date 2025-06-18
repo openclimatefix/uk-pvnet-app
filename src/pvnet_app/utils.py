@@ -73,8 +73,8 @@ def check_model_runs_finished(
     elif raise_if_missing == "critical":
         required_forecasts = {
             model_config.name
-                for model_config in model_configs
-                if model_config.is_critical
+            for model_config in model_configs
+            if model_config.is_critical
         }
         failed_forecasts = required_forecasts - set(completed_forecasts)
         message = "The following critical models failed to run"
