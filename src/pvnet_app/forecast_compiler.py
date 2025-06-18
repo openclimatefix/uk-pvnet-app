@@ -43,7 +43,7 @@ _model_mismatch_msg = (
 
 
 class ForecastCompiler:
-    """Class for making and compiling solar forecasts from for all GB GSPs and national total"""
+    """Class for making and compiling solar forecasts from for all GB GSPs and national total."""
 
     def __init__(
         self,
@@ -54,7 +54,7 @@ class ForecastCompiler:
         national_capacity: float,
         use_legacy: bool = False,
     ):
-        """Class for making and compiling solar forecasts from for all GB GSPs and national total
+        """Class for making and compiling solar forecasts from for all GB GSPs and national total.
 
         Args:
             model_config: The configuration for the model
@@ -111,7 +111,7 @@ class ForecastCompiler:
         summation_version: str | None,
         device: torch.device,
     ):
-        """Load the GSP and summation models
+        """Load the GSP and summation models.
 
         Args:
             model_name: The huggingface repo of the GSP model
@@ -503,6 +503,6 @@ def change_keys_to_ocf_datapipes_keys(batch):
 
     if BatchKey.nwp in batch.keys():
         nwp_batch = batch[BatchKey.nwp]
-        for nwp_source in nwp_batch.keys():
+        for nwp_source in nwp_batch:
             nwp_batch[nwp_source][NWPBatchKey.nwp] = nwp_batch[nwp_source]["nwp"]
             del nwp_batch[nwp_source]["nwp"]

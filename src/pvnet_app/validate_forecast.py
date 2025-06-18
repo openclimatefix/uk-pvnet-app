@@ -23,7 +23,7 @@ def check_forecast_max(
     national_forecast: pd.Series,
     national_capacity: float,
     model_name: str,
-):
+)-> bool:
     """Check that the forecast doesn't exceed some limits.
 
     - Check the forecast doesn't exceed the national capacity.
@@ -65,7 +65,7 @@ def check_forecast_fluctuations(
     warning_threshold: float,
     error_threshold: float,
     model_name: str,
-):
+)-> bool:
     """Check for fluctuations in the forecast values.
 
     This function checks to see if the forecast values go up, then down, then up again by some
@@ -81,7 +81,7 @@ def check_forecast_fluctuations(
 
     diff = np.diff(national_forecast.values)
 
-    def zig_zag_over_threshold(threshold):
+    def zig_zag_over_threshold(threshold)->bool:
         return (
             (diff[0:-2] > threshold)  # forecast goes up
             & (diff[1:-1] < -threshold)  # goes down
@@ -109,7 +109,7 @@ def check_forecast_positive_during_daylight(
     national_forecast: pd.Series,
     sun_elevation_lower_limit: float,
     model_name: str,
-):
+)-> bool:
     """Check that the forecast values are positive when the sun is up.
 
     Args:

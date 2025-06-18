@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def download_data(source: str, destination: str) -> bool:
-    """Download data from a source to a destination
+    """Download data from a source to a destination.
 
     Args:
         source: The source path
@@ -38,7 +38,7 @@ def regrid_nwp_data(
     method: str,
     nwp_source: str,
 ) -> xr.Dataset:
-    """This function regrids the input NWP data to the grid of the target path
+    """This function regrids the input NWP data to the grid of the target path.
 
     Args:
         ds: The NWP data to regrid
@@ -86,7 +86,7 @@ def check_model_nwp_inputs_available(
     nwp_source: str,
     nwp_valid_times: pd.DatetimeIndex | None,
 ) -> bool:
-    """Checks whether the model can be run given the available NWP data
+    """Checks whether the model can be run given the available NWP data.
 
     Args:
         data_config_filename: Path to the data configuration file
@@ -158,7 +158,7 @@ class NWPDownloader(ABC):
     nwp_source: str = None
     save_chunk_dict: dict = None
 
-    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None):
+    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None) -> None:
         self.source_path = source_path
         self.nwp_variables = nwp_variables
         # Initially no valid times are available. This will only change is the data can be
@@ -167,12 +167,12 @@ class NWPDownloader(ABC):
 
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-        """ "Apply all processing steps to the NWP data in order to match the training data"""
+        """Apply all processing steps to the NWP data in order to match the training data."""
         pass
 
     @abstractmethod
     def data_is_okay(self, ds: xr.Dataset) -> bool:
-        """Apply quality checks to the NWP data
+        """Apply quality checks to the NWP data.
 
         Args:
             ds: The NWP data
@@ -183,7 +183,7 @@ class NWPDownloader(ABC):
         pass
 
     def resave(self, ds: xr.Dataset) -> None:
-        """Resave the NWP data to the destination path"""
+        """Resave the NWP data to the destination path."""
         ds["variable"] = ds["variable"].astype(str)
 
         # Overwrite the old data
@@ -191,7 +191,7 @@ class NWPDownloader(ABC):
         ds.chunk(self.save_chunk_dict).to_zarr(self.destination_path)
 
     def filter_variables(self, ds: xr.Dataset) -> xr.Dataset:
-        """Filter the NWP data to only include the variables needed by the models"""
+        """Filter the NWP data to only include the variables needed by the models."""
         if self.nwp_variables is not None:
             logger.info(
                 f"Selecting variables: {self.nwp_variables} from {ds.variable.values}",
@@ -201,7 +201,7 @@ class NWPDownloader(ABC):
         return ds
 
     def run(self) -> None:
-        """Download, process, and save the NWP data"""
+        """Download, process, and save the NWP data."""
         logger.info(f"Downloading and processing the {self.nwp_source} data")
 
         if self.source_path is None:
@@ -239,7 +239,7 @@ class NWPDownloader(ABC):
         self.valid_times = valid_times
 
     def clean_up(self) -> None:
-        """Remove the downloaded data"""
+        """Remove the downloaded data."""
         shutil.rmtree(self.destination_path, ignore_errors=True)
 
     def check_model_inputs_available(
@@ -247,7 +247,7 @@ class NWPDownloader(ABC):
         data_config_filename: str,
         t0: pd.Timestamp,
     ) -> bool:
-        """Check if the NWP data the model needs is available
+        """Check if the NWP data the model needs is available.
 
         Args:
             data_config_filename: The path to the data configuration file
@@ -273,7 +273,7 @@ class ECMWFDownloader(NWPDownloader):
 
     @staticmethod
     def regrid(ds: xr.Dataset) -> xr.Dataset:
-        """Regrid the ECMWF data to the target grid
+        """Regrid the ECMWF data to the target grid.
 
         In training the ECMWF was at twice the resolution as we have available in production. This
         regridding step will put the data on the same grid as the training data
@@ -289,7 +289,7 @@ class ECMWFDownloader(NWPDownloader):
 
     @staticmethod
     def extend_to_shetlands(ds: xr.Dataset) -> xr.Dataset:
-        """Extend the ECMWF data to reach the shetlands (with NaNS) as in the training data
+        """Extend the ECMWF data to reach the shetlands (with NaNS) as in the training data.
 
         The training data stopped at 60 degrees latitude but was extended with NaNs to reach the
         Shetlands. We repeat this here.
@@ -303,8 +303,8 @@ class ECMWFDownloader(NWPDownloader):
         )
 
     @staticmethod
-    def rename_variables(ds):
-        """Rename the ECMWF variables to match the training data
+    def rename_variables(ds: xr.Dataset) -> xr.Dataset:
+        """Rename the ECMWF variables to match the training data clear.
 
         Rename variable names in the variable coordinate to match the names the model expects and
         was trained on.
@@ -347,7 +347,7 @@ class ECMWFDownloader(NWPDownloader):
 
     @staticmethod
     def remove_nans(ds: xr.Dataset) -> xr.Dataset:
-        """Remove the NaNs introduced the the NWP consumer bug
+        """Remove the NaNs introduced the the NWP consumer bug.
 
         - The last step of the ECMWF data is NaN
         - All data above 60 degrees latitude is NaN
@@ -377,9 +377,23 @@ class ECMWFDownloader(NWPDownloader):
 
     @override
     def data_is_okay(self, ds: xr.Dataset) -> bool:
-        # Need to slice off known nans first
+        """Check if the dataset contains any NaN values after removing known NaNs.
+
+        Args:
+            ds: xarray Dataset to validate
+
+        Returns:
+            bool: False if any NaN values are found, True otherwise
+        """
+        # Remove known NaNs first
         ds = self.remove_nans(ds)
-        contains_nans = ds[list(ds.data_vars.keys())[0]].isnull().any().compute().item()
+
+        # Get first variable name more efficiently
+        first_var = next(iter(ds.data_vars))
+
+        # Check for NaNs without creating intermediate lists
+        contains_nans = ds[first_var].isnull().any().compute().item()
+
         return not contains_nans
 
 
@@ -395,7 +409,7 @@ class UKVDownloader(NWPDownloader):
 
     @staticmethod
     def regrid(ds: xr.Dataset) -> xr.Dataset:
-        """Regrid the UKV data to the target grid
+        """Regrid the UKV data to the target grid.
 
         In production the UKV data is on a different grid structure to the training data. The
         training data from CEDA is on a regular OSGB grid. The production data is on some other
@@ -421,8 +435,8 @@ class UKVDownloader(NWPDownloader):
         return ds.astype(np.float16)
 
     @staticmethod
-    def rename_variables(ds):
-        """Change the UKV variable names to match the training data"""
+    def rename_variables(ds: xr.Dataset) -> xr.Dataset :
+        """Change the UKV variable names to match the training data."""
         # This is for nwp-consumer>=1.0.0
         if "um-ukv" in ds.data_vars:
 
@@ -458,7 +472,7 @@ class UKVDownloader(NWPDownloader):
 
     @staticmethod
     def add_lon_lat_coords(ds: xr.Dataset) -> xr.Dataset:
-        """Add latitude and longitude coords to the UKV data
+        """Add latitude and longitude coords to the UKV data.
 
         The training UKV data is on a regular OSGB grid but the live data is on a Lambert Azimuthal
         Equal Area grid. We need to add longitudes and latitudes coords so we can regrid the data
@@ -521,5 +535,5 @@ class UKVDownloader(NWPDownloader):
 
     @override
     def data_is_okay(self, ds: xr.Dataset) -> bool:
-        contains_nans = ds[list(ds.data_vars.keys())[0]].isnull().any().compute().item()
+        contains_nans = next(iter(ds.data_vars.values())).isnull().any().compute().item()
         return not contains_nans

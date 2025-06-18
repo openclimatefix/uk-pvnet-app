@@ -350,7 +350,7 @@ def test_interpolate_missing_satellite_timestamps():
     ds = xr.DataArray(
         data=np.ones(times.shape),
         dims=["time"],
-        coords=dict(time=times),
+        coords={time,times},
     ).to_dataset(name="data")
 
     ds_interp = interpolate_missing_satellite_timestamps(

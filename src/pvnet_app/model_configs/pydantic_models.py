@@ -1,4 +1,4 @@
-"""A pydantic model for the ML models"""
+"""A pydantic model for the ML models."""
 
 import logging
 from importlib.resources import files
@@ -11,14 +11,14 @@ log = logging.getLogger(__name__)
 
 
 class HuggingFaceCommit(BaseModel):
-    """The location of a model on Hugging Face"""
+    """The location of a model on Hugging Face."""
 
     repo: str = Field(..., description="The Hugging Face repo")
     commit: str = Field(..., description="The commit hash")
 
 
 class ModelConfig(BaseModel):
-    """Configuration of a model and the settings it will be run with in the app"""
+    """Configuration of a model and the settings it will be run with in the app."""
 
     name: str = Field(..., description="The name of the model")
     pvnet: HuggingFaceCommit = Field(..., description="The PVNet model location")
@@ -60,7 +60,7 @@ class ModelConfig(BaseModel):
 
 
 class ModelConfigCollection(BaseModel):
-    """A collection of model configurations"""
+    """A collection of model configurations."""
 
     models: list[ModelConfig] = Field(
         ...,
@@ -85,7 +85,7 @@ def get_all_models(
     get_day_ahead_only: bool = False,
     use_ocf_data_sampler: bool = True,
 ) -> list[ModelConfig]:
-    """Returns all the models for a given client
+    """Returns all the models for a given client.
 
     Args:
         allow_adjuster: If set to false, all models will have use_adjuster set to false

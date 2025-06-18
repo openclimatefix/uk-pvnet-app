@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_satellite_timestamps(zarr_path: str) -> pd.DatetimeIndex:
-    """Get the datetimes of the satellite data at the given path
+    """Get the datetimes of the satellite data at the given path.
 
     Args:
         zarr_path: The path to the satellite zarr
@@ -29,8 +29,8 @@ def get_satellite_timestamps(zarr_path: str) -> pd.DatetimeIndex:
     return pd.to_datetime(ds.time.values)
 
 
-def fill_1d_bool_gaps(x, max_gap):
-    """In a boolean array, fill consecutive False elements if their number is less than the gap_size
+def fill_1d_bool_gaps(x, max_gap)-> np.ndarray:
+    """In a boolean array, fill consecutive False elements if their number is less than the gap_size.
 
     Args:
         x: A 1-dimensional boolean array
@@ -69,7 +69,7 @@ def interpolate_missing_satellite_timestamps(
     ds: xr.Dataset,
     max_gap: pd.Timedelta,
 ) -> xr.Dataset:
-    """Linearly interpolate missing satellite timestamps
+    """Linearly interpolate missing satellite timestamps.
 
     The max gap is inclusive of timestamps either side. E.g. if max gap is 15 minutes and the
     satellite includes timestamps 12:00 and 12:15, then 12:05 and 12:10 will be filled. If the max
@@ -140,7 +140,7 @@ def extend_satellite_data_with_nans(
     t0: pd.Timestamp,
     limit: pd.Timedelta = pd.Timedelta("3h"),
 ) -> xr.Dataset:
-    """Fill missing satellite timestamps with NaNs
+    """Fill missing satellite timestamps with NaNs.
 
     The satellite data is filled with NaNs after its last avilable timestamp. The data is
     extended forwards in time either up to t0 or up to the limit, whichever is smaller.
@@ -404,7 +404,7 @@ class SatelliteDownloader:
         return data_available
 
     def choose_and_load_satellite_data(self) -> xr.Dataset:
-        """Select from the 5 and 15-minutely satellite data for the most recent data"""
+        """Select from the 5 and 15-minutely satellite data for the most recent data."""
         # Check which satellite data exists
         exists_5_minute = os.path.exists(self.destination_path_5)
         exists_15_minute = os.path.exists(self.destination_path_15)
@@ -450,7 +450,7 @@ class SatelliteDownloader:
 
     @staticmethod
     def data_is_okay(ds: xr.Dataset) -> bool:
-        """Apply quality checks to the satellite data
+        """Apply quality checks to the satellite data.
 
         Args:
             ds: The satellite data
@@ -468,7 +468,7 @@ class SatelliteDownloader:
         return (not too_many_nans) and (not too_many_zeros)
 
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-        """ "Apply all processing steps to the satellite data in order to match the training data
+        """Apply all processing steps to the satellite data in order to match the training data.
 
         Args:
             ds: The satellite data
@@ -494,7 +494,7 @@ class SatelliteDownloader:
         return ds
 
     def resave(self, ds: xr.Dataset) -> None:
-        """Resave the satellite data to the destination path"""
+        """Resave the satellite data to the destination path."""
         ds["variable"] = ds["variable"].astype(str)
 
         # Overwrite the old data
@@ -514,7 +514,7 @@ class SatelliteDownloader:
         ds.chunk(save_chunk_dict).to_zarr(self.destination_path)
 
     def run(self) -> None:
-        """Download, process, and save the satellite data"""
+        """Download, process, and save the satellite data."""
         logger.info("Downloading and processing the satellite data")
         data_available = self.download_data()
 
@@ -537,7 +537,7 @@ class SatelliteDownloader:
         data_config_filename: str,
         t0: pd.Timestamp,
     ) -> bool:
-        """Check if the satellite data the model needs is available
+        """Check if the satellite data the model needs is available.
 
         Args:
             data_config_filename: The path to the data configuration file
@@ -550,7 +550,7 @@ class SatelliteDownloader:
         )
 
     def clean_up(self) -> None:
-        """Remove the downloaded data"""
+        """Remove the downloaded data."""
         for path in [
             self.destination_path,
             self.destination_path_5,

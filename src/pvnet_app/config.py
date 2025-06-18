@@ -42,7 +42,8 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
 
     # Replace data sources
     for source in ["gsp", "satellite"]:
-        if source in config["input_data"] and config["input_data"][source][f"{source}_zarr_path"] != "":
+        if (source in config["input_data"]
+            and config["input_data"][source][f"{source}_zarr_path"] != ""):
             config["input_data"][source][f"{source}_zarr_path"] = production_paths[
                 source
                 ]
@@ -51,7 +52,8 @@ def populate_config_with_data_data_filepaths(config: dict, gsp_path: str = "") -
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config:
-            if (nwp_config[nwp_source]["nwp_zarr_path"] != "" and nwp_source in production_paths["nwp"] ):
+            if (nwp_config[nwp_source]["nwp_zarr_path"] != ""
+                and nwp_source in production_paths["nwp"] ):
                 nwp_config[nwp_source]["nwp_zarr_path"] = production_paths["nwp"][nwp_source]
             elif nwp_config[nwp_source]["nwp_zarr_path"] != "":
                 raise ValueError(f"Missing NWP path: {nwp_source}")
@@ -95,7 +97,8 @@ def reformat_config_data_sampler(config: dict) -> dict:
         config: The data config.
     """
     # Replace satellite
-    if "satellite" in config["input_data"] and config["input_data"]["satellite"]["satellite_zarr_path"] != "":
+    if ("satellite" in config["input_data"]
+        and config["input_data"]["satellite"]["satellite_zarr_path"] != ""):
 
         rename_pairs = [
             ("satellite_image_size_pixels_width", "image_size_pixels_width"),
@@ -154,7 +157,7 @@ def update_config(
     rename_pairs: list,
     config: dict,
     change_history_minutes: bool = True,
-    remove_keys: list=None,
+    remove_keys: list | None = None,
 ) -> None:
     """Update the config in place with rename pairs, and remove keys if they exist.
 
@@ -261,7 +264,6 @@ def get_nwp_channels(provider: str, nwp_config: dict) -> None | list[str]:
         nwp_config: The NWP config.
     """
     nwp_channels = None
-    if "nwp" in nwp_config["input_data"]:
-        if provider in nwp_config["input_data"]["nwp"]:
+    if "nwp" in nwp_config["input_data"] and provider in nwp_config["input_data"]["nwp"]:
             nwp_channels = nwp_config["input_data"]["nwp"][provider]["nwp_channels"]
     return nwp_channels

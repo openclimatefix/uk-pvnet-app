@@ -27,7 +27,7 @@ def get_gsp_and_national_capacities(
         # Get GSP capacities
         all_capacities = get_latest_gsp_capacities(
             session=session,
-            gsp_ids=[0] + gsp_ids,
+            gsp_ids=[0, *gsp_ids],
             datetime_utc=t0 - timedelta(days=2),
         )
 

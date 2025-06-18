@@ -28,7 +28,7 @@ def get_boolean_env_var(env_var: str, default: bool) -> bool:
         return default
 
 
-def save_batch_to_s3(batch: NumpyBatch, model_name: str, s3_directory: str):
+def save_batch_to_s3(batch: NumpyBatch, model_name: str, s3_directory: str)-> None:
     """Saves a batch to a local file and uploads it to S3.
 
     Args:
@@ -66,18 +66,16 @@ def check_model_runs_finished(
             If set to "critical", only missing critical models will raise an exception.
     """
     if raise_if_missing == "any":
-        required_forecasts = set([model_config.name for model_config in model_configs])
+        required_forecasts = {model_config.name for model_config in model_configs}
         failed_forecasts = required_forecasts - set(completed_forecasts)
         message = "The following models failed to run"
 
     elif raise_if_missing == "critical":
-        required_forecasts = set(
-            [
-                model_config.name
+        required_forecasts = {
+            model_config.name
                 for model_config in model_configs
                 if model_config.is_critical
-            ],
-        )
+        }
         failed_forecasts = required_forecasts - set(completed_forecasts)
         message = "The following critical models failed to run"
 
