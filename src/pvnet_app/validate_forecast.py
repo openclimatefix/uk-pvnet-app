@@ -101,7 +101,6 @@ def check_forecast_fluctuations(
 
     return forecast_okay
 
-
 def check_forecast_positive_during_daylight(
     national_forecast: pd.Series,
     sun_elevation_lower_limit: float,
@@ -127,15 +126,19 @@ def check_forecast_positive_during_daylight(
 
     # Check if forecast values are > 0 when sun elevation is over the threshold
     daylight_mask = solpos["elevation"] > sun_elevation_lower_limit
+    bad_times = national_forecast[daylight_mask][national_forecast[daylight_mask] <= 0]
 
-    if not (national_forecast[daylight_mask] > 0).all():
+    if not bad_times.empty:
         logger.warning(
             f"{model_name}: Forecast values must be > 0 when sun elevation > "
-            f"{sun_elevation_lower_limit} degree."
+            f"{sun_elevation_lower_limit} degrees. "
+            f"Found {len(bad_times)} offending timestamps: {bad_times.index.tolist()}"
         )
         forecast_okay = False
     
     return forecast_okay
+
+
 
 
 def validate_forecast(
