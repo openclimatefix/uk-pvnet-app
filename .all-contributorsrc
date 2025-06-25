@@ -133,6 +133,15 @@
         "code",
         "doc"
       ]
+    },
+    {
+      "login": "ram-from-tvl",
+      "name": "RAM KUMAR R",
+      "avatar_url": "https://avatars.githubusercontent.com/u/114728749?v=4",
+      "profile": "https://www.linkedin.com/in/r-ram-kumar-71bb75144/",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
