@@ -346,7 +346,13 @@ def scale_satellite_data(ds: xr.Dataset) -> xr.Dataset:
     Args:
         ds: The satellite data
     """
-    return ds / 1023
+
+    scale_factor = os.environ.get("SATELLITE_SCALE_FACTOR", 1023)
+    logger.info(
+        f"Scaling satellite data by {scale_factor} to be between 0 and 1"
+    )
+
+    return ds / scale_factor
 
 
 class SatelliteDownloader:

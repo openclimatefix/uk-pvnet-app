@@ -23,6 +23,10 @@ The following environment variables are used in the app:
 
 ### Optional Environment Variables
 
+#### These control the data sources
+
+- `SATELLITE_SCALE_FACTOR`: The scale factor for the satellite data. Defaults to 1023. 
+
 #### These control the model(s) run
 
 - `RUN_CRITICAL_MODELS_ONLY`: Option to run critical models only. Defaults to false.
@@ -35,7 +39,7 @@ The following environment variables are used in the app:
 - `ALLOW_SAVE_GSP_SUM`: Option to allow model to save the GSP sum. If false this overwrites the
   model configs so saving of the GSP sum is not used. Defaults to false.
 
-#### These extra varaibles control validation and logging
+#### These extra variables control validation and logging
 
 - `SENTRY_DSN`: Optional link to Sentry.
 - `ENVIRONMENT`: The environment this is running in. Defaults to local.
