@@ -26,6 +26,7 @@ from pvnet_app.forecaster import Forecaster
 from pvnet_app.validate_forecast import validate_forecast
 from pvnet_app.consts import __version__
 
+from src.pvnet_app.data.satellite import get_satellite_source_paths
 
 try:
     __pvnet_version__ = version("pvnet")
@@ -140,11 +141,8 @@ def app(
     ecmwf_source_path = os.getenv("NWP_ECMWF_ZARR_PATH", None)
     ukv_source_path = os.getenv("NWP_UKV_ZARR_PATH", None)
     cloudcasting_source_path = os.getenv("CLOUDCASTING_ZARR_PATH", None)
-    sat_source_path_5 = os.getenv("SATELLITE_ZARR_PATH", None)
-    sat_source_path_15 = os.getenv("SATELLITE_15_ZARR_PATH", None)
-    if sat_source_path_15 is None and sat_source_path_5 is not None:
-        sat_source_path_15 = sat_source_path_5.replace(".zarr", "_15.zarr")
-    
+    sat_source_path_5, sat_source_path_15 = get_satellite_source_paths()
+
     # --- Log version and variables
     logger.info(f"Using `pvnet` library version: {__pvnet_version__}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
@@ -383,6 +381,7 @@ def app(
             model_configs=model_configs, 
             raise_if_missing=raise_model_failure,
         )
+
 
 if __name__ == "__main__":
     typer.run(app)
