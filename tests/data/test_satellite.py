@@ -13,6 +13,7 @@ from pvnet_app.data.satellite import (
     extend_satellite_data_with_nans,
     interpolate_missing_satellite_timestamps,
     SatelliteDownloader,
+    get_satellite_source_paths,
 )
 
 # ------------------------------------------------------------
@@ -344,3 +345,22 @@ def test_contains_too_many_of_value(sat_5_data):
     ds = sat_5_data.copy(deep=True)
     ds['data'].values[:] = np.nan
     assert contains_too_many_of_value(ds, value=np.nan, threshold=0.1)
+
+
+def test_get_satellite_source_paths():
+    os.environ["SATELLITE_ZARR_PATH"] = "temp_sat.zarr.zip"
+    path_5, path_15 = get_satellite_source_paths()
+
+    assert path_5 == "temp_sat.zarr.zip"
+    assert path_15 == "temp_sat_15.zarr.zip"
+
+    os.environ["SATELLITE_ZARR_PATH"] = "temp_sat.zarr.zip"
+    os.environ["SATELLITE_15_ZARR_PATH"] = "15_temp_sat.zarr.zip"
+    path_5, path_15 = get_satellite_source_paths()
+
+    assert path_5 == "temp_sat.zarr.zip"
+    assert path_15 == "15_temp_sat.zarr.zip"
+
+    # remove environment variables
+    del os.environ["SATELLITE_ZARR_PATH"]
+    del os.environ["SATELLITE_15_ZARR_PATH"]

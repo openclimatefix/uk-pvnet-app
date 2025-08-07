@@ -560,3 +560,14 @@ class SatelliteDownloader:
         """Remove the downloaded data"""
         for path in [self.destination_path, self.destination_path_5, self.destination_path_15]:
             shutil.rmtree(path, ignore_errors=True)
+
+
+def get_satellite_source_paths() -> (str | None, str | None):
+    """ Get the paths to the satellite data from environment variables"""
+    sat_source_path_5 = os.getenv("SATELLITE_ZARR_PATH", None)
+    sat_source_path_15 = os.getenv("SATELLITE_15_ZARR_PATH", None)
+    if sat_source_path_15 is None and sat_source_path_5 is not None:
+        sat_source_path_15 = sat_source_path_5.replace(".zarr", "_15.zarr")
+    logger.info(
+        f"Satellite source paths: 5-minute: {sat_source_path_5}, 15-minute: {sat_source_path_15}")
+    return sat_source_path_5, sat_source_path_15
