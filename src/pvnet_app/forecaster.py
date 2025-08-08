@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import torch
+import yaml
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
 from nowcasting_datamodel.read.read_models import get_model
@@ -120,8 +121,15 @@ class Forecaster:
             ).to(device)
 
             # Compare the current GSP model with the one the summation model was trained on
+            datamodule_path = SummationBaseModel.get_datamodule_config(
+                model_id=summation_name,
+                revision=summation_version,
+            )
+            with open(datamodule_path) as cfg:
+                sum_pvnet_cfg = yaml.load(cfg, Loader=yaml.FullLoader)["pvnet_model"]
+
+            sum_expected_gsp_model = (sum_pvnet_cfg["model_id"], sum_pvnet_cfg["revision"])
             this_gsp_model = (model_name, model_version)
-            sum_expected_gsp_model = (sum_model.pvnet_model_name, sum_model.pvnet_model_version)
 
             if sum_expected_gsp_model != this_gsp_model:
                 logger.warning(_model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model))
@@ -195,11 +203,10 @@ class Forecaster:
             # Make national predictions using summation model
             inputs = {
                 "pvnet_outputs": torch.Tensor(normed_preds[np.newaxis]).to(self.device),
-                "effective_capacity": (
+                "relative_capacity": (
                     torch.Tensor(self.gsp_capacities.values/self.national_capacity)
                     .to(self.device)
                     .unsqueeze(0)
-                    .unsqueeze(-1)
                 ),
             }
             normed_national = self.summation_model(inputs).detach().squeeze().cpu().numpy()

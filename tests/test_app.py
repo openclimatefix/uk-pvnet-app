@@ -144,8 +144,7 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_forecast_results * 16
 
 
-# Test for new DA model with data sampler utilisation
-def test_app_day_ahead_data_sampler(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
+def test_app_day_ahead(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     """Test the app running the day ahead model"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
