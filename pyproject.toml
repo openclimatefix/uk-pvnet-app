@@ -41,7 +41,6 @@ dependencies = [
     "xarray==2025.1.2",
     "dask==2025.4.1",
     "xesmf==0.8.8", # Requires ESMF to be installed
-    "zarr==2.18.3",
     "numcodecs<0.16",
 ]
 
