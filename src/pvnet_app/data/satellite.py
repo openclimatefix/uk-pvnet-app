@@ -33,7 +33,7 @@ def get_satellite_timestamps(zarr_path: str) -> pd.DatetimeIndex:
 
     logger.info(f"Getting satellite timestamps from {zarr_path}")
     with zarr.storage.ZipStore(zarr_path, mode='r') as store:
-        ds = xr.open_zarr(store)
+        ds = xr.open_zarr(store, consolidated=True)
 
     return pd.to_datetime(ds.time.values)
 
@@ -448,11 +448,11 @@ class SatelliteDownloader:
         if use_5_minute:
             logger.info(f"Using 5-minutely data {self.destination_path_5}.")
             with zarr.storage.ZipStore(self.destination_path_5) as store:
-                ds = xr.open_zarr(store).compute()
+                ds = xr.open_zarr(store, consolidated=True).compute()
         else:
             logger.info(f"Using 15-minutely data {self.destination_path_15}.")
             with zarr.storage.ZipStore(self.destination_path_15) as store:
-                ds = xr.open_zarr(store).compute()
+                ds = xr.open_zarr(store, consolidated=True).compute()
 
         return ds
     
