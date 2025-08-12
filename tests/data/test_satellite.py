@@ -26,7 +26,7 @@ def save_to_zarr_zip(ds: xr.Dataset, filename: str) -> None:
         ds: Dataset to save
         filename: Name of the zip archive
     """
-    with zarr.storage.ZipStore(filename, mode='x') as store:
+    with zarr.storage.ZipStore(filename, mode='w') as store:
         ds.to_zarr(store, compute=True)
 
 
@@ -37,7 +37,12 @@ def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[
         sat_path: Path to the satellite data
         expected_freq_mins: Expected frequency of timesteps in minutes
     """
-    ds_sat = xr.open_zarr(sat_path)
+    # unzip the file first
+    if 'zip' in sat_path:
+        with zarr.storage.ZipStore(sat_path, mode='r') as store:
+            ds_sat = xr.open_zarr(store)
+    else:
+        ds_sat = xr.open_zarr(sat_path)
 
     if not isinstance(expected_freq_mins, list):
         expected_freq_mins = [expected_freq_mins]
