@@ -26,7 +26,7 @@ def save_to_zarr_zip(ds: xr.Dataset, filename: str) -> None:
         ds: Dataset to save
         filename: Name of the zip archive
     """
-    with zarr.ZipStore(filename) as store:
+    with zarr.storage.ZipStore(filename) as store:
         ds.to_zarr(store, compute=True)
 
 
