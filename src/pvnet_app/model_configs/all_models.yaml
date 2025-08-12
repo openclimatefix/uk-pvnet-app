@@ -33,6 +33,21 @@ models:
     save_gsp_to_recent: True
     uses_satellite_data: True
 
+  - name: pvnet_cloud
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        commit: 4703a866aaa8f8be89e0d034cb2bf605f20f0017
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        commit: 69f594695d102349ec3fd647097a3c8cb3e2475d
+    is_critical: False
+    is_day_ahead: False
+    use_adjuster: False
+    save_gsp_sum: False
+    verbose_logging: False
+    save_gsp_to_recent: False
+    uses_satellite_data: True
+
   # Only uses ECMWF data
   - name: pvnet_ecmwf # This name is important as it used for blending
     pvnet:
