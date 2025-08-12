@@ -37,7 +37,6 @@ def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[
         sat_path: Path to the satellite data
         expected_freq_mins: Expected frequency of timesteps in minutes
     """
-    # unzip the file first
     if 'zip' in sat_path:
         with zarr.storage.ZipStore(sat_path, mode='r') as store:
             ds_sat = xr.open_zarr(store)
