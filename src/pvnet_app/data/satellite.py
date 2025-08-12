@@ -6,6 +6,7 @@ import fsspec
 import numpy as np
 import pandas as pd
 import xarray as xr
+import zarr
 
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
 from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
@@ -29,7 +30,11 @@ def get_satellite_timestamps(zarr_path: str) -> pd.DatetimeIndex:
     Returns:
         pd.DatetimeIndex: All available timestamps
     """
-    ds = xr.open_zarr(zarr_path)
+
+    logger.info(f"Getting satellite timestamps from {zarr_path}")
+    with zarr.storage.ZipStore(zarr_path, mode='r') as store:
+        ds = xr.open_zarr(store)
+
     return pd.to_datetime(ds.time.values)
 
 
@@ -441,12 +446,14 @@ class SatelliteDownloader:
 
         # Move the selected data to the expected path
         if use_5_minute:
-            logger.info("Using 5-minutely data.")
-            ds = xr.open_zarr(self.destination_path_5).compute()
+            logger.info(f"Using 5-minutely data {self.destination_path_5}.")
+            with zarr.storage.ZipStore(self.destination_path_5) as store:
+                ds = xr.open_zarr(store).compute()
         else:
-            logger.info("Using 15-minutely data.")
-            ds = xr.open_zarr(self.destination_path_15).compute()
-        
+            logger.info(f"Using 15-minutely data {self.destination_path_15}.")
+            with zarr.storage.ZipStore(self.destination_path_15) as store:
+                ds = xr.open_zarr(store).compute()
+
         return ds
     
     @staticmethod
