@@ -505,11 +505,11 @@ class SatelliteDownloader:
 
     def resave(self, ds: xr.Dataset) -> None:
         """Resave the satellite data to the destination path"""
-
-        ds["variable"] = ds["variable"].astype(str)
         
         # Overwrite the old data
         shutil.rmtree(self.destination_path, ignore_errors=True)
+
+        ds["variable"] = ds["variable"].astype(str)
 
         save_chunk_dict = {
             "x_geostationary": 100,
