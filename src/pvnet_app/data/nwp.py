@@ -11,6 +11,7 @@ import xesmf as xe
 from ocf_data_sampler.config.load import load_yaml_configuration
 
 import numpy as np
+import numcodecs
 import pandas as pd
 import pyproj
 import xarray as xr
@@ -170,15 +171,16 @@ class NWPDownloader(ABC):
 
     def resave(self, ds: xr.Dataset) -> None:
         """Resave the NWP data to the destination path"""
-
-        ds["variable"] = ds["variable"].astype(str)
-
-        for var in ds.data_vars:
-            # Remove the chunks from the data variables
-            ds[var].encoding.pop("chunks", None)
         
         # Overwrite the old data
         shutil.rmtree(self.destination_path, ignore_errors=True)
+
+        ds["variable"] = ds["variable"].astype(str)
+
+        # Clear old encoding
+        for v in list(ds.variables.keys()):
+            ds[v].encoding.clear()
+        
         ds.chunk(self.save_chunk_dict).to_zarr(self.destination_path)
 
     def filter_variables(self, ds: xr.Dataset) -> xr.Dataset:
