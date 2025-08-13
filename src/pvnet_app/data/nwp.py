@@ -11,7 +11,6 @@ import xesmf as xe
 from ocf_data_sampler.config.load import load_yaml_configuration
 
 import numpy as np
-import numcodecs
 import pandas as pd
 import pyproj
 import xarray as xr
