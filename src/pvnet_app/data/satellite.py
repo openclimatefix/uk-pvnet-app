@@ -511,6 +511,13 @@ class SatelliteDownloader:
             ds.attrs["area"] = yaml.dumps(ds.attrs["area"])
             logger.info(ds.attrs["area"])
 
+        if "area" in ds.data.attrs and isinstance(ds.data.attrs["area"], dict):
+            logger.warning("Converting area attribute to YAML string, "
+                "we should do this in the satellite consumer.")
+            logger.info(ds.data.attrs["area"])
+            ds.data.attrs["area"] = yaml.dumps(ds.data.attrs["area"])
+            logger.info(ds.data.attrs["area"])
+
         return ds
 
 
