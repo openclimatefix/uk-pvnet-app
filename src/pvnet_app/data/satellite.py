@@ -469,6 +469,7 @@ class SatelliteDownloader:
         """
 
         # Slice the data to the spatial extent used in PVNet
+        logger.info(ds.attrs)
         spatial_slice = get_pvnet_satellite_spatial_bounds(ds)
         ds = ds.sel(spatial_slice)
 
