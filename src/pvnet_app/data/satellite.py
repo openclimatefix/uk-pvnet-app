@@ -6,6 +6,7 @@ import fsspec
 import numpy as np
 import pandas as pd
 import xarray as xr
+import yaml
 import zarr
 
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
@@ -499,6 +500,10 @@ class SatelliteDownloader:
         # Extend the satellite data with NaNs if needed by the model and record the delay of most 
         # recent non-nan timestamp
         ds = extend_satellite_data_with_nans(ds, t0=self.t0)
+
+        # make sure attrs are yaml string
+        if "area" in ds.attrs and isinstance(ds.attrs["area"], dict):
+            ds.attrs["area"] = yaml.dumps(ds.attrs["area"])
 
         return ds
 
