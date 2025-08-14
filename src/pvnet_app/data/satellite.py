@@ -501,8 +501,11 @@ class SatelliteDownloader:
         # recent non-nan timestamp
         ds = extend_satellite_data_with_nans(ds, t0=self.t0)
 
-        # make sure attrs are yaml string
+        # make sure area attrs are yaml string
+        logger.info(ds.attrs)
         if "area" in ds.attrs and isinstance(ds.attrs["area"], dict):
+            logger.warning("Converting area attribute to YAML string, "
+                           "we should do this in the satellite consumer.")
             ds.attrs["area"] = yaml.dumps(ds.attrs["area"])
 
         return ds
