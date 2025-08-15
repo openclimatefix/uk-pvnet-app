@@ -6,6 +6,7 @@ import fsspec
 import numpy as np
 import pandas as pd
 import xarray as xr
+import yaml
 import zarr
 
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
@@ -453,6 +454,12 @@ class SatelliteDownloader:
             logger.info(f"Using 15-minutely data {self.destination_path_15}.")
             with zarr.storage.ZipStore(self.destination_path_15) as store:
                 ds = xr.open_zarr(store).compute()
+
+        # make sure area attrs are yaml string
+        if "area" in ds.data.attrs and isinstance(ds.data.attrs["area"], dict):
+            logger.warning("Converting area attribute to YAML string, "
+                "we should do this in the satellite consumer.")
+            ds.data.attrs["area"] = yaml.dump(ds.data.attrs["area"])
 
         return ds
     
