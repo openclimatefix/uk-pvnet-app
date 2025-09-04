@@ -48,6 +48,22 @@ models:
     save_gsp_to_recent: False
     uses_satellite_data: True
 
+  # This uses 2NWP + satellite with 0-minute delay
+  - name: pvnet_v2_sat0
+    pvnet:
+        repo: openclimatefix/pvnet_uk_region
+        commit: bd4cced6f00dd40a3858d49b3904ffaf325e6874
+    summation:
+        repo: openclimatefix/pvnet_v2_summation
+        commit: 7f4cb614e85c2a1391c5fcd73d8c457414566a7c
+    is_critical: False
+    is_day_ahead: False
+    use_adjuster: False
+    save_gsp_sum: False
+    verbose_logging: False
+    save_gsp_to_recent: False
+    uses_satellite_data: True
+
   # Only uses ECMWF data
   - name: pvnet_ecmwf # This name is important as it used for blending
     pvnet:
