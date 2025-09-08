@@ -342,22 +342,6 @@ def contains_too_many_of_value(
     return too_many_values
 
 
-def scale_satellite_data(ds: xr.Dataset) -> xr.Dataset:
-    """Scale the satellite data to be between 0 and 1.
-
-    The production satellite data is scaled between 0 and 1023. This function scales it to be 
-    between 0 and 1 as in the training data.
-    
-    Args:
-        ds: The satellite data
-    """
-
-    scale_factor = int(os.environ.get("SATELLITE_SCALE_FACTOR", 1023))
-    logger.info(f"Scaling satellite data by {scale_factor}")
-
-    return ds / scale_factor
-
-
 class SatelliteDownloader:
 
     destination_path_5: str = "sat_5_min.zarr.zip"
@@ -488,9 +472,6 @@ class SatelliteDownloader:
 
         # Interpolate missing satellite timestamps
         ds = interpolate_missing_satellite_timestamps(ds, max_gap=pd.Timedelta("15min"))
-
-        # Scale the data to be between 0 and 1 like in training
-        ds = scale_satellite_data(ds)
 
         # Store the available satellite timestamps before we extend with NaNs
         self.valid_times = pd.to_datetime(ds.time.values)
