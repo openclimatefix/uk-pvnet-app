@@ -25,7 +25,6 @@ The following environment variables are used in the app:
 
 #### These control the data sources
 
-- `SATELLITE_SCALE_FACTOR`: The scale factor for the satellite data. Defaults to 1023. 
 - `SATELLITE_15_ZARR_PATH`: The path to the 15 minute satellite data in Zarr format. If 
 this is not set then the `SATELLITE_ZARR_PATH` is used by `.zarr` is repalced with `_15.zarr`
 
