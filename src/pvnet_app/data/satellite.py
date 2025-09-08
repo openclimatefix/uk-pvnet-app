@@ -6,7 +6,6 @@ import fsspec
 import numpy as np
 import pandas as pd
 import xarray as xr
-import yaml
 import zarr
 
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
