@@ -354,9 +354,7 @@ def scale_satellite_data(ds: xr.Dataset) -> xr.Dataset:
     """
 
     scale_factor = int(os.environ.get("SATELLITE_SCALE_FACTOR", 1023))
-    logger.info(
-        f"Scaling satellite data by {scale_factor} to be between 0 and 1"
-    )
+    logger.info(f"Scaling satellite data by {scale_factor}")
 
     return ds / scale_factor
 
@@ -448,18 +446,13 @@ class SatelliteDownloader:
         # Move the selected data to the expected path
         if use_5_minute:
             logger.info(f"Using 5-minutely data {self.destination_path_5}.")
-            with zarr.storage.ZipStore(self.destination_path_5) as store:
-                ds = xr.open_zarr(store).compute()
+            selected_path = self.destination_path_5
         else:
             logger.info(f"Using 15-minutely data {self.destination_path_15}.")
-            with zarr.storage.ZipStore(self.destination_path_15) as store:
-                ds = xr.open_zarr(store).compute()
+            selected_path = self.destination_path_15
 
-        # make sure area attrs are yaml string
-        if "area" in ds.data.attrs and isinstance(ds.data.attrs["area"], dict):
-            logger.warning("Converting area attribute to YAML string, "
-                "we should do this in the satellite consumer.")
-            ds.data.attrs["area"] = yaml.dump(ds.data.attrs["area"])
+        with zarr.storage.ZipStore(selected_path) as store:
+            ds = xr.open_zarr(store).compute()
 
         return ds
     
