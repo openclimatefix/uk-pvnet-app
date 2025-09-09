@@ -480,6 +480,9 @@ class SatelliteDownloader:
         # recent non-nan timestamp
         ds = extend_satellite_data_with_nans(ds, t0=self.t0)
 
+        # Hot fix for https://github.com/openclimatefix/satellite-consumer/issues/63
+        ds = ds.drop_duplicates(dim="time")
+
         return ds
 
 
