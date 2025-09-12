@@ -1,5 +1,6 @@
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 
+
 def check_nwp_sources_not_all_zero(batch: NumpyBatch) -> None:
     """Check that the NWP data in the batch is not all zeros
     

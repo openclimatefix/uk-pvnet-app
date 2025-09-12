@@ -1,5 +1,6 @@
 import logging
 from datetime import UTC, datetime
+import tempfile
 
 import numpy as np
 import pandas as pd
@@ -15,6 +16,10 @@ from ocf_data_sampler.torch_datasets.sample.base import copy_batch_to_device, ba
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
+
+from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
+from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
+from pvnet_app.config import modify_data_config_for_production
 
 
 from pvnet_app.model_configs.pydantic_models import ModelConfig
@@ -41,8 +46,10 @@ class Forecaster:
     def __init__(
         self,
         model_config: ModelConfig,
-        device: torch.device,
+        data_config_path: str,
         t0: pd.Timestamp,
+        gsp_ids: list[int],
+        device: torch.device,
         gsp_capacities: xr.DataArray,
         national_capacity: float,
     ):
@@ -50,8 +57,10 @@ class Forecaster:
 
         Args:
             model_config: The configuration for the model
+            data_config_path: The path to the model data config
+            t0: The forecast init-time
+            gsp_ids: List of gsp_ids to make predictions for
             device: Device to run the model on
-            t0: The t0 time used to compile the results to numpy array
             gsp_capacities: DataArray of the solar capacities for all regional GSPs at t0
             national_capacity: The national solar capacity at t0
         """
@@ -64,6 +73,9 @@ class Forecaster:
         self.model_tag = model_config.name
         self.model_name = model_name
         self.model_version = model_version
+        self.data_config_path = data_config_path
+        self.t0 = t0
+        self.gsp_ids = gsp_ids
         self.device = device
         self.gsp_capacities = gsp_capacities
         self.national_capacity = national_capacity
@@ -94,7 +106,7 @@ class Forecaster:
         summation_name: str | None,
         summation_version: str | None,
         device: torch.device,
-    ):
+    ) -> tuple[PVNetBaseModel, SummationBaseModel | None]:
         """Load the GSP and summation models
         
         Args:
@@ -141,9 +153,26 @@ class Forecaster:
         """Maybe log message depending on verbosity"""
         if self.verbose_logging:
             logger.info(message)
-    
 
-    @torch.no_grad
+
+    def make_batch(self) -> NumpyBatch:
+        """Create the batch required to run this model"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml") as tmp:
+
+            temp_path = tmp.name
+
+            modify_data_config_for_production(
+                input_path=self.data_config_path, 
+                output_path=temp_path
+            )
+
+            dataset = PVNetUKConcurrentDataset(config_filename=temp_path, gsp_ids=self.gsp_ids)
+
+        return dataset.get_sample(self.t0)
+
+
+    @torch.inference_mode()
     def predict(self, batch: NumpyBatch) -> None:
         """Make predictions for the batch and store results internally"""
 

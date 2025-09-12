@@ -2,7 +2,6 @@
 
 import logging
 import os
-import tempfile
 from importlib.metadata import PackageNotFoundError, version
 
 import pandas as pd
@@ -13,14 +12,13 @@ from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from ocf_data_sampler.load.gsp import get_gsp_boundaries
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
-from pvnet_app.config import get_nwp_channels, get_union_of_configs, save_yaml_config
+from pvnet_app.config import load_yaml_config
 from pvnet_app.consts import __version__
 from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.data.gsp import get_gsp_and_national_capacities
 from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader, CloudcastingDownloader
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.data.satellite import get_satellite_source_paths
-from pvnet_app.dataset import get_dataset
 from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3, check_model_runs_finished
@@ -165,29 +163,23 @@ def app(
     # Open connection to the database - used for pulling GSP capacitites and writing forecasts
     db_connection = DatabaseConnection(url=db_url, base=Base_Forecast, echo=False)
 
-    temp_dir = tempfile.TemporaryDirectory()
-
     # 0. Get Model configs
-    data_config_from_model = {}
+    data_config_paths: dict[str, str] = {}
+    data_configs: list[dict] = []
     for model_config in model_configs:
         # First load the data config
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
             revision=model_config.pvnet.commit,
         )
-        data_config_from_model[model_config.name] = data_config_path
+        data_config_paths[model_config.name] = data_config_path
+        data_configs.append(load_yaml_config(data_config_path))
     
-    common_all_config = get_union_of_configs(data_config_from_model.values())
-
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
     if gsp_ids is None:
-        # "20220314" defaults to the old version of the GSP boundaries
-        gsp_boundaries_version = (
-            common_all_config["input_data"]["gsp"].get("boundaries_version", "20220314")
-        )
-        gsp_ids = get_gsp_boundaries(version=gsp_boundaries_version).iloc[1:].index.tolist()
+        gsp_ids = get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
 
     # --- Get capacities from the database
     logger.info("Loading capacities from the database")
@@ -200,7 +192,7 @@ def app(
     data_downloaders = []
 
     # --- Try to download satellite data if any models require it
-    if "satellite" in common_all_config["input_data"]:
+    if any(["satellite" in conf["input_data"] for conf in data_configs]):
 
         logger.info("Downloading satellite data")
     
@@ -214,43 +206,34 @@ def app(
         data_downloaders.append(sat_downloader)
 
     # --- Try to download NWP data if any models require it
-    if "nwp" in common_all_config["input_data"]:
+    if any(["nwp" in conf["input_data"] for conf in data_configs]):
 
         logger.info("Downloading NWP data")
 
-        required_providers = [
-            source["provider"] for source in common_all_config["input_data"]["nwp"].values()
-        ]
+        # Find the NWP sources required by the models
+        required_providers = set()
+        for conf in data_configs:
+            if "nwp" in conf:
+                for source in conf["input_data"]["nwp"].values():
+                    required_providers.add(source["provider"])
 
         if "ukv" in required_providers:
         
-            ukv_downloader = UKVDownloader(
-                source_path=ukv_source_path,
-                nwp_variables=get_nwp_channels(provider="ukv", nwp_config=common_all_config),
-            )
+            ukv_downloader = UKVDownloader(source_path=ukv_source_path)
             ukv_downloader.run()
 
             data_downloaders.append(ukv_downloader)
         
         if "ecmwf" in required_providers:
 
-            ecmwf_downloader = ECMWFDownloader(
-                source_path=ecmwf_source_path,
-                nwp_variables=get_nwp_channels(provider="ecmwf", nwp_config=common_all_config),
-            )
+            ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path)
             ecmwf_downloader.run()
             
             data_downloaders.append(ecmwf_downloader)
 
         if "cloudcasting" in required_providers:
             
-            cloudcasting_downloader = CloudcastingDownloader(
-                source_path=cloudcasting_source_path, 
-                nwp_variables=get_nwp_channels(
-                    provider="cloudcasting", 
-                    nwp_config=common_all_config
-                )
-            )
+            cloudcasting_downloader = CloudcastingDownloader(source_path=cloudcasting_source_path)
             cloudcasting_downloader.run()
 
             data_downloaders.append(cloudcasting_downloader)
@@ -260,11 +243,10 @@ def app(
 
     # Prepare all the models which can be run
     forecasters = {}
-    used_data_config_paths = []
     for model_config in model_configs:
 
         # First load the data config
-        data_config_path = data_config_from_model[model_config.name]
+        data_config_path = data_config_paths[model_config.name]
 
         # Check if the data available will allow the model to run
         logger.info(f"Checking that the input data for model '{model_config.name}' exists")
@@ -278,51 +260,37 @@ def app(
             # Set up a forecast compiler for the model
             forecasters[model_config.name] = Forecaster(
                 model_config=model_config,
-                device=device,
+                data_config_path=data_config_path,
                 t0=t0,
+                gsp_ids=gsp_ids,
+                device=device,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
             )
 
-            # Store the config filename so we can create batches suitable for all models
-            used_data_config_paths.append(data_config_path)
         else:
             logger.warning(f"The model {model_config.name} cannot be run with input data available")
 
     if len(forecasters) == 0:
         raise Exception("No models were compatible with the available input data.")
 
-    # Find the config with values suitable for running all models
-    common_config = get_union_of_configs(used_data_config_paths)
-
-    # Save the commmon config
-    common_config_path = f"{temp_dir.name}/common_config_path.yaml"
-    save_yaml_config(common_config, common_config_path)
-
-    # ---------------------------------------------------------------------------
-    # Set up data loader
-    logger.info("Creating DataLoader")
-
-    pvnet_dataset = get_dataset(
-        config_filename=common_config_path,
-        gsp_ids=gsp_ids,
-    )
 
     # ---------------------------------------------------------------------------
     # Make predictions
-    logger.info("Processing batches")
+    logger.info("Making predictions")
 
-    batch = pvnet_dataset.get_sample(t0)
+    first_model_name = next(iter(forecasters.keys()))
+    for model_name, forecaster in forecasters.items():
 
-    # Do basic validation of the batch: Will raise error if the batch passes the checks
-    check_batch(batch)
+        batch = forecaster.make_batch()
 
-    if (s3_batch_save_dir is not None):
-        # Save the batch under the name of the first model
-        model_name = next(iter(forecasters))
-        save_batch_to_s3(batch, model_name, s3_batch_save_dir) 
+        # Do basic validation of the batch: Will raise error if the batch fails the checks
+        check_batch(batch)
 
-    for forecaster in forecasters.values():
+        if (s3_batch_save_dir is not None) and model_name==first_model_name:
+            # Save the batch under the name of the first model
+            save_batch_to_s3(batch, model_name, s3_batch_save_dir) 
+
         forecaster.predict(batch)
 
     # Delete the downloaded data
@@ -332,10 +300,10 @@ def app(
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
     logger.info("Validating forecasts")
-    for k in list(forecasters.keys()):
+    for model_name in list(forecasters.keys()):
 
         national_forecast = (
-            forecasters[k].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
+            forecasters[model_name].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
         ).to_series()
 
         forecast_okay = validate_forecast(
@@ -344,14 +312,14 @@ def app(
             zip_zag_warning_threshold=zig_zag_warning_threshold,
             zig_zag_error_threshold=zig_zag_error_threshold,
             sun_elevation_lower_limit=sun_elevation_lower_limit,
-            model_name=k,
+            model_name=model_name,
         )
 
         if not forecast_okay:
-            logger.warning(f"Forecast for model {k} failed validation")
+            logger.warning(f"Forecast for model {model_name} failed validation")
             if filter_bad_forecasts:
                 # This forecast will not be saved
-                del forecasters[k]
+                del forecasters[model_name]
 
     if len(forecasters) == 0:
         raise Exception("No models passed the forecast validation checks")
