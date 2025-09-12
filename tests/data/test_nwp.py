@@ -30,7 +30,6 @@ def test_download_nwp(nwp_ukv_data, nwp_ecmwf_data, cloudcasting_data):
 
 def test_check_model_nwp_inputs_available(config_filename, test_t0, nwp_ukv_data, nwp_ecmwf_data):
 
-
     temp_ukv_path = "temp_nwp_ukv.zarr"
     temp_ecmwf_path = "temp_nwp_ecmwf.zarr"
 

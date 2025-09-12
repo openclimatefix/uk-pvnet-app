@@ -99,8 +99,7 @@ def check_model_nwp_inputs_available(
 
     # Only check if using NWP data
     model_uses_nwp = (
-        hasattr(input_config, "nwp") 
-        and (input_config.nwp is not None)
+        (input_config.nwp is not None)
         and (nwp_source in [c.provider for _, c in input_config.nwp.items()])
     )
 
@@ -144,9 +143,8 @@ class NWPDownloader(ABC):
     nwp_source: str = None
     save_chunk_dict: dict = None
 
-    def __init__(self, source_path: str | None, nwp_variables: list[str] | None = None):
+    def __init__(self, source_path: str | None):
         self.source_path = source_path
-        self.nwp_variables = nwp_variables
         # Initially no valid times are available. This will only change is the data can be 
         # downloaded, processed, and saved successfully
         self.valid_times = None
@@ -181,15 +179,6 @@ class NWPDownloader(ABC):
             ds[v].encoding.clear()
         
         ds.chunk(self.save_chunk_dict).to_zarr(self.destination_path)
-
-    def filter_variables(self, ds: xr.Dataset) -> xr.Dataset:
-        """Filter the NWP data to only include the variables needed by the models"""
-
-        if self.nwp_variables is not None:
-            logger.info(f"Selecting variables: {self.nwp_variables} from {ds.variable.values}")
-            ds = ds.sel(variable=self.nwp_variables)
-
-        return ds
 
     def run(self) -> None:
         """Download, process, and save the NWP data"""
@@ -274,10 +263,10 @@ class ECMWFDownloader(NWPDownloader):
         """
         
         logger.info("Renaming the ECMWF variables")
+
         ds = ds.rename({"hres-ifs_uk": "ECMWF_UK"})
 
-        variable_coords = ds.variable.values
-        rename = {
+        varname_mapping = {
             "cloud_cover_high": "hcc",
             "cloud_cover_low": "lcc",
             "cloud_cover_medium": "mcc",
@@ -298,20 +287,16 @@ class ECMWFDownloader(NWPDownloader):
             "wind_v_component_200m": "v200"
         }
 
-        for k, v in rename.items():
-            variable_coords[variable_coords == k] = v
 
-        # assign the new variable names
+        variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
+            
         ds = ds.assign_coords(variable=variable_coords)
         
         return ds
     
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-
         ds = self.rename_variables(ds)
-        ds = self.filter_variables(ds)
-
         return ds
     
     @override
@@ -442,7 +427,6 @@ class UKVDownloader(NWPDownloader):
     def process(self, ds: xr.Dataset) -> xr.Dataset:
 
         ds = self.rename_variables(ds)
-        ds = self.filter_variables(ds)
         ds = self.add_lon_lat_coords(ds)
         ds = self.regrid(ds)
         ds = self.fix_dtype(ds)
