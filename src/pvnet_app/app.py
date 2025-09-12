@@ -213,7 +213,7 @@ def app(
         # Find the NWP sources required by the models
         required_providers = set()
         for conf in data_configs:
-            if "nwp" in conf:
+            if "nwp" in conf["input_data"]:
                 for source in conf["input_data"]["nwp"].values():
                     required_providers.add(source["provider"])
 
