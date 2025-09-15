@@ -70,7 +70,6 @@ def get_all_models(
     allow_adjuster: bool = True,
     allow_save_gsp_sum: bool = True,
     get_critical_only: bool = False,
-    get_day_ahead_only: bool = False,
 ) -> list[ModelConfig]:
     """Returns all the models for a given client
 
@@ -78,7 +77,6 @@ def get_all_models(
         allow_adjuster: If set to false, all models will have use_adjuster set to false
         allow_save_gsp_sum: If set to false, all models will have save_gsp_sum set to false
         get_critical_only: If only the critical models should be returned
-        get_day_ahead_only: If only the day-ahead model should be returned
     """
     
     filename = files("pvnet_app.model_configs").joinpath("all_models.yaml")
@@ -105,13 +103,6 @@ def get_all_models(
     if get_critical_only:
         log.info("Filtering to critical models")
         filtered_models = [model for model in filtered_models if model.is_critical]
-
-    if get_day_ahead_only:
-        log.info("Filtering to day-ahead models")
-        filtered_models = [model for model in filtered_models if model.is_day_ahead]
-    else:
-        log.info("Filtering to intra-day models")
-        filtered_models = [model for model in filtered_models if not model.is_day_ahead]
 
     # We should always have at least one model 
     if len(filtered_models)==0:

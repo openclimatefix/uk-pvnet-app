@@ -92,7 +92,6 @@ def app(
           adjuster option in the model configs so it is not used. Defaults to true.
         - ALLOW_SAVE_GSP_SUM: Option to allow model to save the GSP sum. If false this overwrites 
           the model configs so saving of the GSP sum is not used. Defaults to false.
-        - DAY_AHEAD_MODEL, option to use day ahead model, defaults to false
         - RUN_CRITICAL_MODELS_ONLY, option to run critical models only, defaults to false
         - FORECAST_VALIDATE_ZIG_ZAG_WARNING, threshold for forecast zig-zag warning,
           defaults to 250 MW.
@@ -121,7 +120,6 @@ def app(
         assert len(gsp_ids)>0, "No GSP IDs provided"
 
     # --- Unpack the environment variables
-    use_day_ahead_model = get_boolean_env_var("DAY_AHEAD_MODEL", default=False)
     run_critical_models_only = get_boolean_env_var("RUN_CRITICAL_MODELS_ONLY", default=False)
     allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
     allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
@@ -144,7 +142,6 @@ def app(
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Making forecast for init time: {t0}")
     logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
-    logger.info(f"Using day ahead model: {use_day_ahead_model}")
     logger.info(f"Running critical models only: {run_critical_models_only}")
     logger.info(f"Allow adjuster: {allow_adjuster}")
     logger.info(f"Allow saving GSP sum: {allow_save_gsp_sum}")
@@ -154,7 +151,6 @@ def app(
         allow_adjuster=allow_adjuster,
         allow_save_gsp_sum=allow_save_gsp_sum,
         get_critical_only=run_critical_models_only,
-        get_day_ahead_only=use_day_ahead_model,
     )
 
     if len(model_configs)==0:
