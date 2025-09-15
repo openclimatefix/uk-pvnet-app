@@ -21,7 +21,7 @@ models:
   - name: pvnet_v2 # This name is important as it used for blending
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        commit: ff09e4aee871fe094d3a2dabe9d9cea50e4b5485
+        commit: cfcb233576c3c8110daed0179452e3d9913c744c
     summation:
         repo: openclimatefix/pvnet_v2_summation
         commit: d746683893330fe3380e57e65d40812daa343c8e
@@ -36,7 +36,7 @@ models:
   - name: pvnet_cloud
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        commit: 4703a866aaa8f8be89e0d034cb2bf605f20f0017
+        commit: 117bd0f1b9454f6995d3d2fa00ef125c9c9a7190
     summation:
         repo: openclimatefix/pvnet_v2_summation
         commit: 69f594695d102349ec3fd647097a3c8cb3e2475d
@@ -52,7 +52,7 @@ models:
   - name: pvnet_v2_sat0
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        commit: bd4cced6f00dd40a3858d49b3904ffaf325e6874
+        commit: bcd70352e2d77a69e1aec7670749c2c675a5a14e
     summation:
         repo: openclimatefix/pvnet_v2_summation
         commit: 7f4cb614e85c2a1391c5fcd73d8c457414566a7c
@@ -68,7 +68,7 @@ models:
   - name: pvnet_ecmwf # This name is important as it used for blending
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        commit: 5a5f16e6d0184f1cf9832d54aa6a0170dff15454
+        commit: 6b7cc5fec03b83837672a759d7e00f249685de6b
     summation:
         repo: openclimatefix/pvnet_v2_summation
         commit: 63df51df2c9b139c5aa1bf80e771d9c67a9b4304
@@ -84,7 +84,7 @@ models:
   - name: pvnet-sat-only
     pvnet:
       repo: openclimatefix/pvnet_uk_region
-      commit: 020aba8fed65f4cbd368dfe808871f7fc41e6443
+      commit: 86140b77d015fce1d5fa1a518d340127e488fcfd
     summation:
       repo: openclimatefix/pvnet_v2_summation
       commit: 1912909b68d62633d9ba343acfb445a491e322c2
@@ -100,7 +100,7 @@ models:
   - name: pvnet-ukv-only
     pvnet:
         repo: openclimatefix/pvnet_uk_region
-        commit: 9d27d1a3b985c3f2c39417c53f6bdc6576b75a9b
+        commit: 30c406ea8455d9d43aa1284cba23c3a59102f549
     summation:
         repo: openclimatefix/pvnet_v2_summation
         commit: aa60b85f1de69b4fb11da56a2bfb23d04f85e036
@@ -116,7 +116,7 @@ models:
   - name: pvnet_day_ahead
     pvnet:
         repo: openclimatefix/pvnet_uk_region_day_ahead
-        commit: 9d00f3f7888ef7dee4af8554bc1e2f7c2edfb43b
+        commit: ace3469f6fb6db7356afe401c1aaf1a78505f4f7
     summation:
         repo: openclimatefix/pvnet_summation_uk_national_day_ahead
         commit: f97172b9aebd2983767c78a0f833d3ddf7d1ebf0

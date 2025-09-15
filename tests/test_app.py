@@ -16,8 +16,8 @@ NUM_GSPS = 331
 
 
 def test_app(
-        test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, 
-        cloudcasting_data, db_url
+    test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, 
+    cloudcasting_data, db_url
 ):
     """Test the app running the intraday models"""
 
