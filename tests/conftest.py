@@ -178,9 +178,7 @@ def config_filename():
 
 def make_sat_data(test_t0, delay_mins, freq_mins):
     # Load dataset which only contains coordinates, but no data
-    ds = xr.open_zarr(
-        f"{test_data_dir}/non_hrv_shell.zarr",
-    ).compute()
+    ds = xr.open_zarr(f"{test_data_dir}/non_hrv_shell.zarr").compute()
 
     # Expand time dim to be len 36 = 3 hours of 5 minute data
     n_hours = 3
