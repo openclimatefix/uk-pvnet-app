@@ -200,6 +200,7 @@ def app(
             t0=t0,
             source_path_5=sat_source_path_5,
             source_path_15=sat_source_path_15,
+            gsp_ids=gsp_ids,
         )
         sat_downloader.run()
 

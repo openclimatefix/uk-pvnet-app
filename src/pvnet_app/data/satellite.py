@@ -9,8 +9,10 @@ import xarray as xr
 import zarr
 
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import get_gsp_locations
+from ocf_data_sampler.select.geospatial import convert_coordinates
 from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
 from ocf_data_sampler.load.utils import make_spatial_coords_increasing
+
 
 from ocf_data_sampler.config.load import load_yaml_configuration
 
@@ -247,7 +249,8 @@ def check_model_satellite_inputs_available(
 
 
 def get_pvnet_satellite_spatial_bounds(
-    ds: xr.Dataset, 
+    ds: xr.Dataset,
+    gsp_ids: list[int],
     width_pixels: int = 24, 
     height_pixels: int = 24,
 ) -> dict[str, slice]:
@@ -255,6 +258,7 @@ def get_pvnet_satellite_spatial_bounds(
 
     Args:
         da: The satellite data
+        gsp_ids: The GSP IDs the satellite data will be used for
         width_pixels: The width of the spatial slice in pixels
         height_pixels: The height of the spatial slice in pixels
 
@@ -271,7 +275,21 @@ def get_pvnet_satellite_spatial_bounds(
 
     # We will loop over all the GSP locations and find the min and max x and y coordinates
     # This gives us a bounding box used by PVNet
-    locations = get_gsp_locations()
+    locations = get_gsp_locations(gsp_ids, version="20250109")
+
+    xs, ys = np.array([loc.in_coord_system("osgb") for loc in locations]).T
+
+    geo_xs, geo_ys = convert_coordinates(
+        x=xs,
+        y=ys,
+        from_coords="osgb",
+        target_coords="geostationary",
+        area_string=ds.data.attrs["area"],
+    )
+
+    # Add the projection to the locations objects
+    for x, y, loc in zip(geo_xs, geo_ys, locations, strict=True):
+        loc.add_coord_system(x, y, "geostationary")
 
     xmin = np.inf
     xmax = -np.inf
@@ -349,13 +367,15 @@ class SatelliteDownloader:
     destination_path: str = sat_path
 
     def __init__(self, 
-        t0: pd.Timestamp, 
-        source_path_5: str | None, 
-        source_path_15: str | None,  
+        t0: pd.Timestamp,
+        source_path_5: str | None,
+        source_path_15: str | None,
+        gsp_ids: list[int],
     ):
         self.t0 = t0
         self.source_path_5 = source_path_5
         self.source_path_15 = source_path_15
+        self.gsp_ids = gsp_ids
         self.valid_times = None
 
     def download_data(self) -> bool:
@@ -440,18 +460,19 @@ class SatelliteDownloader:
         return ds
     
     @staticmethod
-    def data_is_okay(ds: xr.Dataset) -> bool:
+    def data_is_okay(ds: xr.Dataset, gsp_ids: list[int]) -> bool:
         """Apply quality checks to the satellite data
         
         Args:
             ds: The satellite data
+            gsp_ids: The GSP IDs the satellite data will be used for
 
         Returns:
             bool: Whether the data passes the quality checks
         """
 
         # Slice the data to the spatial extent used in PVNet
-        spatial_slice = get_pvnet_satellite_spatial_bounds(ds)
+        spatial_slice = get_pvnet_satellite_spatial_bounds(ds, gsp_ids=gsp_ids)
         ds = ds.sel(spatial_slice)
 
         too_many_nans = contains_too_many_of_value(ds, value=np.nan, threshold=0.05)
@@ -518,7 +539,7 @@ class SatelliteDownloader:
         # Select the most recent satellite data and load it into memory
         ds = self.choose_and_load_satellite_data()
         
-        if self.data_is_okay(ds):
+        if self.data_is_okay(ds, self.gsp_ids):
             ds = self.process(ds).compute()
             self.resave(ds)
 
