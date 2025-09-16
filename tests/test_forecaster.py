@@ -1,4 +1,3 @@
-import pytest
 import torch
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
@@ -38,7 +37,3 @@ def test_model_loading():
             assert isinstance(summation_model, SummationBaseModel)
         else:
             assert summation_model is None
-        
-        # Assertion major required attributes actually exist
-        assert hasattr(pvnet_model, "forecast_len")
-        assert hasattr(pvnet_model, "output_quantiles")

@@ -31,7 +31,6 @@ this is not set then the `SATELLITE_ZARR_PATH` is used by `.zarr` is repalced wi
 #### These control the model(s) run
 
 - `RUN_CRITICAL_MODELS_ONLY`: Option to run critical models only. Defaults to false.
-- `DAY_AHEAD_MODEL`: Option to use day ahead model. Defaults to false.
 
 #### These control the saved results
 
