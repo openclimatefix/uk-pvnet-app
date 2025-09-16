@@ -53,10 +53,10 @@ def generate_table() -> str:
 
         row = " | ".join([
             model_config.name,
-            str(uses_sat),
-            str(uses_ukv),
-            str(uses_ecmwf),
-            str(uses_cloud),
+            "yes" if uses_sat else "-",
+            "yes" if uses_ukv else "-",
+            "yes" if uses_ecmwf else "-",
+            "yes" if uses_cloud else "-",
             f"[HF Link]({pvnet_link})",
             f"[Summation HF Link]({summation_link})",
         ])
