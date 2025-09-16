@@ -1,3 +1,7 @@
+"""This script updates the model summary table in the package README to the current models
+
+It adds all models in src/pvnet_app/model_configs/all_models.py
+"""
 from pathlib import Path
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_app.model_configs.pydantic_models import get_all_models, HuggingFaceCommit
