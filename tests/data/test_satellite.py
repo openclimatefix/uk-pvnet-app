@@ -21,9 +21,11 @@ from pvnet_app.data.satellite import (
 # ------------------------------------------------------------
 # Utility functions for the tests
 
+
 @pytest.fixture()
 def gsp_ids():
     return get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
+
 
 def save_to_zarr_zip(ds: xr.Dataset, filename: str) -> None:
     """Save the given xarray dataset to a zarr file in a zip archive
@@ -55,15 +57,16 @@ def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[
     dts = pd.to_datetime(ds_sat.time).diff()[1:]
     return np.isin(dts, pd.to_timedelta(expected_freq_mins, unit="min")).all()
 
+
 # ------------------------------------------------------------
 # Tests begin here
+
 
 def test_download_sat_5_data(sat_5_data, test_t0, gsp_ids):
     """Download only the 5 minute satellite data"""
 
     # make temporary directory
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         # Change to temporary working directory
         os.chdir(tmpdirname)
 
@@ -93,7 +96,6 @@ def test_download_sat_15_data(sat_15_data, test_t0, gsp_ids):
     """Download only the 15 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         os.chdir(tmpdirname)
 
         # Make 15-minutely satellite data available
@@ -122,7 +124,6 @@ def test_download_sat_5_and_15_data(sat_5_data, sat_15_data, test_t0, gsp_ids):
     """Download 5 minute sat and 15 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         os.chdir(tmpdirname)
 
         # Make 5- and 15-minutely satellite data available
@@ -157,7 +158,6 @@ def test_run_sat_5_data(sat_5_data, test_t0, gsp_ids):
     """Download and process only the 5 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         os.chdir(tmpdirname)
 
         # Make 5-minutely satellite data available
@@ -179,7 +179,6 @@ def test_run_sat_15_data(sat_15_data, test_t0, gsp_ids):
     """Download and process only the 15 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         os.chdir(tmpdirname)
 
         # Make 15-minutely satellite data available
@@ -207,7 +206,6 @@ def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0,
     """
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         os.chdir(tmpdirname)
 
         save_to_zarr_zip(sat_5_data_delayed, filename="latest.zarr.zip")
@@ -229,7 +227,6 @@ def test_run_zeros_in_sat_data(sat_15_data, test_t0, gsp_ids):
     """Check that the satellite data is considered invalid if it contains too many zeros"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         os.chdir(tmpdirname)
 
         # Make half the values zeros
@@ -255,7 +252,6 @@ def test_run_nan_in_sat_data(sat_15_data, test_t0, gsp_ids):
     """Check that the satellite data is considered invalid if it contains too many NaNs"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         os.chdir(tmpdirname)
 
         # Make half the values zeros
@@ -278,13 +274,24 @@ def test_run_nan_in_sat_data(sat_15_data, test_t0, gsp_ids):
 
 
 def test_check_model_satellite_inputs_available(config_filename):
-
     t0 = pd.Timestamp("2023-01-01 00:00")
-    sat_datetime_1 = pd.date_range(t0 - pd.Timedelta("120min"), t0 - pd.Timedelta("5min"), freq="5min")
-    sat_datetime_2 = pd.date_range(t0 - pd.Timedelta("120min"), t0 - pd.Timedelta("15min"), freq="5min")
-    sat_datetime_3 = pd.date_range(t0 - pd.Timedelta("120min"), t0 - pd.Timedelta("35min"), freq="5min")
-    sat_datetime_4 = pd.to_datetime([t for t in sat_datetime_1 if t!=t0-pd.Timedelta("30min")])
-    sat_datetime_5 = pd.to_datetime([t for t in sat_datetime_1 if t!=t0-pd.Timedelta("60min")])
+    sat_datetime_1 = pd.date_range(
+        t0 - pd.Timedelta("120min"),
+        t0 - pd.Timedelta("5min"),
+        freq="5min",
+    )
+    sat_datetime_2 = pd.date_range(
+        t0 - pd.Timedelta("120min"),
+        t0 - pd.Timedelta("15min"),
+        freq="5min",
+    )
+    sat_datetime_3 = pd.date_range(
+        t0 - pd.Timedelta("120min"),
+        t0 - pd.Timedelta("35min"),
+        freq="5min",
+    )
+    sat_datetime_4 = pd.to_datetime([t for t in sat_datetime_1 if t != t0 - pd.Timedelta("30min")])
+    sat_datetime_5 = pd.to_datetime([t for t in sat_datetime_1 if t != t0 - pd.Timedelta("60min")])
 
     assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_1)
     assert check_model_satellite_inputs_available(config_filename, t0, sat_datetime_2)
@@ -309,7 +316,7 @@ def test_extend_satellite_data_with_nans(sat_5_data):
     ds_extended = extend_satellite_data_with_nans(sat_5_data, t0=t0, limit=limit)
 
     assert ds_extended.time.values[-1] == t0
-    assert len(sat_5_data.time) + int(delay/pd.Timedelta("5min")) == len(ds_extended.time)
+    assert len(sat_5_data.time) + int(delay / pd.Timedelta("5min")) == len(ds_extended.time)
 
     # This test should add nans to the end of the satellite data but only up to a limit
     delay = pd.Timedelta("4h")
@@ -317,7 +324,7 @@ def test_extend_satellite_data_with_nans(sat_5_data):
     ds_extended = extend_satellite_data_with_nans(sat_5_data, t0=t0, limit=limit)
 
     assert ds_extended.time.values[-1] == (t0 - delay + limit)
-    assert len(sat_5_data.time) + int(limit/pd.Timedelta("5min")) == len(ds_extended.time)
+    assert len(sat_5_data.time) + int(limit / pd.Timedelta("5min")) == len(ds_extended.time)
 
 
 def test_interpolate_missing_satellite_timestamps():
@@ -343,16 +350,15 @@ def test_interpolate_missing_satellite_timestamps():
     expected_times = pd.date_range(start=t_start, end=t_end, freq="5min")
     expected_times = [t for t in expected_times if not (times[0] < t < times[1])]
 
-    assert (pd.to_datetime(ds_interp.time)==pd.to_datetime(expected_times)).all().item()
+    assert (pd.to_datetime(ds_interp.time) == pd.to_datetime(expected_times)).all().item()
 
-    assert (ds_interp.data.values==1).all().item()
+    assert (ds_interp.data.values == 1).all().item()
 
 
 def test_contains_too_many_of_value(sat_5_data):
-
     # The original data has no zeros or NaNs
-    assert not contains_too_many_of_value(sat_5_data, value=0, threshold=0.)
-    assert not contains_too_many_of_value(sat_5_data, value=np.nan, threshold=0.)
+    assert not contains_too_many_of_value(sat_5_data, value=0, threshold=0.0)
+    assert not contains_too_many_of_value(sat_5_data, value=np.nan, threshold=0.0)
 
     # Check it can detect too many zeros
     ds = sat_5_data.copy(deep=True)

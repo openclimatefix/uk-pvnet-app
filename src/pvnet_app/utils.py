@@ -1,3 +1,4 @@
+"""General utility functions for pvnet_app."""
 import logging
 import os
 
@@ -22,7 +23,8 @@ def get_boolean_env_var(env_var: str, default: bool) -> bool:
     """
     if env_var in os.environ:
         env_var_value = os.getenv(env_var).lower()
-        assert env_var_value in ["true", "false"]
+        if env_var_value not in ["true", "false"]:
+            raise ValueError(f"Environment variable {env_var} must be 'true' or 'false'")
         return env_var_value == "true"
     else:
         return default
@@ -68,13 +70,15 @@ def check_model_runs_finished(
 
     elif raise_if_missing == "critical":
         required_forecasts = {
-            model_config.name for model_config in model_configs if model_config.is_critical}
+            model_config.name for model_config in model_configs if model_config.is_critical
+        }
         failed_forecasts = required_forecasts - set(completed_forecasts)
         message = "The following critical models failed to run"
 
     else:
         raise ValueError(
-            f"Invalid value for raise_if_missing: {raise_if_missing}. Should be 'any' or 'critical'",
+            f"Invalid value for raise_if_missing: {raise_if_missing}. "
+            "Should be 'any' or 'critical'",
         )
 
     if len(failed_forecasts) > 0:

@@ -68,7 +68,6 @@ def overwrite_config_dropouts(config: dict) -> dict:
     """
     # Replace data sources
     if "satellite" in config["input_data"]:
-
         satellite_config = config["input_data"]["satellite"]
 
         if satellite_config["zarr_path"] != "":

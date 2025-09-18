@@ -1,4 +1,5 @@
 """A pydantic model for the ML models."""
+
 import logging
 from importlib.resources import files
 
@@ -11,6 +12,7 @@ log = logging.getLogger(__name__)
 
 class HuggingFaceCommit(BaseModel):
     """The location of a model on Hugging Face."""
+
     repo: str = Field(..., description="The Hugging Face repo")
     commit: str = Field(..., description="The commit hash")
 
@@ -104,7 +106,7 @@ def get_all_models(
         filtered_models = [model for model in filtered_models if model.is_critical]
 
     # We should always have at least one model
-    if len(filtered_models)==0:
+    if len(filtered_models) == 0:
         raise Exception("No models found")
 
     selected_model_info = [model.name for model in filtered_models]

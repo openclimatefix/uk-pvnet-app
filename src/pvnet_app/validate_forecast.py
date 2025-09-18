@@ -1,3 +1,5 @@
+"""Function to help validate PV forecasts."""
+
 import logging
 
 import numpy as np
@@ -23,14 +25,14 @@ def check_forecast_max(
     national_forecast: pd.Series,
     national_capacity: float,
     model_name: str,
-):
+) -> bool:
     """Check that the forecast doesn't exceed some limits.
 
     - Check the forecast doesn't exceed the national capacity.
     - Check the forecast doesn't exceed some arbitrary limit.
 
     Args:
-        national_forecast_values: The forecast values for the nation (in MW)
+        national_forecast: The forecast values for the nation (in MW)
         national_capacity: The national PV capacity (in MW)
         model_name: The name of the model that generated the forecast
     """
@@ -41,7 +43,6 @@ def check_forecast_max(
 
     # Check it doesn't exceed the national capacity
     if max_forecast_mw > RELATIVE_MAX_FORECAST * national_capacity:
-
         cap_frac = max_forecast_mw / national_capacity
 
         logger.warning(
@@ -52,7 +53,7 @@ def check_forecast_max(
 
     if max_forecast_mw > ABSOLUTE_MAX_FORECAST:
         logger.warning(
-            f"{model_name}: National forecast exceeds {ABSOLUTE_MAX_FORECAST/1e3:.2f} GW. "
+            f"{model_name}: National forecast exceeds {ABSOLUTE_MAX_FORECAST / 1e3:.2f} GW. "
             f"Max forecast value is {max_forecast_mw / 1e3:.2f} GW).",
         )
         forecast_okay = False
@@ -65,14 +66,14 @@ def check_forecast_fluctuations(
     warning_threshold: float,
     error_threshold: float,
     model_name: str,
-):
+) -> bool:
     """Check for fluctuations in the forecast values.
 
     This function checks to see if the forecast values go up, then down, then up again by some
     thresholds.
 
     Args:
-        national_forecast_values: The forecast values for the nation (in MW)
+        national_forecast: The forecast values for the nation (in MW)
         warning_threshold: The threshold in MW for a warning
         error_threshold: The threshold in MW where the forecast is considered to be in error
         model_name: The name of the model that generated
@@ -81,11 +82,11 @@ def check_forecast_fluctuations(
 
     diff = np.diff(national_forecast.values)
 
-    def zig_zag_over_threshold(threshold):
+    def zig_zag_over_threshold(threshold: float) -> bool:
         return (
-            (diff[0:-2] > threshold) # forecast goes up
-            & (diff[1:-1] < -threshold) # goes down
-            & (diff[2:] > threshold) # goes up
+            (diff[0:-2] > threshold)  # forecast goes up
+            & (diff[1:-1] < -threshold)  # goes down
+            & (diff[2:] > threshold)  # goes up
         ).any()
 
     large_jumps = zig_zag_over_threshold(warning_threshold)
@@ -100,11 +101,12 @@ def check_forecast_fluctuations(
 
     return forecast_okay
 
+
 def check_forecast_positive_during_daylight(
     national_forecast: pd.Series,
     sun_elevation_lower_limit: float,
     model_name: str,
-):
+) -> bool:
     """Check that the forecast values are positive when the sun is up.
 
     Args:
@@ -116,7 +118,7 @@ def check_forecast_positive_during_daylight(
 
     # Calculate the solar position throughout the forecast
     solpos = pvlib.solarposition.get_solarposition(
-        time=national_forecast.index, # The index is expect to be the valid times
+        time=national_forecast.index,  # The index is expect to be the valid times
         longitude=UK_LONGITUDE,
         latitude=UK_LATITUDE,
         method="nrel_numpy",
@@ -137,8 +139,6 @@ def check_forecast_positive_during_daylight(
     return forecast_okay
 
 
-
-
 def validate_forecast(
     national_forecast: pd.Series,
     national_capacity: float,
@@ -155,7 +155,7 @@ def validate_forecast(
       `check_forecast_positive_during_daylight()`
 
     Args:
-        national_forecast_values: All the forecast values for the nation (in MW).
+        national_forecast: All the forecast values for the nation (in MW).
         national_capacity: The national PV capacity (in MW).
         zip_zag_warning_threshold: The threshold in MW for zig-zag check warning.
         zig_zag_error_threshold:  The threshold in MW for zig-zag check failure.

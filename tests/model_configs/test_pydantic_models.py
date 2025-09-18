@@ -13,5 +13,3 @@ def test_get_all_models_get_critical_only():
     models = get_all_models(get_critical_only=True)
     assert len(models) == 3
     assert all(m.is_critical for m in models)
-
-

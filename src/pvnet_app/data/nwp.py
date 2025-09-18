@@ -66,8 +66,7 @@ def regrid_nwp_data(
     # Regrid in a loop to keep RAM usage lower
     ds_list = []
     for step in ds.step:
-
-        # Copy to make sure the data is C-contiguous for efficient regridding
+        # Copy to make sure the data is C-contiguous for efficient regridding
         ds_step = ds.sel(step=step).copy(deep=True)
         ds_list.append(regridder(ds_step))
 
@@ -92,17 +91,15 @@ def check_model_nwp_inputs_available(
     input_config = load_yaml_configuration(data_config_filename).input_data
 
     # Only check if using NWP data
-    model_uses_nwp = (
-        (input_config.nwp is not None)
-        and (nwp_source in [c.provider for _, c in input_config.nwp.items()])
+    model_uses_nwp = (input_config.nwp is not None) and (
+        nwp_source in [c.provider for _, c in input_config.nwp.items()]
     )
 
     if model_uses_nwp and (nwp_valid_times is None):
         available = False
 
     elif model_uses_nwp:
-
-        nwp_config = next(c for _, c in input_config.nwp.items() if c.provider==nwp_source)
+        nwp_config = next(c for _, c in input_config.nwp.items() if c.provider == nwp_source)
 
         # Get the NWP valid times required by the model
         freq = pd.Timedelta(f"{nwp_config.time_resolution_minutes}min")
@@ -112,7 +109,7 @@ def check_model_nwp_inputs_available(
         req_end_time = (t0 + pd.Timedelta(f"{nwp_config.interval_end_minutes}min")).ceil(freq)
 
         # If we diff accumulated channels in time we'll need one more timestamp
-        if len(nwp_config.accum_channels)>0:
+        if len(nwp_config.accum_channels) > 0:
             req_end_time = req_end_time + freq
 
         required_nwp_times = pd.date_range(start=req_start_time, end=req_end_time, freq=freq)
@@ -120,7 +117,7 @@ def check_model_nwp_inputs_available(
         # Check if any of the expected datetimes are missing
         missing_time_steps = np.setdiff1d(required_nwp_times, nwp_valid_times, assume_unique=True)
 
-        available = len(missing_time_steps)==0
+        available = len(missing_time_steps) == 0
 
         if len(missing_time_steps) > 0:
             logger.warning(f"Some {nwp_source} timesteps for {t0=} missing: \n{missing_time_steps}")
@@ -132,7 +129,6 @@ def check_model_nwp_inputs_available(
 
 
 class NWPDownloader(ABC):
-
     destination_path: str = None
     nwp_source: str = None
     save_chunk_dict: dict = None
@@ -145,7 +141,7 @@ class NWPDownloader(ABC):
 
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-        """"Apply all processing steps to the NWP data in order to match the training data."""
+        """ "Apply all processing steps to the NWP data in order to match the training data."""
         pass
 
     @abstractmethod
@@ -233,7 +229,6 @@ class NWPDownloader(ABC):
 
 
 class ECMWFDownloader(NWPDownloader):
-
     destination_path = nwp_ecmwf_path
     nwp_source = "ecmwf"
     save_chunk_dict = {
@@ -277,7 +272,6 @@ class ECMWFDownloader(NWPDownloader):
             "wind_v_component_200m": "v200",
         }
 
-
         variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
 
         ds = ds.assign_coords(variable=variable_coords)
@@ -295,9 +289,7 @@ class ECMWFDownloader(NWPDownloader):
         return not contains_nans
 
 
-
 class UKVDownloader(NWPDownloader):
-
     destination_path = nwp_ukv_path
     nwp_source = "ukv"
     save_chunk_dict = {
@@ -383,8 +375,8 @@ class UKVDownloader(NWPDownloader):
             proj="laea",
             lat_0=54.9,
             lon_0=-2.5,
-            x_0=0.,
-            y_0=0.,
+            x_0=0.0,
+            y_0=0.0,
             ellps="WGS84",
             datum="WGS84",
         )
@@ -413,7 +405,6 @@ class UKVDownloader(NWPDownloader):
 
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-
         ds = self.rename_variables(ds)
         ds = self.add_lon_lat_coords(ds)
         ds = self.regrid(ds)
@@ -428,7 +419,6 @@ class UKVDownloader(NWPDownloader):
 
 
 class CloudcastingDownloader(NWPDownloader):
-
     destination_path = nwp_cloudcasting_path
     nwp_source = "cloudcasting"
     save_chunk_dict = {

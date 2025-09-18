@@ -116,7 +116,7 @@ def app(
         t0 = pd.Timestamp(t0).floor("30min")
 
     if gsp_ids is not None:
-        assert len(gsp_ids)>0, "No GSP IDs provided"
+        assert len(gsp_ids) > 0, "No GSP IDs provided"
 
     # --- Unpack the environment variables
     run_critical_models_only = get_boolean_env_var("RUN_CRITICAL_MODELS_ONLY", default=False)
@@ -129,7 +129,7 @@ def app(
     zig_zag_error_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_ERROR", 500))
     sun_elevation_lower_limit = float(os.getenv("FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT", 10))
 
-    db_url = os.environ["DB_URL"] # Will raise KeyError if not set
+    db_url = os.environ["DB_URL"]  # Will raise KeyError if not set
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
     ecmwf_source_path = os.getenv("NWP_ECMWF_ZARR_PATH", None)
     ukv_source_path = os.getenv("NWP_UKV_ZARR_PATH", None)
@@ -152,7 +152,7 @@ def app(
         get_critical_only=run_critical_models_only,
     )
 
-    if len(model_configs)==0:
+    if len(model_configs) == 0:
         raise Exception("No models found after filtering")
 
     # Open connection to the database - used for pulling GSP capacitites and writing forecasts
@@ -188,7 +188,6 @@ def app(
 
     # --- Try to download satellite data if any models require it
     if any("satellite" in conf["input_data"] for conf in data_configs):
-
         logger.info("Downloading satellite data")
 
         sat_downloader = SatelliteDownloader(
@@ -203,7 +202,6 @@ def app(
 
     # --- Try to download NWP data if any models require it
     if any("nwp" in conf["input_data"] for conf in data_configs):
-
         logger.info("Downloading NWP data")
 
         # Find the NWP sources required by the models
@@ -214,21 +212,18 @@ def app(
                     required_providers.add(source["provider"])
 
         if "ukv" in required_providers:
-
             ukv_downloader = UKVDownloader(source_path=ukv_source_path)
             ukv_downloader.run()
 
             data_downloaders.append(ukv_downloader)
 
         if "ecmwf" in required_providers:
-
             ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path)
             ecmwf_downloader.run()
 
             data_downloaders.append(ecmwf_downloader)
 
         if "cloudcasting" in required_providers:
-
             cloudcasting_downloader = CloudcastingDownloader(source_path=cloudcasting_source_path)
             cloudcasting_downloader.run()
 
@@ -240,7 +235,6 @@ def app(
     # Prepare all the models which can be run
     forecasters = {}
     for model_config in model_configs:
-
         # First load the data config
         data_config_path = data_config_paths[model_config.name]
 
@@ -270,20 +264,18 @@ def app(
     if len(forecasters) == 0:
         raise Exception("No models were compatible with the available input data.")
 
-
     # ---------------------------------------------------------------------------
     # Make predictions
     logger.info("Making predictions")
 
     first_model_name = next(iter(forecasters.keys()))
     for model_name, forecaster in forecasters.items():
-
         batch = forecaster.make_batch()
 
         # Do basic validation of the batch: Will raise error if the batch fails the checks
         check_batch(batch)
 
-        if (s3_batch_save_dir is not None) and model_name==first_model_name:
+        if (s3_batch_save_dir is not None) and model_name == first_model_name:
             # Save the batch under the name of the first model
             save_batch_to_s3(batch, model_name, s3_batch_save_dir)
 
@@ -297,7 +289,6 @@ def app(
     # Run validation checks on the forecast values
     logger.info("Validating forecasts")
     for model_name in list(forecasters.keys()):
-
         national_forecast = (
             forecasters[model_name].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
         ).to_series()
@@ -319,7 +310,6 @@ def app(
 
     if len(forecasters) == 0:
         raise Exception("No models passed the forecast validation checks")
-
 
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally

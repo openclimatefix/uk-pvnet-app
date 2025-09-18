@@ -2,6 +2,7 @@
 
 It adds all models in src/pvnet_app/model_configs/all_models.py
 """
+
 from pathlib import Path
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
@@ -36,9 +37,8 @@ def generate_table() -> str:
     rows = [header, separator]
 
     for model_config in model_configs:
-
         pvnet_link = make_huffingface_link(model_config.pvnet)
-        summation_link =  make_huffingface_link(model_config.summation)
+        summation_link = make_huffingface_link(model_config.summation)
 
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
@@ -48,7 +48,6 @@ def generate_table() -> str:
 
         providers = set()
         if "nwp" in data_config["input_data"]:
-
             for source in data_config["input_data"]["nwp"].values():
                 providers.add(source["provider"])
 
@@ -57,15 +56,17 @@ def generate_table() -> str:
         uses_cloud = "cloudcasting" in providers
         uses_sat = "satellite" in data_config["input_data"]
 
-        row = " | ".join([
-            model_config.name,
-            "yes" if uses_sat else "-",
-            "yes" if uses_ukv else "-",
-            "yes" if uses_ecmwf else "-",
-            "yes" if uses_cloud else "-",
-            f"[HF Link]({pvnet_link})",
-            f"[Summation HF Link]({summation_link})",
-        ])
+        row = " | ".join(
+            [
+                model_config.name,
+                "yes" if uses_sat else "-",
+                "yes" if uses_ukv else "-",
+                "yes" if uses_ecmwf else "-",
+                "yes" if uses_cloud else "-",
+                f"[HF Link]({pvnet_link})",
+                f"[Summation HF Link]({summation_link})",
+            ],
+        )
         rows.append(row)
 
     table = ""

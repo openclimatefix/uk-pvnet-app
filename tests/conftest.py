@@ -59,7 +59,6 @@ def db_session(db_connection):
     """Return a sqlalchemy session, which tears down everything properly post-test."""
 
     with db_connection.get_session() as s:
-
         yield s
 
         # Remove forecasts made in the test
@@ -77,10 +76,9 @@ def populate_db_session_with_input_data(session, test_t0):
     total_capacity_mw = 17_000
 
     gsp_yields = []
-    for i in range(0, num_gsps+1):
-
+    for i in range(0, num_gsps + 1):
         # Capacity is total capacity for GSP 0. The rest of the GSPs share the capacity evenly
-        installed_capacity_mw = total_capacity_mw if i == 0 else total_capacity_mw/num_gsps
+        installed_capacity_mw = total_capacity_mw if i == 0 else total_capacity_mw / num_gsps
 
         location_sql: LocationSQL = get_location(
             session=session,
@@ -96,7 +94,7 @@ def populate_db_session_with_input_data(session, test_t0):
         ):
             gsp_yield_sql = GSPYield(
                 datetime_utc=date.to_pydatetime().replace(tzinfo=UTC),
-                solar_generation_kw=np.random.randint(low=0, high=installed_capacity_mw*1000),
+                solar_generation_kw=np.random.randint(low=0, high=installed_capacity_mw * 1000),
                 capacity_mwp=installed_capacity_mw,
             ).to_orm()
             gsp_yield_sql.location = location_sql
@@ -161,14 +159,16 @@ def nwp_ecmwf_data(test_t0):
         init_time=init_time,
     )
 
+
 @pytest.fixture(scope="session")
 def cloudcasting_data(test_t0):
-     # The init time is the same as test_t0
+    # The init time is the same as test_t0
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_cloudcasting_shell.zarr",
         varname="sat_pred",
         init_time=test_t0,
     )
+
 
 @pytest.fixture(scope="session")
 def config_filename():
