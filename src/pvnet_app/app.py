@@ -2,7 +2,7 @@
 
 import logging
 import os
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import version
 
 import pandas as pd
 import sentry_sdk
@@ -13,7 +13,6 @@ from nowcasting_datamodel.models.base import Base_Forecast
 from ocf_data_sampler.load.gsp import get_gsp_boundaries
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_app.config import load_yaml_config
-from pvnet_app.consts import __version__
 from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.data.gsp import get_gsp_and_national_capacities
 from pvnet_app.data.nwp import UKVDownloader, ECMWFDownloader, CloudcastingDownloader
@@ -24,10 +23,8 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.utils import get_boolean_env_var, save_batch_to_s3, check_model_runs_finished
 from pvnet_app.validate_forecast import validate_forecast
 
-try:
-    __pvnet_version__ = version("pvnet")
-except PackageNotFoundError:
-    __pvnet_version__ = "v?"
+
+__version__ = version("pvnet-app")
 
 # ---------------------------------------------------------------------------
 # LOGGING AND SENTRY
@@ -138,7 +135,8 @@ def app(
     sat_source_path_5, sat_source_path_15 = get_satellite_source_paths()
 
     # --- Log version and variables
-    logger.info(f"Using `pvnet` library version: {__pvnet_version__}")
+    pvnet_version = version("pvnet")
+    logger.info(f"Using `pvnet` library version: {pvnet_version}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Making forecast for init time: {t0}")
     logger.info(f"Making forecast for GSP IDs: {gsp_ids}")

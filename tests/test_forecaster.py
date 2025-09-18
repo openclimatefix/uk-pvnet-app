@@ -15,17 +15,17 @@ def test_model_loading():
     
     for model_config in models:
         # Extract model info
-        model_name = model_config.pvnet.repo
-        model_version = model_config.pvnet.commit
-        summation_name = model_config.summation.repo if model_config.summation else None
-        summation_version = model_config.summation.commit if model_config.summation else None
+        pvnet_repo = model_config.pvnet.repo
+        pvnet_commit = model_config.pvnet.commit
+        summation_repo = model_config.summation.repo if model_config.summation else None
+        summation_commit = model_config.summation.commit if model_config.summation else None
         
         # Load models via Forecaster
         pvnet_model, summation_model = Forecaster.load_model(
-            model_name=model_name,
-            model_version=model_version,
-            summation_name=summation_name,
-            summation_version=summation_version,
+            pvnet_repo=pvnet_repo,
+            pvnet_commit=pvnet_commit,
+            summation_repo=summation_repo,
+            summation_commit=summation_commit,
             device=device
         )
         
@@ -33,7 +33,7 @@ def test_model_loading():
         assert isinstance(pvnet_model, PVNetBaseModel)
         
         # Verify summation model if configured
-        if summation_name:
+        if summation_repo is not None:
             assert isinstance(summation_model, SummationBaseModel)
         else:
             assert summation_model is None

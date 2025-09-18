@@ -1,6 +1,7 @@
 """A pydantic model for the ML models"""
 import logging
 from importlib.resources import files
+from typing import Literal
 
 import fsspec
 from pyaml_env import parse_config
@@ -27,7 +28,7 @@ class ModelConfig(BaseModel):
         False, 
         description="Whether to save the sum of GSPs as welll as the national estimate"
     )
-    verbose_logging: bool = Field(False, description="Whether to log verbose output for the model")
+    log_level: Literal["INFO", "DEBUG"] = Field(..., description="Log level to use for the model")
     save_gsp_to_recent: bool = Field(
         False, 
         description="Whether to save the GSP results to the `ForecastValueLastSevenDays` table",

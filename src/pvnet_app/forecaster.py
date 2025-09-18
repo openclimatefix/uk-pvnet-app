@@ -1,6 +1,7 @@
 import logging
 from datetime import UTC, datetime
 import tempfile
+from importlib.metadata import version
 
 import numpy as np
 import pandas as pd
@@ -23,9 +24,7 @@ from pvnet_app.config import modify_data_config_for_production
 
 
 from pvnet_app.model_configs.pydantic_models import ModelConfig
-from pvnet_app.consts import __version__
 
-logger = logging.getLogger(__name__)
 
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
@@ -33,8 +32,8 @@ MIN_DAY_ELEVATION = 0
 
 
 _model_mismatch_msg = (
-    "The PVNet version running in this app is {}/{}. The summation model running in this app was "
-    "trained on outputs from PVNet version {}/{}. Combining these models may lead to an error if "
+    "The PVNet commit running in this app is {}/{}. The summation model running in this app was "
+    "trained on outputs from PVNet commit {}/{}. Combining these models may lead to an error if "
     "the shape of PVNet output doesn't match the expected shape of the summation model. Combining "
     "may lead to unreliable results even if the shapes match."
 )
@@ -64,15 +63,13 @@ class Forecaster:
             gsp_capacities: DataArray of the solar capacities for all regional GSPs at t0
             national_capacity: The national solar capacity at t0
         """
-        model_name = model_config.pvnet.repo
-        model_version = model_config.pvnet.commit
 
-        logger.info(f"Loading model: {model_name} - {model_version}")
+        self.logger = logging.getLogger(model_config.name)
+        self.logger.setLevel(getattr(logging, model_config.log_level))
+        self.logger.info(f"Loading model: {model_config.pvnet.repo}")
 
         # Store settings
         self.model_tag = model_config.name
-        self.model_name = model_name
-        self.model_version = model_version
         self.data_config_path = data_config_path
         self.t0 = t0
         self.gsp_ids = gsp_ids
@@ -82,12 +79,11 @@ class Forecaster:
         self.apply_adjuster = model_config.use_adjuster
         self.save_gsp_sum = model_config.save_gsp_sum
         self.save_gsp_to_recent = model_config.save_gsp_to_recent
-        self.verbose_logging = model_config.verbose_logging
 
         # Load the GSP and summation models
         self.model, self.summation_model = self.load_model(
-            model_name,
-            model_version,
+            model_config.pvnet.repo,
+            model_config.pvnet.commit,
             model_config.summation.repo,
             model_config.summation.commit,
             device,
@@ -98,62 +94,56 @@ class Forecaster:
             start="30min", freq="30min", periods=self.model.forecast_len,
         )
 
-
-    @staticmethod
     def load_model(
-        model_name: str,
-        model_version: str,
-        summation_name: str | None,
-        summation_version: str | None,
+        self,
+        pvnet_repo: str,
+        pvnet_commit: str,
+        summation_repo: str | None,
+        summation_commit: str | None,
         device: torch.device,
     ) -> tuple[PVNetBaseModel, SummationBaseModel | None]:
         """Load the GSP and summation models
         
         Args:
-            model_name: The huggingface repo of the GSP model
-            model_version: The commit hash of the GSP repo to load
-            summation_name: The huggingface repo of the summation model
-            summation_version: The commit hash of the summation model to load
+            pvnet_repo: The huggingface repo of the GSP model
+            pvnet_commit: The commit hash of the GSP repo to load
+            summation_repo: The huggingface repo of the summation model
+            summation_commit: The commit hash of the summation model to load
             device: The device the models will be run on
         """
         
         # Load the GSP level model
         model = PVNetBaseModel.from_pretrained(
-            model_id=model_name,
-            revision=model_version,
+            model_id=pvnet_repo,
+            revision=pvnet_commit,
         ).to(device)
 
         # Load the summation model
-        if summation_name is None:
+        if summation_repo is None:
             sum_model = None
         else:
             sum_model = SummationBaseModel.from_pretrained(
-                model_id=summation_name,
-                revision=summation_version,
+                model_id=summation_repo,
+                revision=summation_commit,
             ).to(device)
 
             # Compare the current GSP model with the one the summation model was trained on
             datamodule_path = SummationBaseModel.get_datamodule_config(
-                model_id=summation_name,
-                revision=summation_version,
+                model_id=summation_repo,
+                revision=summation_commit,
             )
             with open(datamodule_path) as cfg:
                 sum_pvnet_cfg = yaml.load(cfg, Loader=yaml.FullLoader)["pvnet_model"]
 
             sum_expected_gsp_model = (sum_pvnet_cfg["model_id"], sum_pvnet_cfg["revision"])
-            this_gsp_model = (model_name, model_version)
+            this_gsp_model = (pvnet_repo, pvnet_commit)
 
             if sum_expected_gsp_model != this_gsp_model:
-                logger.warning(_model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model))
+                self.logger.warning(
+                    _model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model)
+                )
 
         return model, sum_model
-
-
-    def log_info(self, message: str) -> None:
-        """Maybe log message depending on verbosity"""
-        if self.verbose_logging:
-            logger.info(message)
-
 
     def make_batch(self) -> NumpyBatch:
         """Create the batch required to run this model"""
@@ -176,13 +166,13 @@ class Forecaster:
     def predict(self, batch: NumpyBatch) -> None:
         """Make predictions for the batch and store results internally"""
 
-        self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
+        self.logger.debug(f"Predicting for model: {self.model_tag}")
 
         gsp_ids = batch["gsp_id"]
         # The dataloader normalises solar elevation data to the range [0, 1]
         elevation = (batch["solar_elevation"] - 0.5) * 180
         
-        self.log_info(f"GSPs: {gsp_ids}")
+        self.logger.debug(f"GSPs: {gsp_ids}")
 
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
         
@@ -200,6 +190,14 @@ class Forecaster:
             gsp_ids,
         )
 
+        # Multiply normalised forecasts by capacities and clip negatives
+        self.logger.debug(f"Converting to absolute MW using {self.gsp_capacities}")
+        da_abs = da_normed.clip(0, None) * self.gsp_capacities.values[:, None, None]
+        
+        max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
+        self.logger.debug(f"Maximum predictions: {max_preds}")
+
+        # Apply sundown mask
         da_sundown_mask = xr.DataArray(
             data=sun_down_masks,
             dims=["gsp_id", "target_datetime_utc"],
@@ -208,26 +206,17 @@ class Forecaster:
                 target_datetime_utc=self.valid_times,
             ),
         )
-
-        # Multiply normalised forecasts by capacities and clip negatives
-        self.log_info(f"Converting to absolute MW using {self.gsp_capacities}")
-        da_abs = da_normed.clip(0, None) * self.gsp_capacities.values[:, None, None]
-        
-        max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
-        self.log_info(f"Maximum predictions: {max_preds}")
-
-        # Apply sundown mask
         da_abs = da_abs.where(~da_sundown_mask).fillna(0.0)
 
         if self.summation_model is None:
-            self.log_info("Summing across GSPs to produce national forecast")
+            self.logger.debug("Summing across GSPs to produce national forecast")
             da_abs_national = (
                 da_abs.sum(dim="gsp_id")
                 .expand_dims(dim="gsp_id", axis=0)
                 .assign_coords(gsp_id=[0])
             )
         else:
-            self.log_info("Using summation model to produce national forecast")
+            self.logger.debug("Using summation model to produce national forecast")
 
             # Make national predictions using summation model
             inputs = {
@@ -251,10 +240,9 @@ class Forecaster:
             da_abs_national = da_normed_national.clip(0, None) * self.national_capacity
 
             # Apply sundown mask - All GSPs must be masked to mask national
-            da_abs_national = da_abs_national.where(
-                ~da_sundown_mask.all(dim="gsp_id")).fillna(0.0)
+            da_abs_national = da_abs_national.where(~da_sundown_mask.all(dim="gsp_id")).fillna(0.0)
 
-        self.log_info(
+        self.logger.debug(
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}",
         )
 
@@ -290,16 +278,15 @@ class Forecaster:
 
     def log_forecast_to_database(self, session: Session) -> None:
         """Log the compiled forecast to the database"""
-        self.log_info("Converting DataArray to list of ForecastSQL")
+        self.logger.debug("Converting DataArray to list of ForecastSQL")
 
         sql_forecasts = self.convert_dataarray_to_forecasts(
             self.da_abs_all,
             session,
             model_tag=self.model_tag,
-            version=__version__,
         )
 
-        self.log_info("Saving ForecastSQL to database")
+        self.logger.debug("Saving ForecastSQL to database")
 
         if self.save_gsp_to_recent:
 
@@ -350,7 +337,6 @@ class Forecaster:
                 da_abs_sum_gsps,
                 session,
                 model_tag=f"{self.model_tag}_gsp_sum",
-                version=__version__,
             )
 
             save_sql_forecasts(
@@ -368,7 +354,6 @@ class Forecaster:
         da_preds: xr.DataArray, 
         session: Session, 
         model_tag: str, 
-        version: str,
     ) -> list[ForecastSQL]:
         """Make a ForecastSQL object from a DataArray.
 
@@ -376,7 +361,6 @@ class Forecaster:
             da_preds: DataArray of forecasted values
             session: Database session
             model_key: the name of the model to saved to the database
-            version: The version of the model
         Return:
             List of ForecastSQL objects
         """
@@ -386,7 +370,7 @@ class Forecaster:
         # forecast will have downloaded older data than is reflected here
         input_data_last_updated = get_latest_input_data_last_updated(session=session)
 
-        model = get_model(name=model_tag, version=version, session=session)
+        model = get_model(name=model_tag, version=version("pvnet-app"), session=session)
 
         forecasts = []
 
