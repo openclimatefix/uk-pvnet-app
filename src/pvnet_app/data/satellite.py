@@ -18,8 +18,6 @@ from pvnet_app.consts import sat_path
 
 logger = logging.getLogger(__name__)
 
-extend_satellite_data_with_nans_limit = pd.Timedelta("3h")
-
 
 def get_satellite_timestamps(zarr_path: str) -> pd.DatetimeIndex:
     """Get the datetimes of the satellite data at the given path.
@@ -137,7 +135,7 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
 def extend_satellite_data_with_nans(
     ds: xr.Dataset,
     t0: pd.Timestamp,
-    limit: pd.Timedelta = extend_satellite_data_with_nans_limit,
+    limit: pd.Timedelta | None = None,
 ) -> xr.Dataset:
     """Fill missing satellite timestamps with NaNs.
 
@@ -152,6 +150,9 @@ def extend_satellite_data_with_nans(
     # Find how delayed the satellite data is
     sat_max_time = pd.to_datetime(ds.time).max()
     delay = t0 - sat_max_time
+
+    if limit is None:
+        limit = pd.Timedelta("3h")
 
     if delay > pd.Timedelta(0):
         logger.info(f"Filling most recent {delay} with NaNs")
