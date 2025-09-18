@@ -1,3 +1,4 @@
+"""Constants for the pvnet app."""
 from importlib.metadata import PackageNotFoundError, version
 
 try:

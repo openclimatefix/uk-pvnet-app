@@ -1,3 +1,4 @@
+"""Functions and classes to download and process NWP data."""
 import logging
 import shutil
 from abc import ABC, abstractmethod
@@ -84,6 +85,8 @@ def check_model_nwp_inputs_available(
     Args:
         data_config_filename: Path to the data configuration file
         t0: The init-time of the forecast
+        nwp_source: The NWP data source to check (e.g. "ukv", "ecmwf", "cloudcasting")
+        nwp_valid_times: The valid times available in the NWP data
 
     Returns:
         bool: Whether the NWP timestamps satisfy that specified in the config
@@ -129,11 +132,13 @@ def check_model_nwp_inputs_available(
 
 
 class NWPDownloader(ABC):
+    """Abstract base class to download and process NWP data."""
     destination_path: str = None
     nwp_source: str = None
     save_chunk_dict: dict = None
 
     def __init__(self, source_path: str | None) -> None:
+        """Initialise the NWP downloader."""
         self.source_path = source_path
         # Initially no valid times are available. This will only change is the data can be
         # downloaded, processed, and saved successfully
@@ -141,7 +146,7 @@ class NWPDownloader(ABC):
 
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-        """ "Apply all processing steps to the NWP data in order to match the training data."""
+        """Apply all processing steps to the NWP data in order to match the training data."""
         pass
 
     @abstractmethod
@@ -229,16 +234,17 @@ class NWPDownloader(ABC):
 
 
 class ECMWFDownloader(NWPDownloader):
+    """Class to download and process the ECMWF data."""
     destination_path = nwp_ecmwf_path
     nwp_source = "ecmwf"
-    save_chunk_dict = {
+    save_chunk_dict = { # noqa: RUF012
         "step": 10,
         "latitude": 50,
         "longitude": 50,
     }
 
     @staticmethod
-    def rename_variables(ds):
+    def rename_variables(ds: xr.Dataset) -> xr.Dataset:
         """Rename the ECMWF variables to match the training data.
 
         Rename variable names in the variable coordinate to match the names the model expects and
@@ -290,9 +296,10 @@ class ECMWFDownloader(NWPDownloader):
 
 
 class UKVDownloader(NWPDownloader):
+    """Class to download and process the UKV data."""
     destination_path = nwp_ukv_path
     nwp_source = "ukv"
-    save_chunk_dict = {
+    save_chunk_dict = { # noqa: RUF012
         "step": 10,
         "x": 100,
         "y": 100,
@@ -324,7 +331,7 @@ class UKVDownloader(NWPDownloader):
         return ds.astype(np.float16)
 
     @staticmethod
-    def rename_variables(ds):
+    def rename_variables(ds: xr.Dataset) -> xr.Dataset:
         """Change the UKV variable names to match the training data."""
         # This is for nwp-consumer>=1.0.0
         logger.info("Renaming the UKV variables")
@@ -419,9 +426,10 @@ class UKVDownloader(NWPDownloader):
 
 
 class CloudcastingDownloader(NWPDownloader):
+    """Class to download and process the cloudcasting data."""
     destination_path = nwp_cloudcasting_path
     nwp_source = "cloudcasting"
-    save_chunk_dict = {
+    save_chunk_dict: dict[str, int] = { # noqa: RUF012
         "step": -1,
         "x_geostationary": 100,
         "y_geostationary": 100,

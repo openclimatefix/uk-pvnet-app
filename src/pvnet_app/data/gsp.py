@@ -1,3 +1,4 @@
+"""Functions to get GSP data from the database."""
 import numpy as np
 import pandas as pd
 from nowcasting_datamodel.connection import DatabaseConnection

@@ -1,3 +1,4 @@
+"""Functions to validate data batches."""
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 
 

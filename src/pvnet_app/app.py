@@ -68,7 +68,7 @@ def app(
     t0: str | None = None,
     gsp_ids: list[int] | None = None,
     write_predictions: bool = True,
-):
+) -> None:
     """Inference function to run PVNet.
 
     Args:
@@ -115,8 +115,8 @@ def app(
     else:
         t0 = pd.Timestamp(t0).floor("30min")
 
-    if gsp_ids is not None:
-        assert len(gsp_ids) > 0, "No GSP IDs provided"
+    if gsp_ids is not None and len(gsp_ids) == 0:
+            raise ValueError("No GSP IDs provided")
 
     # --- Unpack the environment variables
     run_critical_models_only = get_boolean_env_var("RUN_CRITICAL_MODELS_ONLY", default=False)

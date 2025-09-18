@@ -1,3 +1,4 @@
+"""Functions to load and save configuration files."""
 import yaml
 
 from pvnet_app.consts import nwp_cloudcasting_path, nwp_ecmwf_path, nwp_ukv_path, sat_path
@@ -10,7 +11,7 @@ def load_yaml_config(path: str) -> dict:
         path: The path to the config file
     """
     with open(path) as file:
-        config = yaml.load(file, Loader=yaml.FullLoader)
+        config = yaml.safe_load(file, Loader=yaml.FullLoader)
     return config
 
 
@@ -44,18 +45,19 @@ def populate_config_with_data_data_filepaths(config: dict) -> dict:
     config["input_data"]["gsp"]["zarr_path"] = ""
 
     # Replace satellite data path
-    if "satellite" in config["input_data"]:
-        if config["input_data"]["satellite"]["zarr_path"] != "":
+    if "satellite" in config["input_data"] and \
+        config["input_data"]["satellite"]["zarr_path"] != "":
             config["input_data"]["satellite"]["zarr_path"] = production_paths["satellite"]
 
     # NWP is nested so much be treated separately
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config:
-            if nwp_config[nwp_source]["zarr_path"] != "":
-                provider = nwp_config[nwp_source]["provider"]
-                assert provider in production_paths["nwp"], f"Missing NWP path: {provider}"
-                nwp_config[nwp_source]["zarr_path"] = production_paths["nwp"][provider]
+            provider = nwp_config[nwp_source]["provider"]
+            if nwp_config[nwp_source]["zarr_path"] != "" and \
+                provider not in production_paths["nwp"]:
+                raise ValueError(f"Unknown NWP provider: {provider}")
+            nwp_config[nwp_source]["zarr_path"] = production_paths["nwp"][provider]
 
     return config
 
