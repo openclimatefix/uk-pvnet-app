@@ -1,6 +1,7 @@
-from pvnet_app.model_configs.pydantic_models import ModelConfig, HuggingFaceCommit
-from pvnet_app.utils import check_model_runs_finished
 import pytest
+
+from pvnet_app.model_configs.pydantic_models import HuggingFaceCommit, ModelConfig
+from pvnet_app.utils import check_model_runs_finished
 
 
 def test_check_model_runs_finished():

@@ -1,22 +1,21 @@
 import os
 import tempfile
-import pytest
 
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
 import zarr
-
 from ocf_data_sampler.load.gsp import get_gsp_boundaries
 
 from pvnet_app.consts import sat_path
 from pvnet_app.data.satellite import (
-    contains_too_many_of_value,
-    check_model_satellite_inputs_available,
-    extend_satellite_data_with_nans,
-    interpolate_missing_satellite_timestamps,
     SatelliteDownloader,
+    check_model_satellite_inputs_available,
+    contains_too_many_of_value,
+    extend_satellite_data_with_nans,
     get_satellite_source_paths,
+    interpolate_missing_satellite_timestamps,
 )
 
 # ------------------------------------------------------------
@@ -28,24 +27,24 @@ def gsp_ids():
 
 def save_to_zarr_zip(ds: xr.Dataset, filename: str) -> None:
     """Save the given xarray dataset to a zarr file in a zip archive
-    
+
     Args:
         ds: Dataset to save
         filename: Name of the zip archive
     """
-    with zarr.storage.ZipStore(filename, mode='w') as store:
+    with zarr.storage.ZipStore(filename, mode="w") as store:
         ds.to_zarr(store, compute=True)
 
 
 def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[int]) -> bool:
     """Check that the satellite data at the given path has the expected frequency of timesteps.
-    
+
     Args:
         sat_path: Path to the satellite data
         expected_freq_mins: Expected frequency of timesteps in minutes
     """
-    if 'zip' in sat_path:
-        with zarr.storage.ZipStore(sat_path, mode='r') as store:
+    if "zip" in sat_path:
+        with zarr.storage.ZipStore(sat_path, mode="r") as store:
             ds_sat = xr.open_zarr(store)
     else:
         ds_sat = xr.open_zarr(sat_path)
@@ -85,8 +84,8 @@ def test_download_sat_5_data(sat_5_data, test_t0, gsp_ids):
 
         # Check the satellite data is 5-minutely
         assert timesteps_match_expected_freq(
-            sat_downloader.destination_path_5, 
-            expected_freq_mins=5
+            sat_downloader.destination_path_5,
+            expected_freq_mins=5,
         )
 
 
@@ -114,8 +113,8 @@ def test_download_sat_15_data(sat_15_data, test_t0, gsp_ids):
 
         # Check the satellite data is 15-minutely
         assert timesteps_match_expected_freq(
-            sat_downloader.destination_path_15, 
-            expected_freq_mins=15
+            sat_downloader.destination_path_15,
+            expected_freq_mins=15,
         )
 
 
@@ -143,14 +142,14 @@ def test_download_sat_5_and_15_data(sat_5_data, sat_15_data, test_t0, gsp_ids):
 
         # Check this satellite data is 5-minutely
         assert timesteps_match_expected_freq(
-            sat_downloader.destination_path_5, 
-            expected_freq_mins=5
+            sat_downloader.destination_path_5,
+            expected_freq_mins=5,
         )
 
         # Check this satellite data is 15-minutely
         assert timesteps_match_expected_freq(
-            sat_downloader.destination_path_15, 
-            expected_freq_mins=15
+            sat_downloader.destination_path_15,
+            expected_freq_mins=15,
         )
 
 
@@ -332,12 +331,12 @@ def test_interpolate_missing_satellite_timestamps():
     ds = xr.DataArray(
         data=np.ones(times.shape),
         dims=["time"],
-        coords=dict(time=times),
+        coords={"time": times},
     ).to_dataset(name="data")
-    
+
     ds_interp = interpolate_missing_satellite_timestamps(ds, max_gap=pd.Timedelta("15min"))
 
-    # The function interpolates to 5 minute intervals but will only interpolate between 
+    # The function interpolates to 5 minute intervals but will only interpolate between
     # timestamps if there is less than 15 minutes between them. In this case, the 5 minute
     # intervals between the first two timestamps should not have been interpolated because
     # there is a 30 minute gap
@@ -350,19 +349,19 @@ def test_interpolate_missing_satellite_timestamps():
 
 
 def test_contains_too_many_of_value(sat_5_data):
-    
+
     # The original data has no zeros or NaNs
     assert not contains_too_many_of_value(sat_5_data, value=0, threshold=0.)
     assert not contains_too_many_of_value(sat_5_data, value=np.nan, threshold=0.)
 
     # Check it can detect too many zeros
     ds = sat_5_data.copy(deep=True)
-    ds['data'].values[:] = 0
+    ds["data"].values[:] = 0
     assert contains_too_many_of_value(ds, value=0, threshold=0.1)
 
     # Check it can detect too many NaNs
     ds = sat_5_data.copy(deep=True)
-    ds['data'].values[:] = np.nan
+    ds["data"].values[:] = np.nan
     assert contains_too_many_of_value(ds, value=np.nan, threshold=0.1)
 
 

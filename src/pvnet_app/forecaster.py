@@ -1,29 +1,26 @@
 import logging
-from datetime import UTC, datetime
 import tempfile
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 import torch
+import xarray as xr
 import yaml
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
 from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
-from ocf_data_sampler.torch_datasets.sample.base import copy_batch_to_device, batch_to_tensor
+from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
+from ocf_data_sampler.torch_datasets.sample.base import batch_to_tensor, copy_batch_to_device
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 
-from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
-from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
 from pvnet_app.config import modify_data_config_for_production
-
-
-from pvnet_app.model_configs.pydantic_models import ModelConfig
 from pvnet_app.consts import __version__
+from pvnet_app.model_configs.pydantic_models import ModelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +38,7 @@ _model_mismatch_msg = (
 
 
 class Forecaster:
-    """Class for making and compiling solar forecasts from for all GB GSPs and national total"""
+    """Class for making and compiling solar forecasts from for all GB GSPs and national total."""
 
     def __init__(
         self,
@@ -52,8 +49,8 @@ class Forecaster:
         device: torch.device,
         gsp_capacities: xr.DataArray,
         national_capacity: float,
-    ):
-        """Class for making and compiling solar forecasts from for all GB GSPs and national total
+    ) -> None:
+        """Class for making and compiling solar forecasts from for all GB GSPs and national total.
 
         Args:
             model_config: The configuration for the model
@@ -107,8 +104,8 @@ class Forecaster:
         summation_version: str | None,
         device: torch.device,
     ) -> tuple[PVNetBaseModel, SummationBaseModel | None]:
-        """Load the GSP and summation models
-        
+        """Load the GSP and summation models.
+
         Args:
             model_name: The huggingface repo of the GSP model
             model_version: The commit hash of the GSP repo to load
@@ -116,7 +113,6 @@ class Forecaster:
             summation_version: The commit hash of the summation model to load
             device: The device the models will be run on
         """
-        
         # Load the GSP level model
         model = PVNetBaseModel.from_pretrained(
             model_id=model_name,
@@ -150,21 +146,20 @@ class Forecaster:
 
 
     def log_info(self, message: str) -> None:
-        """Maybe log message depending on verbosity"""
+        """Maybe log message depending on verbosity."""
         if self.verbose_logging:
             logger.info(message)
 
 
     def make_batch(self) -> NumpyBatch:
-        """Create the batch required to run this model"""
-
+        """Create the batch required to run this model."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml") as tmp:
 
             temp_path = tmp.name
 
             modify_data_config_for_production(
-                input_path=self.data_config_path, 
-                output_path=temp_path
+                input_path=self.data_config_path,
+                output_path=temp_path,
             )
 
             dataset = PVNetUKConcurrentDataset(config_filename=temp_path, gsp_ids=self.gsp_ids)
@@ -174,18 +169,17 @@ class Forecaster:
 
     @torch.inference_mode()
     def predict(self, batch: NumpyBatch) -> None:
-        """Make predictions for the batch and store results internally"""
-
+        """Make predictions for the batch and store results internally."""
         self.log_info(f"Predicting for model: {self.model_name}-{self.model_version}")
 
         gsp_ids = batch["gsp_id"]
         # The dataloader normalises solar elevation data to the range [0, 1]
         elevation = (batch["solar_elevation"] - 0.5) * 180
-        
+
         self.log_info(f"GSPs: {gsp_ids}")
 
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
-        
+
         # Run batch through model
         normed_preds = self.model(batch).detach().cpu().numpy()
 
@@ -195,24 +189,24 @@ class Forecaster:
 
         # Convert GSP results to xarray DataArray
         da_normed = self.preds_to_dataarray(
-            normed_preds, 
-            self.model.output_quantiles, 
+            normed_preds,
+            self.model.output_quantiles,
             gsp_ids,
         )
 
         da_sundown_mask = xr.DataArray(
             data=sun_down_masks,
             dims=["gsp_id", "target_datetime_utc"],
-            coords=dict(
-                gsp_id=gsp_ids,
-                target_datetime_utc=self.valid_times,
-            ),
+            coords={
+                "gsp_id": gsp_ids,
+                "target_datetime_utc": self.valid_times,
+            },
         )
 
         # Multiply normalised forecasts by capacities and clip negatives
         self.log_info(f"Converting to absolute MW using {self.gsp_capacities}")
         da_abs = da_normed.clip(0, None) * self.gsp_capacities.values[:, None, None]
-        
+
         max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
         self.log_info(f"Maximum predictions: {max_preds}")
 
@@ -268,7 +262,7 @@ class Forecaster:
         output_quantiles: list[float] | None,
         gsp_ids: list[int],
     ) -> xr.DataArray:
-        """Put numpy array of predictions into a dataarray"""
+        """Put numpy array of predictions into a dataarray."""
         if output_quantiles is not None:
             output_labels = [f"forecast_mw_plevel_{int(q*100):02}" for q in output_quantiles]
             output_labels[output_labels.index("forecast_mw_plevel_50")] = "forecast_mw"
@@ -279,17 +273,17 @@ class Forecaster:
         da = xr.DataArray(
             data=preds,
             dims=["gsp_id", "target_datetime_utc", "output_label"],
-            coords=dict(
-                gsp_id=gsp_ids,
-                target_datetime_utc=self.valid_times,
-                output_label=output_labels,
-            ),
+            coords={
+                "gsp_id": gsp_ids,
+                "target_datetime_utc": self.valid_times,
+                "output_label": output_labels,
+            },
         )
         return da
 
 
     def log_forecast_to_database(self, session: Session) -> None:
-        """Log the compiled forecast to the database"""
+        """Log the compiled forecast to the database."""
         self.log_info("Converting DataArray to list of ForecastSQL")
 
         sql_forecasts = self.convert_dataarray_to_forecasts(
@@ -365,9 +359,9 @@ class Forecaster:
 
     @staticmethod
     def convert_dataarray_to_forecasts(
-        da_preds: xr.DataArray, 
-        session: Session, 
-        model_tag: str, 
+        da_preds: xr.DataArray,
+        session: Session,
+        model_tag: str,
         version: str,
     ) -> list[ForecastSQL]:
         """Make a ForecastSQL object from a DataArray.
@@ -380,9 +374,8 @@ class Forecaster:
         Return:
             List of ForecastSQL objects
         """
-
         # Get time when the input data was last updated
-        # TODO: This time will probably be wrong. It can take 15 mins to run the app, so the 
+        # TODO: This time will probably be wrong. It can take 15 mins to run the app, so the
         # forecast will have downloaded older data than is reflected here
         input_data_last_updated = get_latest_input_data_last_updated(session=session)
 
@@ -413,7 +406,7 @@ class Forecaster:
 
                     if f"forecast_mw_plevel_{p_level}" in da_gsp_time.output_label:
                         p_val = da_gsp_time.sel(output_label=f"forecast_mw_plevel_{p_level}").item()
-                        # `p[10, 90]` can be NaN if PVNet has probabilistic outputs and 
+                        # `p[10, 90]` can be NaN if PVNet has probabilistic outputs and
                         # PVNet_summation doesn't, or vice versa. Do not log the value if NaN
                         if not np.isnan(p_val):
                             properties[p_level] = p_val
@@ -427,7 +420,7 @@ class Forecaster:
 
             forecast = ForecastSQL(
                 model=model,
-                # TODO: Should this time reflect when the forecast is saved, or the forecast 
+                # TODO: Should this time reflect when the forecast is saved, or the forecast
                 # init-time?
                 forecast_creation_time=datetime.now(tz=UTC),
                 location=location,

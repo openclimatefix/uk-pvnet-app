@@ -1,16 +1,18 @@
-"""This script updates the model summary table in the package README to the current models
+"""This script updates the model summary table in the package README to the current models.
 
 It adds all models in src/pvnet_app/model_configs/all_models.py
 """
 from pathlib import Path
+
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
-from pvnet_app.model_configs.pydantic_models import get_all_models, HuggingFaceCommit
+
 from pvnet_app.config import load_yaml_config
+from pvnet_app.model_configs.pydantic_models import HuggingFaceCommit, get_all_models
 
 
 def make_huffingface_link(model_commit: HuggingFaceCommit) -> str:
-    """Make a link to the model on huggingface
-    
+    """Make a link to the model on huggingface.
+
     Args:
         repo_commit: The model commit
     """
@@ -18,7 +20,7 @@ def make_huffingface_link(model_commit: HuggingFaceCommit) -> str:
 
 
 def generate_table() -> str:
-    """Make a new summary table for the models descriobed in the model configs"""
+    """Make a new summary table for the models descriobed in the model configs."""
     model_configs = get_all_models()
     columns = [
         "Model Name",
@@ -32,7 +34,7 @@ def generate_table() -> str:
     header = " | ".join(columns)
     separator = "|".join(["----" for _ in columns])
     rows = [header, separator]
-    
+
     for model_config in model_configs:
 
         pvnet_link = make_huffingface_link(model_config.pvnet)
@@ -46,10 +48,10 @@ def generate_table() -> str:
 
         providers = set()
         if "nwp" in data_config["input_data"]:
-            
+
             for source in data_config["input_data"]["nwp"].values():
                 providers.add(source["provider"])
-        
+
         uses_ecmwf = "ecmwf" in providers
         uses_ukv = "ukv" in providers
         uses_cloud = "cloudcasting" in providers
@@ -65,7 +67,7 @@ def generate_table() -> str:
             f"[Summation HF Link]({summation_link})",
         ])
         rows.append(row)
-    
+
     table = ""
     for row in rows:
         table += f"| {row} |\n"
@@ -73,8 +75,8 @@ def generate_table() -> str:
     return table
 
 
-def update_readme():
-    """Update the model summary table in the package README with the models in the model config"""
+def update_readme() -> None:
+    """Update the model summary table in the package README with the models in the model config."""
     readme = Path("README.md").read_text()
     start, end = "<!-- START model-config-table -->", "<!-- END model-config-table -->"
     new_table = generate_table()

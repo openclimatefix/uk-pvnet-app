@@ -1,8 +1,8 @@
 import logging
+
 import numpy as np
 import pandas as pd
 import pvlib
-
 
 logger = logging.getLogger()
 
@@ -28,7 +28,7 @@ def check_forecast_max(
 
     - Check the forecast doesn't exceed the national capacity.
     - Check the forecast doesn't exceed some arbitrary limit.
-    
+
     Args:
         national_forecast_values: The forecast values for the nation (in MW)
         national_capacity: The national PV capacity (in MW)
@@ -56,7 +56,7 @@ def check_forecast_max(
             f"Max forecast value is {max_forecast_mw / 1e3:.2f} GW).",
         )
         forecast_okay = False
-    
+
     return forecast_okay
 
 
@@ -67,7 +67,7 @@ def check_forecast_fluctuations(
     model_name: str,
 ):
     """Check for fluctuations in the forecast values.
-    
+
     This function checks to see if the forecast values go up, then down, then up again by some
     thresholds.
 
@@ -77,7 +77,6 @@ def check_forecast_fluctuations(
         error_threshold: The threshold in MW where the forecast is considered to be in error
         model_name: The name of the model that generated
     """
-
     forecast_okay = True
 
     diff = np.diff(national_forecast.values)
@@ -113,7 +112,6 @@ def check_forecast_positive_during_daylight(
         sun_elevation_lower_limit: The lower limit for the sun elevation (in degrees)
         model_name: The name of the model that generated the forecast
     """
-
     forecast_okay = True
 
     # Calculate the solar position throughout the forecast
@@ -121,7 +119,7 @@ def check_forecast_positive_during_daylight(
         time=national_forecast.index, # The index is expect to be the valid times
         longitude=UK_LONGITUDE,
         latitude=UK_LATITUDE,
-        method='nrel_numpy'
+        method="nrel_numpy",
     )
 
     # Check if forecast values are > 0 when sun elevation is over the threshold
@@ -132,10 +130,10 @@ def check_forecast_positive_during_daylight(
         logger.warning(
             f"{model_name}: Forecast values must be > 0 when sun elevation > "
             f"{sun_elevation_lower_limit} degrees. "
-            f"Found {len(bad_times)} offending timestamps: {bad_times.index.tolist()}"
+            f"Found {len(bad_times)} offending timestamps: {bad_times.index.tolist()}",
         )
         forecast_okay = False
-    
+
     return forecast_okay
 
 
@@ -153,7 +151,7 @@ def validate_forecast(
 
     - Checks the forecast doesn't exceed some values. See `check_forecast_max()`
     - Checks for fluctuations in the forecast values. See `check_forecast_fluctuations()`
-    - Checks that forecast values are positive when the sun is up. See 
+    - Checks that forecast values are positive when the sun is up. See
       `check_forecast_positive_during_daylight()`
 
     Args:
@@ -165,7 +163,6 @@ def validate_forecast(
             values must be positive when the sun is above this angle.
         model_name: The name of the model that generated the forecast.
     """
-
     forecast_max_okay = check_forecast_max(
         national_forecast=national_forecast,
         national_capacity=national_capacity,
@@ -184,5 +181,5 @@ def validate_forecast(
         sun_elevation_lower_limit=sun_elevation_lower_limit,
         model_name=model_name,
     )
-    
+
     return forecast_max_okay & forecast_fluctuations_okay & forecast_positive_during_daylight

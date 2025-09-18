@@ -9,8 +9,8 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 
-from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.app import app
+from pvnet_app.model_configs.pydantic_models import get_all_models
 
 NUM_GSPS = 331
 
@@ -50,8 +50,8 @@ def check_number_of_forecasts(model_configs, db_session):
 
 
 def test_app(
-    test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, 
-    cloudcasting_data, db_url
+    test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay,
+    cloudcasting_data, db_url,
 ):
     """Test the app running the intraday models"""
 

@@ -1,23 +1,22 @@
-import pytest
 import os
 from datetime import UTC, timedelta
 
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_me_latest
 from nowcasting_datamodel.models import GSPYield, LocationSQL
 from nowcasting_datamodel.models.base import Base_Forecast
-from nowcasting_datamodel.read.read import get_location
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
-    ForecastValueSQL,
     ForecastValueLatestSQL,
     ForecastValueSevenDaysSQL,
+    ForecastValueSQL,
 )
+from nowcasting_datamodel.read.read import get_location
 from testcontainers.postgres import PostgresContainer
-
 
 test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/test_data"
 
@@ -144,7 +143,7 @@ def make_nwp_data(shell_path, varname, init_time):
 @pytest.fixture(scope="session")
 def nwp_ukv_data(test_t0):
     # The init time was at least 8 hours ago and floor to 3-hour interval
-    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))     
+    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_ukv_shell.zarr",
         varname="um-ukv",
@@ -155,7 +154,7 @@ def nwp_ukv_data(test_t0):
 @pytest.fixture(scope="session")
 def nwp_ecmwf_data(test_t0):
     # The init time was at least 8 hours ago and floor to 3-hour interval
-    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))              
+    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_ecmwf_shell.zarr",
         varname="hres-ifs_uk",
