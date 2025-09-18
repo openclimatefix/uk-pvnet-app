@@ -11,7 +11,7 @@ def load_yaml_config(path: str) -> dict:
         path: The path to the config file
     """
     with open(path) as file:
-        config = yaml.safe_load(file, Loader=yaml.FullLoader)
+        config = yaml.safe_load(file)
     return config
 
 

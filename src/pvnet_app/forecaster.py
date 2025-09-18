@@ -136,7 +136,7 @@ class Forecaster:
                 revision=summation_version,
             )
             with open(datamodule_path) as cfg:
-                sum_pvnet_cfg = yaml.safe_load(cfg, Loader=yaml.FullLoader)["pvnet_model"]
+                sum_pvnet_cfg = yaml.safe_load(cfg)["pvnet_model"]
 
             sum_expected_gsp_model = (sum_pvnet_cfg["model_id"], sum_pvnet_cfg["revision"])
             this_gsp_model = (model_name, model_version)
