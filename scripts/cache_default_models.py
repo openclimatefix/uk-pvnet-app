@@ -11,7 +11,7 @@ from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from pvnet_app.app import models_dict
 
 
-def main():
+def main() -> None:
     """Download model from Huggingface and save it to cache."""
     # Model will be downloaded and saved to cache on disk
     PVNetBaseModel.from_pretrained(
