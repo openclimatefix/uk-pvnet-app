@@ -168,20 +168,13 @@ class Forecaster:
 
         self.logger.debug(f"Predicting for model: {self.model_tag}")
 
-        gsp_ids = batch["gsp_id"]
-        # The dataloader normalises solar elevation data to the range [0, 1]
-        elevation = (batch["solar_elevation"] - 0.5) * 180
-        
+        gsp_ids = batch["gsp_id"]        
         self.logger.debug(f"GSPs: {gsp_ids}")
 
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
         
         # Run batch through model
         normed_preds = self.model(batch).detach().cpu().numpy()
-
-        # We only need elevation mask for forecasted values, not history
-        elevation = elevation[:, -normed_preds.shape[1]:]
-        sun_down_masks = elevation < MIN_DAY_ELEVATION
 
         # Convert GSP results to xarray DataArray
         da_normed = self.preds_to_dataarray(
@@ -197,9 +190,14 @@ class Forecaster:
         max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
         self.logger.debug(f"Maximum predictions: {max_preds}")
 
-        # Apply sundown mask
+        # Calculate and apply sundown mask from solar elevation
+        # - In the batch the solar elevation angle is scaled to the range [0, 1]
+        elevation = (batch["solar_elevation"] - 0.5) * 180
+        # - We only need elevation mask for forecasted values, not history
+        elevation = elevation[:, -normed_preds.shape[1]:]
+
         da_sundown_mask = xr.DataArray(
-            data=sun_down_masks,
+            data=elevation < MIN_DAY_ELEVATION,
             dims=["gsp_id", "target_datetime_utc"],
             coords=dict(
                 gsp_id=gsp_ids,

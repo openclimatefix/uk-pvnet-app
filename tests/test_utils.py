@@ -6,10 +6,10 @@ import pytest
 def test_check_model_runs_finished():
 
     null_commit = HuggingFaceCommit(repo="dummy", commit="dummy")
-
+    kwargs = {"pvnet": null_commit, "summation":null_commit, "log_level": "INFO"}
     model_configs = [
-        ModelConfig(name="pvnet_v2", is_critical=True, pvnet=null_commit, summation=null_commit),
-        ModelConfig(name="pvnet_test", is_critical=False, pvnet=null_commit, summation=null_commit),
+        ModelConfig(name="pvnet_v2", is_critical=True, **kwargs),
+        ModelConfig(name="pvnet_test", is_critical=False, **kwargs),
     ]
 
     # 1. In this scenario, the critical model has been run but the non-critical model has not
