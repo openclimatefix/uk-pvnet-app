@@ -15,7 +15,7 @@ def make_huffingface_link(model_commit: HuggingFaceCommit) -> str:
     """Make a link to the model on huggingface.
 
     Args:
-        repo_commit: The model commit
+        model_commit: The model commit
     """
     return f"https://huggingface.co/{model_commit.repo}/tree/{model_commit.commit}"
 
