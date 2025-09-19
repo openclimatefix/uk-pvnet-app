@@ -1,10 +1,10 @@
-from pvnet_app.model_configs.pydantic_models import ModelConfig, HuggingFaceCommit
-from pvnet_app.utils import check_model_runs_finished
 import pytest
+
+from pvnet_app.model_configs.pydantic_models import HuggingFaceCommit, ModelConfig
+from pvnet_app.utils import check_model_runs_finished
 
 
 def test_check_model_runs_finished():
-
     null_commit = HuggingFaceCommit(repo="dummy", commit="dummy")
     kwargs = {"pvnet": null_commit, "summation":null_commit, "log_level": "INFO"}
     model_configs = [
@@ -15,7 +15,7 @@ def test_check_model_runs_finished():
     # 1. In this scenario, the critical model has been run but the non-critical model has not
     completed_forecasts = ["pvnet_v2"]
 
-    # This should not raise an exception since we only check critical models
+    # This should not raise an exception since we only check critical models
     check_model_runs_finished(completed_forecasts, model_configs, raise_if_missing="critical")
 
     # This should raise an exception since we are checking all models
@@ -39,4 +39,3 @@ def test_check_model_runs_finished():
     # These should not raise an exception since all models have been run
     check_model_runs_finished(completed_forecasts, model_configs, raise_if_missing="critical")
     check_model_runs_finished(completed_forecasts, model_configs, raise_if_missing="any")
-

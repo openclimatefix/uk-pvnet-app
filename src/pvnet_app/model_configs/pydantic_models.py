@@ -1,4 +1,5 @@
-"""A pydantic model for the ML models"""
+"""A pydantic model for the ML models."""
+
 import logging
 from importlib.resources import files
 from typing import Literal
@@ -11,13 +12,14 @@ log = logging.getLogger(__name__)
 
 
 class HuggingFaceCommit(BaseModel):
-    """The location of a model on Hugging Face"""
+    """The location of a model on Hugging Face."""
+
     repo: str = Field(..., description="The Hugging Face repo")
     commit: str = Field(..., description="The commit hash")
 
 
 class ModelConfig(BaseModel):
-    """Configuration of a model and the settings it will be run with in the app"""
+    """Configuration of a model and the settings it will be run with in the app."""
 
     name: str = Field(..., description="The name of the model")
     pvnet: HuggingFaceCommit = Field(..., description="The PVNet model location")
@@ -25,41 +27,41 @@ class ModelConfig(BaseModel):
 
     use_adjuster: bool = Field(False, description="Whether to use the adjuster")
     save_gsp_sum: bool = Field(
-        False, 
-        description="Whether to save the sum of GSPs as welll as the national estimate"
+        False,
+        description="Whether to save the sum of GSPs as welll as the national estimate",
     )
     log_level: Literal["INFO", "DEBUG"] = Field(..., description="Log level to use for the model")
     save_gsp_to_recent: bool = Field(
-        False, 
+        False,
         description="Whether to save the GSP results to the `ForecastValueLastSevenDays` table",
     )
     is_day_ahead: bool = Field(
-        False, 
+        False,
         description="If this model makes day-ahead forecasts (as opposed to intra-day)",
     )
     is_critical: bool = Field(
-        False, 
+        False,
         description="If this model must always be part of the critial set of models which should "
         "always be run",
     )
     uses_satellite_data: bool = Field(
-        True, 
-        description="If this model uses satellite data (currently this is only used in tests)"
+        True,
+        description="If this model uses satellite data (currently this is only used in tests)",
     )
 
 
 class ModelConfigCollection(BaseModel):
-    """A collection of model configurations"""
+    """A collection of model configurations."""
 
     models: list[ModelConfig] = Field(
-        ..., 
-        description="A list of model configs to use for the forecast"
+        ...,
+        description="A list of model configs to use for the forecast",
     )
 
     @field_validator("models")
     @classmethod
     def name_must_be_unique(cls, v: list[ModelConfig]) -> list[ModelConfig]:
-        """Ensure that all model names are unique"""
+        """Ensure that all model names are unique."""
         names = [model.name for model in v]
 
         if len(names) != len(set(names)):
@@ -72,14 +74,13 @@ def get_all_models(
     allow_save_gsp_sum: bool = True,
     get_critical_only: bool = False,
 ) -> list[ModelConfig]:
-    """Returns all the models for a given client
+    """Returns all the models for a given client.
 
     Args:
         allow_adjuster: If set to false, all models will have use_adjuster set to false
         allow_save_gsp_sum: If set to false, all models will have save_gsp_sum set to false
         get_critical_only: If only the critical models should be returned
     """
-    
     filename = files("pvnet_app.model_configs").joinpath("all_models.yaml")
 
     with fsspec.open(filename, mode="r") as stream:
@@ -105,8 +106,8 @@ def get_all_models(
         log.info("Filtering to critical models")
         filtered_models = [model for model in filtered_models if model.is_critical]
 
-    # We should always have at least one model 
-    if len(filtered_models)==0:
+    # We should always have at least one model
+    if len(filtered_models) == 0:
         raise Exception("No models found")
 
     selected_model_info = [model.name for model in filtered_models]

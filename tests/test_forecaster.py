@@ -11,9 +11,9 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 def test_model_loading():
     """Test that all configured models can be loaded correctly."""
 
-    models = get_all_models(get_critical_only=False)    
+    models = get_all_models(get_critical_only=False)
     device = torch.device("cpu")
-    
+
     for model_config in models:
         # Extract model info
         pvnet_repo = model_config.pvnet.repo
@@ -42,7 +42,7 @@ def test_model_loading():
 
         # Verify models loaded correctly
         assert isinstance(pvnet_model, PVNetBaseModel)
-        
+
         # Verify summation model if configured
         if summation_repo is not None:
             assert isinstance(summation_model, SummationBaseModel)

@@ -9,8 +9,8 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 
-from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.app import app
+from pvnet_app.model_configs.pydantic_models import get_all_models
 
 NUM_GSPS = 331
 
@@ -24,7 +24,7 @@ def check_number_of_forecasts(model_configs, db_session):
     expected_num_forecasts = 0
     expected_num_forecast_values = 0
     for model_config in model_configs:
-        # The number of forecasts
+        # The number of forecasts
         num_forecasts = NUM_GSPS + 1 + model_config.save_gsp_sum
         expected_num_forecasts += num_forecasts
         # The number of forecast values - 16 for intraday, 36 for day-ahead)
@@ -50,13 +50,17 @@ def check_number_of_forecasts(model_configs, db_session):
 
 
 def test_app(
-    test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, sat_5_data_zero_delay, 
-    cloudcasting_data, db_url
+    test_t0,
+    db_session,
+    nwp_ukv_data,
+    nwp_ecmwf_data,
+    sat_5_data_zero_delay,
+    cloudcasting_data,
+    db_url,
 ):
     """Test the app running the intraday models"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         os.chdir(tmpdirname)
 
         os.environ["DB_URL"] = db_url
@@ -90,12 +94,10 @@ def test_app(
     check_number_of_forecasts(model_configs, db_session)
 
 
-
 def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     """Test the app for the case when no satellite data is available"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-
         os.chdir(tmpdirname)
 
         os.environ["DB_URL"] = db_url

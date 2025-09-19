@@ -1,7 +1,9 @@
+"""Functions to get GSP data from the database."""
 import numpy as np
 import pandas as pd
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
+
 
 def get_gsp_and_national_capacities(
     db_connection: DatabaseConnection,
@@ -24,14 +26,14 @@ def get_gsp_and_national_capacities(
         # Get GSP capacities
         all_capacities = get_latest_gsp_capacities(
             session=session,
-            gsp_ids=[0]+gsp_ids,
+            gsp_ids=[0, *gsp_ids],
             datetime_utc=t0 - pd.Timedelta(days=2),
         )
 
     # Do basic sanity checking
     if np.isnan(all_capacities).any():
         raise ValueError("Capacities contain NaNs")
-        
+
     national_capacity = all_capacities[0].item()
     gsp_capacities = all_capacities[1:]
 
