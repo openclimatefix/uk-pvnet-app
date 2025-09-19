@@ -29,7 +29,7 @@ models:
     is_day_ahead: False
     use_adjuster: True
     save_gsp_sum: False
-    verbose_logging: True
+    log_level: DEBUG
     save_gsp_to_recent: True
     uses_satellite_data: True
 
@@ -44,7 +44,7 @@ models:
     is_day_ahead: False
     use_adjuster: False
     save_gsp_sum: False
-    verbose_logging: False
+    log_level: INFO
     save_gsp_to_recent: False
     uses_satellite_data: True
 
@@ -60,7 +60,7 @@ models:
     is_day_ahead: False
     use_adjuster: False
     save_gsp_sum: False
-    verbose_logging: False
+    log_level: INFO
     save_gsp_to_recent: False
     uses_satellite_data: True
 
@@ -76,7 +76,7 @@ models:
     is_day_ahead: False
     use_adjuster: False
     save_gsp_sum: False
-    verbose_logging: False
+    log_level: INFO
     save_gsp_to_recent: False
     uses_satellite_data: False
 
@@ -92,7 +92,7 @@ models:
     is_day_ahead: False
     use_adjuster: False
     save_gsp_sum: False
-    verbose_logging: False
+    log_level: INFO
     save_gsp_to_recent: False
     uses_satellite_data: True
 
@@ -108,7 +108,7 @@ models:
     is_day_ahead: False
     use_adjuster: False
     save_gsp_sum: False
-    verbose_logging: False
+    log_level: INFO
     save_gsp_to_recent: False
     uses_satellite_data: False
 
@@ -124,6 +124,6 @@ models:
     is_day_ahead: True
     use_adjuster: True
     save_gsp_sum: True
-    verbose_logging: True
+    log_level: INFO
     save_gsp_to_recent: True
     uses_satellite_data: False
