@@ -23,7 +23,6 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.utils import check_model_runs_finished, get_boolean_env_var, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
-
 __version__ = version("pvnet-app")
 
 # ---------------------------------------------------------------------------

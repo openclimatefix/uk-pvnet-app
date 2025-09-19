@@ -1,8 +1,8 @@
 """Functions to run the forecaster."""
 import logging
 import tempfile
+from datetime import UTC, datetime
 from importlib.metadata import version
-from datetime import datetime, UTC
 
 import numpy as np
 import pandas as pd
@@ -21,10 +21,7 @@ from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 
 from pvnet_app.config import modify_data_config_for_production
-
 from pvnet_app.model_configs.pydantic_models import ModelConfig
-
-
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -62,7 +59,6 @@ class Forecaster:
             gsp_capacities: DataArray of the solar capacities for all regional GSPs at t0
             national_capacity: The national solar capacity at t0
         """
-
         self.logger = logging.getLogger(model_config.name)
         self.logger.setLevel(getattr(logging, model_config.log_level))
         self.logger.info(f"Loading model: {model_config.pvnet.repo}")
@@ -140,7 +136,7 @@ class Forecaster:
 
             if sum_expected_gsp_model != this_gsp_model:
                 self.logger.warning(
-                    _model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model)
+                    _model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model),
                 )
 
         return model, sum_model
@@ -161,11 +157,10 @@ class Forecaster:
 
     @torch.inference_mode()
     def predict(self, batch: NumpyBatch) -> None:
-        """Make predictions for the batch and store results internally"""
-
+        """Make predictions for the batch and store results internally."""
         self.logger.debug(f"Predicting for model: {self.model_tag}")
 
-        gsp_ids = batch["gsp_id"]        
+        gsp_ids = batch["gsp_id"]
         self.logger.debug(f"GSPs: {gsp_ids}")
 
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
@@ -183,7 +178,7 @@ class Forecaster:
         # Multiply normalised forecasts by capacities and clip negatives
         self.logger.debug(f"Converting to absolute MW using {self.gsp_capacities}")
         da_abs = da_normed.clip(0, None) * self.gsp_capacities.values[:, None, None]
-        
+
         max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
         self.logger.debug(f"Maximum predictions: {max_preds}")
 
@@ -268,7 +263,7 @@ class Forecaster:
         return da
 
     def log_forecast_to_database(self, session: Session) -> None:
-        """Log the compiled forecast to the database"""
+        """Log the compiled forecast to the database."""
         self.logger.debug("Converting DataArray to list of ForecastSQL")
 
         sql_forecasts = self.convert_dataarray_to_forecasts(
@@ -340,16 +335,16 @@ class Forecaster:
 
     @staticmethod
     def convert_dataarray_to_forecasts(
-        da_preds: xr.DataArray, 
-        session: Session, 
-        model_tag: str, 
+        da_preds: xr.DataArray,
+        session: Session,
+        model_tag: str,
     ) -> list[ForecastSQL]:
         """Make a ForecastSQL object from a DataArray.
 
         Args:
             da_preds: DataArray of forecasted values
             session: Database session
-            model_key: the name of the model to saved to the database
+            model_tag: the name of the model to saved to the database
         Return:
             List of ForecastSQL objects
         """

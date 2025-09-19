@@ -1,6 +1,5 @@
-import torch
 import pandas as pd
-
+import torch
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
@@ -20,7 +19,7 @@ def test_model_loading():
         pvnet_commit = model_config.pvnet.commit
         summation_repo = model_config.summation.repo if model_config.summation else None
         summation_commit = model_config.summation.commit if model_config.summation else None
-        
+
         forecaster = Forecaster(
             model_config=model_config,
             data_config_path="dummy.yaml",
