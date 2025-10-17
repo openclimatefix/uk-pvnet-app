@@ -1,18 +1,12 @@
 """Functions to run the forecaster."""
 import logging
 import tempfile
-from datetime import UTC, datetime
-from importlib.metadata import version
 
 import numpy as np
 import pandas as pd
 import torch
 import xarray as xr
 import yaml
-from nowcasting_datamodel.models import ForecastSQL, ForecastValue
-from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
-from nowcasting_datamodel.read.read_models import get_model
-from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
 from ocf_data_sampler.torch_datasets.sample.base import batch_to_tensor, copy_batch_to_device
@@ -22,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.model_configs.pydantic_models import ModelConfig
+from pvnet_app.save import save_forecast
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -264,142 +259,19 @@ class Forecaster:
 
     def log_forecast_to_database(self, session: Session) -> None:
         """Log the compiled forecast to the database."""
-        self.logger.debug("Converting DataArray to list of ForecastSQL")
-
-        sql_forecasts = self.convert_dataarray_to_forecasts(
-            self.da_abs_all,
-            session,
-            model_tag=self.model_tag,
-        )
-
         self.logger.debug("Saving ForecastSQL to database")
 
-        if self.save_gsp_to_recent:
-            # Save all forecasts and save to last_seven_days table
-            save_sql_forecasts(
-                forecasts=sql_forecasts,
-                session=session,
-                update_national=True,
-                update_gsp=True,
-                apply_adjuster=self.apply_adjuster,
-                save_to_last_seven_days=True,
-            )
-        else:
-            # Save national and save to last_seven_days table
-            save_sql_forecasts(
-                forecasts=sql_forecasts[0:1],
-                session=session,
-                update_national=True,
-                update_gsp=False,
-                apply_adjuster=self.apply_adjuster,
-                save_to_last_seven_days=True,
-            )
+        # save using nowcasting_datamodel
+        save_forecast(
+            session=session,
+            forecast_da=self.da_abs_all,
+            model_tag=self.model_tag,
+            save_gsp_to_recent=self.save_gsp_to_recent,
+            apply_adjuster=self.apply_adjuster,
+            save_gsp_sum=self.save_gsp_sum,
+        )
 
-            # Save GSP results but not to last_seven_dats table
-            save_sql_forecasts(
-                forecasts=sql_forecasts[1:],
-                session=session,
-                update_national=False,
-                update_gsp=True,
-                apply_adjuster=self.apply_adjuster,
-                save_to_last_seven_days=False,
-            )
+        # save to new dataplatform
+        # TODO
 
-        if self.save_gsp_sum:
-            # Compute the sum if we are logging the sum of GSPs independently
-            da_abs_sum_gsps = (
-                self.da_abs_all.sel(gsp_id=slice(1, None))
-                .sum(dim="gsp_id")
-                # Only select the central forecast for the GSP sum. The sums of different p-levels
-                # are not a meaningful qauntities
-                .sel(output_label=["forecast_mw"])
-                .expand_dims(dim="gsp_id", axis=0)
-                .assign_coords(gsp_id=[0])
-            )
 
-            # Save the sum of GSPs independently - mainly for summation model monitoring
-            gsp_sum_sql_forecasts = self.convert_dataarray_to_forecasts(
-                da_abs_sum_gsps,
-                session,
-                model_tag=f"{self.model_tag}_gsp_sum",
-            )
-
-            save_sql_forecasts(
-                forecasts=gsp_sum_sql_forecasts,
-                session=session,
-                update_national=True,
-                update_gsp=False,
-                apply_adjuster=False,
-                save_to_last_seven_days=True,
-            )
-
-    @staticmethod
-    def convert_dataarray_to_forecasts(
-        da_preds: xr.DataArray,
-        session: Session,
-        model_tag: str,
-    ) -> list[ForecastSQL]:
-        """Make a ForecastSQL object from a DataArray.
-
-        Args:
-            da_preds: DataArray of forecasted values
-            session: Database session
-            model_tag: the name of the model to saved to the database
-        Return:
-            List of ForecastSQL objects
-        """
-        # Get time when the input data was last updated
-        # TODO: This time will probably be wrong. It can take 15 mins to run the app, so the
-        # forecast will have downloaded older data than is reflected here
-        input_data_last_updated = get_latest_input_data_last_updated(session=session)
-
-        model = get_model(name=model_tag, version=version("pvnet-app"), session=session)
-
-        forecasts = []
-
-        for gsp_id in da_preds.gsp_id.values:
-            da_gsp = da_preds.sel(gsp_id=gsp_id)
-
-            forecast_values = []
-
-            for target_time in pd.to_datetime(da_gsp.target_datetime_utc.values):
-                da_gsp_time = da_gsp.sel(target_datetime_utc=target_time)
-
-                forecast_value_sql = ForecastValue(
-                    target_time=target_time.replace(tzinfo=UTC),
-                    expected_power_generation_megawatts=(
-                        da_gsp_time.sel(output_label="forecast_mw").item()
-                    ),
-                ).to_orm()
-
-                properties = {}
-
-                for p_level in ["10", "90"]:
-                    if f"forecast_mw_plevel_{p_level}" in da_gsp_time.output_label:
-                        p_val = da_gsp_time.sel(output_label=f"forecast_mw_plevel_{p_level}").item()
-                        # `p[10, 90]` can be NaN if PVNet has probabilistic outputs and
-                        # PVNet_summation doesn't, or vice versa. Do not log the value if NaN
-                        if not np.isnan(p_val):
-                            properties[p_level] = p_val
-
-                if len(properties) > 0:
-                    forecast_value_sql.properties = properties
-
-                forecast_values.append(forecast_value_sql)
-
-            location = get_location(session=session, gsp_id=int(gsp_id))
-
-            forecast = ForecastSQL(
-                model=model,
-                # TODO: Should this time reflect when the forecast is saved, or the forecast
-                # init-time?
-                forecast_creation_time=datetime.now(tz=UTC),
-                location=location,
-                input_data_last_updated=input_data_last_updated,
-                forecast_values=forecast_values,
-                historic=False,
-            )
-
-            forecasts.append(forecast)
-
-        return forecasts
