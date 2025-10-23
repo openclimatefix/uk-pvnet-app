@@ -24,12 +24,27 @@ models:
         commit: cfcb233576c3c8110daed0179452e3d9913c744c
     summation:
         repo: openclimatefix-models/pvnet_v2_summation
-        commit: e43006c1359c5ea4df03fe4f6ce3d0da8a4c68f0
+        commit: d746683893330fe3380e57e65d40812daa343c8e
     is_critical: True
     is_day_ahead: False
     use_adjuster: True
     save_gsp_sum: False
     log_level: DEBUG
+    save_gsp_to_recent: True
+    uses_satellite_data: True
+
+  - name: pvnet_v2_new
+    pvnet:
+        repo: openclimatefix-models/pvnet_uk_region
+        commit: cfcb233576c3c8110daed0179452e3d9913c744c
+    summation:
+        repo: openclimatefix-models/pvnet_v2_summation
+        commit: e43006c1359c5ea4df03fe4f6ce3d0da8a4c68f0
+    is_critical: False
+    is_day_ahead: False
+    use_adjuster: True
+    save_gsp_sum: False
+    log_level: INFO
     save_gsp_to_recent: True
     uses_satellite_data: True
 
@@ -119,8 +134,23 @@ models:
         commit: ace3469f6fb6db7356afe401c1aaf1a78505f4f7
     summation:
         repo: openclimatefix-models/pvnet_summation_uk_national_day_ahead
-        commit: fba62ff05d1465076d2cfb4a40f18d9896e7a457
+        commit: f97172b9aebd2983767c78a0f833d3ddf7d1ebf0
     is_critical: True
+    is_day_ahead: True
+    use_adjuster: True
+    save_gsp_sum: True
+    log_level: INFO
+    save_gsp_to_recent: True
+    uses_satellite_data: False
+
+  - name: pvnet_day_ahead_new
+    pvnet:
+        repo: openclimatefix-models/pvnet_uk_region_day_ahead
+        commit: ace3469f6fb6db7356afe401c1aaf1a78505f4f7
+    summation:
+        repo: openclimatefix-models/pvnet_summation_uk_national_day_ahead
+        commit: fba62ff05d1465076d2cfb4a40f18d9896e7a457
+    is_critical: False
     is_day_ahead: True
     use_adjuster: True
     save_gsp_sum: True
