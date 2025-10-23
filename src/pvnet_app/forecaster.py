@@ -10,12 +10,12 @@ import yaml
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
-    batch_to_tensor, 
+    batch_to_tensor,
     copy_batch_to_device,
 )
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
-from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from pvnet_summation.data.datamodule import construct_sample as construct_sum_sample
+from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 
 from pvnet_app.config import modify_data_config_for_production
