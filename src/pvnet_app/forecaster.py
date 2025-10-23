@@ -9,9 +9,13 @@ import xarray as xr
 import yaml
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
-from ocf_data_sampler.torch_datasets.sample.base import batch_to_tensor, copy_batch_to_device
+from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
+    batch_to_tensor, 
+    copy_batch_to_device,
+)
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
+from pvnet_summation.data.datamodule import construct_sample as construct_sum_sample
 from sqlalchemy.orm import Session
 
 from pvnet_app.config import modify_data_config_for_production
@@ -202,14 +206,18 @@ class Forecaster:
             self.logger.debug("Using summation model to produce national forecast")
 
             # Make national predictions using summation model
-            inputs = {
-                "pvnet_outputs": torch.Tensor(normed_preds[np.newaxis]).to(self.device),
-                "relative_capacity": (
-                    torch.Tensor(self.gsp_capacities.values / self.national_capacity)
-                    .to(self.device)
-                    .unsqueeze(0)
-                ),
-            }
+            inputs = construct_sum_sample(
+                pvnet_inputs=None,
+                valid_times=self.valid_times,
+                relative_capacities=self.gsp_capacities.values / self.national_capacity,
+                target=None,
+            )
+            inputs["pvnet_outputs"] = normed_preds
+            del inputs["pvnet_inputs"]
+
+            # Expand for batch dimension and convert to tensors
+            inputs = {k: torch.from_numpy(v[None, ...]).to(self.device) for k, v in inputs.items()}
+
             normed_national = self.summation_model(inputs).detach().squeeze().cpu().numpy()
 
             # Convert national predictions to DataArray
