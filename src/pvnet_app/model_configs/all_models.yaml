@@ -33,7 +33,7 @@ models:
     save_gsp_to_recent: True
     uses_satellite_data: True
 
-  - name: pvnet_v2_new
+  - name: pvnet_v2_new_summation
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
         commit: cfcb233576c3c8110daed0179452e3d9913c744c
@@ -143,7 +143,7 @@ models:
     save_gsp_to_recent: True
     uses_satellite_data: False
 
-  - name: pvnet_day_ahead_new
+  - name: pvnet_day_ahead_new_summation
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region_day_ahead
         commit: ace3469f6fb6db7356afe401c1aaf1a78505f4f7
