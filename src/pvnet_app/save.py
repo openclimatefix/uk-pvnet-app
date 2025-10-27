@@ -12,6 +12,9 @@ from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from sqlalchemy.orm import Session
 
+from grpclib.client import Channel
+from dp_sdk.ocf import dp
+
 logger = logging.getLogger(__name__)
 
 
@@ -122,7 +125,7 @@ def convert_dataarray_to_forecasts(
     # forecast will have downloaded older data than is reflected here
     input_data_last_updated = get_latest_input_data_last_updated(session=session)
 
-    model = get_model(name=model_tag, version=version("pvnet-app"), session=session)
+    model = get_model(name=model_tag, version=version("pvnet_app"), session=session)
 
     forecasts = []
 
@@ -172,3 +175,83 @@ def convert_dataarray_to_forecasts(
         forecasts.append(forecast)
 
     return forecasts
+
+
+async def save_forecast_to_data_platform(forecast_da: xr.DataArray, model_tag:str, init_time_utc:datetime) -> None:
+
+    # 1. big try and except
+    try:
+
+        # 2. setup connection / session / thing
+        # TODO should make this a with statement
+        channel = Channel(host="localhost", port=50051)
+        client = dp.DataPlatformServiceStub(channel)
+
+        # 3. get or update or create forecaster version ( this is similar to ml_model before)
+        name = model_tag
+        app_version = version("pvnet_app")
+        # TODO what if this already existis? Should we use a get functions instead
+        cf_request = dp.CreateForecasterRequest(
+            name=name,
+            version=app_version, 
+        )
+        forecaster = await client.create_forecaster(cf_request)
+        # TODO, get the forecastser
+        
+        # 4a. get Location (get the UK National location)
+        # TODO internal/database/postgres/testdata/uk_gsps
+        # TODO get location by name
+
+        # 4b Save National, create forecast
+        forecast_values = get_forecast_values_from_dataarray(forecast_da, gsp_id=0)
+        forecast_request = dp.CreateForecastRequest(
+            forecast=dp.CreateForecastRequestForecast(
+                forecaster=forecaster,
+                location_uuid="0199f281-3721-7b66-a1c5-f5cf625088bf", # TODO change
+                energy_source=dp.EnergySource.SOLAR,
+                init_time_utc=init_time_utc,
+            ),
+        values=forecast_values
+        )
+        _ = await client.create_forecast(forecast_request)
+
+        # TODO GSP
+        # 5a. get all GSP locations
+        # 5b. For GSP ), create Forecast object
+
+    except Exception as e:
+        logger.error(f"Error saving forecast to data platform: {e}")
+        raise e
+
+
+def get_forecast_values_from_dataarray(forecast_da: xr.DataArray, gsp_id: int) -> list[dp.CreateForecastRequestForecastValue]:
+    """Convert a DataArray for a single GSP to a list of ForecastValue objects.
+
+    Args:
+        da_gsp: DataArray for a single GSP
+
+    """
+
+    da_gsp = forecast_da.sel(gsp_id=gsp_id)
+
+    init_time_utc = pd.to_datetime(da_gsp.init_datetime_utc.values[0])
+
+    forecast_values = []
+    for target_time in pd.to_datetime(da_gsp.target_datetime_utc.values):
+        da_gsp_time = da_gsp.sel(target_datetime_utc=target_time)
+
+        horizon_mins = int((target_time - init_time_utc).total_seconds() / 60)
+
+        forecast_value = dp.CreateForecastRequestForecastValue(
+            horizon_mins=horizon_mins,
+            p50_watts=da_gsp_time.sel(output_label="forecast_mw").item()*10**6,
+        )
+        
+        # TODO add p10 and p90 if they exist
+
+        forecast_values.append(forecast_value)
+
+    return forecast_values
+
+
+

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.model_configs.pydantic_models import ModelConfig
-from pvnet_app.save import save_forecast
+from pvnet_app.save import save_forecast, save_forecast_to_data_platform
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -273,5 +273,11 @@ class Forecaster:
 
         # save to new dataplatform
         # TODO
+        import asyncio
+        asyncio.run(save_forecast_to_data_platform(
+            forecast_da=self.da_abs_all,
+            model_tag=self.model_tag,
+            init_time_utc=self.t0
+        ))
 
 
