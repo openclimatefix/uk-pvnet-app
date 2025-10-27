@@ -43,7 +43,8 @@ dependencies = [
     "xesmf==0.8.8", # Requires ESMF to be installed
     "numcodecs<0.16",
     "dp-sdk",
-    "betterproto>=1.2.5",
+    "betterproto==2.0.0b7",
+    "grpclib==0.4.8"
 ]
 
 [dependency-groups]
