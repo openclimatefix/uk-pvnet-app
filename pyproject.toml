@@ -42,6 +42,7 @@ dependencies = [
     "dask==2025.7.0",
     "xesmf==0.8.8", # Requires ESMF to be installed
     "numcodecs<0.16",
+    "dp-sdk",
 ]
 
 [dependency-groups]
@@ -139,4 +140,7 @@ indent-style = "space"
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = 100
+
+[tool.uv.sources]
+dp-sdk = { url = "https://github.com/openclimatefix/data-platform/releases/download/v0.1.1/dp_sdk-0.0.0-py3-none-any.whl" }
 

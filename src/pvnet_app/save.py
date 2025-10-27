@@ -1,4 +1,5 @@
 """Functions to save forecasts to the database."""
+
 import logging
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -6,14 +7,13 @@ from importlib.metadata import version
 import numpy as np
 import pandas as pd
 import xarray as xr
+from dp_sdk.ocf import dp
+from grpclib.client import Channel
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
 from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from sqlalchemy.orm import Session
-
-from grpclib.client import Channel
-from dp_sdk.ocf import dp
 
 logger = logging.getLogger(__name__)
 
@@ -177,11 +177,14 @@ def convert_dataarray_to_forecasts(
     return forecasts
 
 
-async def save_forecast_to_data_platform(forecast_da: xr.DataArray, model_tag:str, init_time_utc:datetime) -> None:
-
+async def save_forecast_to_data_platform(
+    forecast_da: xr.DataArray,
+    model_tag: str,
+    init_time_utc: datetime,
+) -> None:
+    """Save forecast DataArray to data platform."""
     # 1. big try and except
     try:
-
         # 2. setup connection / session / thing
         # TODO should make this a with statement
         channel = Channel(host="localhost", port=50051)
@@ -193,11 +196,11 @@ async def save_forecast_to_data_platform(forecast_da: xr.DataArray, model_tag:st
         # TODO what if this already existis? Should we use a get functions instead
         cf_request = dp.CreateForecasterRequest(
             name=name,
-            version=app_version, 
+            version=app_version,
         )
         forecaster = await client.create_forecaster(cf_request)
         # TODO, get the forecastser
-        
+
         # 4a. get Location (get the UK National location)
         # TODO internal/database/postgres/testdata/uk_gsps
         # TODO get location by name
@@ -207,11 +210,11 @@ async def save_forecast_to_data_platform(forecast_da: xr.DataArray, model_tag:st
         forecast_request = dp.CreateForecastRequest(
             forecast=dp.CreateForecastRequestForecast(
                 forecaster=forecaster,
-                location_uuid="0199f281-3721-7b66-a1c5-f5cf625088bf", # TODO change
+                location_uuid="0199f281-3721-7b66-a1c5-f5cf625088bf",  # TODO change
                 energy_source=dp.EnergySource.SOLAR,
                 init_time_utc=init_time_utc,
             ),
-        values=forecast_values
+            values=forecast_values,
         )
         _ = await client.create_forecast(forecast_request)
 
@@ -224,14 +227,17 @@ async def save_forecast_to_data_platform(forecast_da: xr.DataArray, model_tag:st
         raise e
 
 
-def get_forecast_values_from_dataarray(forecast_da: xr.DataArray, gsp_id: int) -> list[dp.CreateForecastRequestForecastValue]:
+def get_forecast_values_from_dataarray(
+    forecast_da: xr.DataArray,
+    gsp_id: int,
+) -> list[dp.CreateForecastRequestForecastValue]:
     """Convert a DataArray for a single GSP to a list of ForecastValue objects.
 
     Args:
-        da_gsp: DataArray for a single GSP
+        forecast_da: DataArray for a single GSP
+        gsp_id: GSP ID
 
     """
-
     da_gsp = forecast_da.sel(gsp_id=gsp_id)
 
     init_time_utc = pd.to_datetime(da_gsp.init_datetime_utc.values[0])
@@ -244,14 +250,11 @@ def get_forecast_values_from_dataarray(forecast_da: xr.DataArray, gsp_id: int) -
 
         forecast_value = dp.CreateForecastRequestForecastValue(
             horizon_mins=horizon_mins,
-            p50_watts=da_gsp_time.sel(output_label="forecast_mw").item()*10**6,
+            p50_watts=da_gsp_time.sel(output_label="forecast_mw").item() * 10**6,
         )
-        
+
         # TODO add p10 and p90 if they exist
 
         forecast_values.append(forecast_value)
 
     return forecast_values
-
-
-
