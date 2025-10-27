@@ -1,5 +1,6 @@
 """Application to run inference for PVNet multiple models."""
 
+import asyncio
 import logging
 import os
 from importlib.metadata import version
@@ -319,7 +320,7 @@ def app(
 
     with db_connection.get_session() as session, session.no_autoflush:
         for forecaster in forecasters.values():
-            forecaster.log_forecast_to_database(session=session)
+            asyncio.run(forecaster.log_forecast_to_database(session=session))
 
     logger.info("Finished forecast")
 

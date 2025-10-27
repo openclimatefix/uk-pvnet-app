@@ -1,5 +1,6 @@
 """Functions to run the forecaster."""
 import logging
+import os
 import tempfile
 
 import numpy as np
@@ -7,6 +8,9 @@ import pandas as pd
 import torch
 import xarray as xr
 import yaml
+from dateutil.tz import UTC
+from dp_sdk.ocf import dp
+from grpclib.client import Channel
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
@@ -20,7 +24,7 @@ from sqlalchemy.orm import Session
 
 from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.model_configs.pydantic_models import ModelConfig
-from pvnet_app.save import save_forecast
+from pvnet_app.save import save_forecast, save_forecast_to_data_platform
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -32,6 +36,10 @@ _model_mismatch_msg = (
     "the shape of PVNet output doesn't match the expected shape of the summation model. Combining "
     "may lead to unreliable results even if the shapes match."
 )
+
+data_platform_host = os.getenv("DATA_PLATFORM_HOST", "localhost")
+data_platform_port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
+
 
 
 class Forecaster:
@@ -265,7 +273,7 @@ class Forecaster:
         )
         return da
 
-    def log_forecast_to_database(self, session: Session) -> None:
+    async def log_forecast_to_database(self, session: Session) -> None:
         """Log the compiled forecast to the database."""
         self.logger.debug("Saving ForecastSQL to database")
 
@@ -280,6 +288,14 @@ class Forecaster:
         )
 
         # save to new dataplatform
-        # TODO
-
-
+        try:
+            async with Channel(host=data_platform_host, port=data_platform_port) as channel:
+                client = dp.DataPlatformDataServiceStub(channel)
+                await save_forecast_to_data_platform(
+                    forecast_da=self.da_abs_all,
+                    model_tag=self.model_tag,
+                    init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
+                    client=client,
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to save forecast to data platform with error {e}")
