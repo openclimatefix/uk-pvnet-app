@@ -188,7 +188,7 @@ async def save_forecast_to_data_platform(
         # 2. setup connection / session / thing
         # TODO should make this a with statement
         channel = Channel(host="localhost", port=50051)
-        client = dp.DataPlatformServiceStub(channel)
+        client = dp.DataPlatformDataServiceStub(channel)
 
         # 3. get or update or create forecaster version ( this is similar to ml_model before)
         name = model_tag
@@ -224,7 +224,6 @@ async def save_forecast_to_data_platform(
 
     except Exception as e:
         logger.error(f"Error saving forecast to data platform: {e}")
-        raise e
 
 
 def get_forecast_values_from_dataarray(
