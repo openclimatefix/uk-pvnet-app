@@ -1,6 +1,7 @@
 """Functions to save forecasts to the database."""
 
 import logging
+import os
 from datetime import UTC, datetime
 from importlib.metadata import version
 
@@ -16,6 +17,10 @@ from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+# TODO this might move up to app level later on
+data_platform_host = os.getenv("DATA_PLATFORM_HOST", "localhost")
+data_platform_port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
 
 
 def save_forecast(
@@ -187,7 +192,7 @@ async def save_forecast_to_data_platform(
     try:
         # 2. setup connection / session / thing
         # TODO should make this a with statement
-        channel = Channel(host="localhost", port=50051)
+        channel = Channel(host=data_platform_host, port=data_platform_port)
         client = dp.DataPlatformDataServiceStub(channel)
 
         # 3. get or update or create forecaster version ( this is similar to ml_model before)
