@@ -11,5 +11,5 @@ def test_get_all_models():
 def test_get_all_models_get_critical_only():
     """Test for getting all the critcal models"""
     models = get_all_models(get_critical_only=True)
-    assert len(models) == 4
+    assert len(models) == 5
     assert all(m.is_critical for m in models)
