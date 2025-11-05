@@ -8,6 +8,7 @@ from importlib.metadata import version
 import numpy as np
 import pandas as pd
 import xarray as xr
+from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
@@ -15,10 +16,6 @@ from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, g
 from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from sqlalchemy.orm import Session
-
-from betterproto.lib.google.protobuf import Struct, Value
-
-from pvnet_app import forecaster
 
 logger = logging.getLogger(__name__)
 
@@ -210,9 +207,9 @@ async def save_forecast_to_data_platform(
         list_forecasters_request = dp.ListForecastersRequest(latest_versions_only=True)
         list_forecasters_response = await client.list_forecasters(list_forecasters_request)
         forecasters = list_forecasters_response.forecasters
-        
+
         forecasters_filtered = [f for f in forecasters if f.forecaster_name == name]
-        
+
         if len(forecasters_filtered) > 0:
             forecaster = forecasters_filtered[0]
         else:
@@ -225,21 +222,21 @@ async def save_forecast_to_data_platform(
 
         # now loop over all gsps
         for gsp_id in forecast_da.gsp_id.values:
-            print(f"Saving forecast for GSP ID: {gsp_id}")
+            logger.debug(f"Saving forecast for GSP ID: {gsp_id}")
 
-            # 5. get Location 
+            # 5. get Location
             # TODO refactor for all gsps
             location = all_locations[int(gsp_id)]
 
             # 6. Save create forecast
             # todo make work for all gsps
-            forecast_values = get_forecast_values_from_dataarray(forecast_da, 
+            forecast_values = get_forecast_values_from_dataarray(forecast_da,
                                                                 gsp_id=gsp_id,
                                                                 init_time_utc=init_time_utc,
                                                                 capacity_watts=location.effective_capacity_watts)
             forecast_request = dp.CreateForecastRequest(
                 forecaster=forecaster,
-                location_uuid=location.location_uuid,  
+                location_uuid=location.location_uuid,
                 energy_source=dp.EnergySource.SOLAR,
                 init_time_utc=init_time_utc.to_pydatetime().replace(tzinfo=UTC),
                 values=forecast_values,
@@ -265,6 +262,8 @@ def get_forecast_values_from_dataarray(
     Args:
         forecast_da: DataArray for a single GSP
         gsp_id: GSP ID
+        init_time_utc: Forecast initialization time
+        capacity_watts: Capacity of the location in watts
 
     """
     da_gsp = forecast_da.sel(gsp_id=gsp_id)
@@ -277,7 +276,7 @@ def get_forecast_values_from_dataarray(
         p50_fraction = da_gsp_time.sel(output_label="forecast_mw").item() * 10**6 / capacity_watts
 
         # TODO tidy this up
-        metadata = Struct(fields={'temp': Value(string_value='temp')})
+        metadata = Struct(fields={"temp": Value(string_value="temp")})
 
         forecast_value = dp.CreateForecastRequestForecastValue(
             horizon_mins=horizon_mins,
@@ -295,8 +294,7 @@ def get_forecast_values_from_dataarray(
 async def get_all_gsp_and_national_locations(
     client: dp.DataPlatformDataServiceStub,
 ) -> dict[int, dp.ListLocationsResponseLocationSummary]:
-    """Get all GSP and national locations for solar energy source"""
-
+    """Get all GSP and national locations for solar energy sourc."""
     all_locations = {}
     all_location_request = dp.ListLocationsRequest(
         location_type_filter=dp.LocationType.NATION,
