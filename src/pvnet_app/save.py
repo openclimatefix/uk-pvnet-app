@@ -16,6 +16,10 @@ from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from sqlalchemy.orm import Session
 
+from betterproto.lib.google.protobuf import Struct, Value
+
+from pvnet_app import forecaster
+
 logger = logging.getLogger(__name__)
 
 # TODO this might move up to app level later on
@@ -189,51 +193,72 @@ async def save_forecast_to_data_platform(
 ) -> None:
     """Save forecast DataArray to data platform."""
     # 1. big try and except
+
     try:
         # 2. setup connection / session / thing
         # TODO should make this a with statement
         channel = Channel(host=data_platform_host, port=data_platform_port)
         client = dp.DataPlatformDataServiceStub(channel)
 
-        # 3. get or update or create forecaster version ( this is similar to ml_model before)
+        # 3. Get all locations
+        all_locations = await get_all_gsp_and_national_locations(client)
+
+        # 4. get or update or create forecaster version ( this is similar to ml_model before)
         name = model_tag
         app_version = version("pvnet_app")
-        # TODO what if this already existis? Should we use a get functions instead
-        cf_request = dp.CreateForecasterRequest(
-            name=name,
-            version=app_version,
-        )
-        forecaster = await client.create_forecaster(cf_request)
-        # TODO, get the forecastser
 
-        # 4a. get Location (get the UK National location)
-        # TODO internal/database/postgres/testdata/uk_gsps
-        # TODO get location by name
+        list_forecasters_request = dp.ListForecastersRequest(latest_versions_only=True)
+        list_forecasters_response = await client.list_forecasters(list_forecasters_request)
+        forecasters = list_forecasters_response.forecasters
+        
+        forecasters_filtered = [f for f in forecasters if f.forecaster_name == name]
+        
+        if len(forecasters_filtered) > 0:
+            forecaster = forecasters_filtered[0]
+        else:
+            cf_request = dp.CreateForecasterRequest(
+                name=name,
+                version=app_version,
+            )
+            forecaster_response = await client.create_forecaster(cf_request)
+            forecaster = forecaster_response.forecaster
 
-        # 4b Save National, create forecast
-        forecast_values = get_forecast_values_from_dataarray(forecast_da, gsp_id=0)
-        forecast_request = dp.CreateForecastRequest(
-            forecast=dp.CreateForecastRequestForecast(
+        # now loop over all gsps
+        for gsp_id in forecast_da.gsp_id.values:
+            print(f"Saving forecast for GSP ID: {gsp_id}")
+
+            # 5. get Location 
+            # TODO refactor for all gsps
+            location = all_locations[int(gsp_id)]
+
+            # 6. Save create forecast
+            # todo make work for all gsps
+            forecast_values = get_forecast_values_from_dataarray(forecast_da, 
+                                                                gsp_id=gsp_id,
+                                                                init_time_utc=init_time_utc,
+                                                                capacity_watts=location.effective_capacity_watts)
+            forecast_request = dp.CreateForecastRequest(
                 forecaster=forecaster,
-                location_uuid="0199f281-3721-7b66-a1c5-f5cf625088bf",  # TODO change
+                location_uuid=location.location_uuid,  
                 energy_source=dp.EnergySource.SOLAR,
-                init_time_utc=init_time_utc,
-            ),
-            values=forecast_values,
-        )
-        _ = await client.create_forecast(forecast_request)
+                init_time_utc=init_time_utc.to_pydatetime().replace(tzinfo=UTC),
+                values=forecast_values,
+            )
+            _ = await client.create_forecast(forecast_request)
 
-        # TODO GSP
-        # 5a. get all GSP locations
-        # 5b. For GSP ), create Forecast object
 
     except Exception as e:
         logger.error(f"Error saving forecast to data platform: {e}")
+        raise e
+
+    channel.close()
 
 
 def get_forecast_values_from_dataarray(
     forecast_da: xr.DataArray,
     gsp_id: int,
+    init_time_utc: datetime,
+    capacity_watts: int,
 ) -> list[dp.CreateForecastRequestForecastValue]:
     """Convert a DataArray for a single GSP to a list of ForecastValue objects.
 
@@ -244,21 +269,49 @@ def get_forecast_values_from_dataarray(
     """
     da_gsp = forecast_da.sel(gsp_id=gsp_id)
 
-    init_time_utc = pd.to_datetime(da_gsp.init_datetime_utc.values[0])
-
     forecast_values = []
     for target_time in pd.to_datetime(da_gsp.target_datetime_utc.values):
         da_gsp_time = da_gsp.sel(target_datetime_utc=target_time)
 
         horizon_mins = int((target_time - init_time_utc).total_seconds() / 60)
+        p50_fraction = da_gsp_time.sel(output_label="forecast_mw").item() * 10**6 / capacity_watts
+
+        # TODO tidy this up
+        metadata = Struct(fields={'temp': Value(string_value='temp')})
 
         forecast_value = dp.CreateForecastRequestForecastValue(
             horizon_mins=horizon_mins,
-            p50_watts=da_gsp_time.sel(output_label="forecast_mw").item() * 10**6,
+            p50_fraction=p50_fraction,
+            p10_fraction=0.01,  # TODO add p10
+            p90_fraction=0.99,  # TODO add p90
+            metadata=metadata,
         )
-
-        # TODO add p10 and p90 if they exist
 
         forecast_values.append(forecast_value)
 
     return forecast_values
+
+
+async def get_all_gsp_and_national_locations(
+    client: dp.DataPlatformDataServiceStub,
+) -> dict[int, dp.ListLocationsResponseLocationSummary]:
+    """Get all GSP and national locations for solar energy source"""
+
+    all_locations = {}
+    all_location_request = dp.ListLocationsRequest(
+        location_type_filter=dp.LocationType.NATION,
+        energy_source_filter=dp.EnergySource.SOLAR,
+    )
+    location_response = await client.list_locations(all_location_request)
+    location = location_response.locations[0]
+    all_locations = {0: location}
+
+    all_location_gsp_request = dp.ListLocationsRequest(
+        location_type_filter=dp.LocationType.GSP,
+        energy_source_filter=dp.EnergySource.SOLAR,
+    )
+    location_response = await client.list_locations(all_location_gsp_request)
+    for loc in location_response.locations:
+        all_locations[loc.metadata.to_dict()["gsp_id"]["numberValue"]] = loc
+
+    return all_locations
