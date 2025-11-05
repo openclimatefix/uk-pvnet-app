@@ -103,7 +103,7 @@ models:
     summation:
       repo: openclimatefix-models/pvnet_v2_summation
       commit: 0f6336d5a4258b3b43b45ea554521bee69df4622
-    is_critical: False
+    is_critical: True
     is_day_ahead: False
     use_adjuster: False
     save_gsp_sum: False
