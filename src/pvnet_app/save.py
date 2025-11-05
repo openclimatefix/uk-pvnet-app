@@ -246,7 +246,6 @@ async def save_forecast_to_data_platform(
 
     except Exception as e:
         logger.error(f"Error saving forecast to data platform: {e}")
-        raise e
 
     channel.close()
 
