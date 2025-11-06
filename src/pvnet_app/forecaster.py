@@ -8,6 +8,7 @@ import pandas as pd
 import torch
 import xarray as xr
 import yaml
+from dateutil.tz import UTC
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
