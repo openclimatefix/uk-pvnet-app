@@ -189,8 +189,22 @@ async def save_forecast_to_data_platform(
     init_time_utc: datetime,
     client: dp.DataPlatformDataServiceStub,
 ) -> None:
-    """Save forecast DataArray to data platform."""
+    """Save forecast DataArray to data platform.
 
+    We do the following steps:
+    1. setup connection and client if not provided
+    2. Get all locations from data platform
+    3. get Forecaster
+    4. loop over all gsps: get the location object
+    5. Forecast the forecast values
+    6. Save to the data platform
+
+    Args:
+        forecast_da: DataArray of forecasts for all GSPs
+        model_tag: the name of the model to saved to the database
+        init_time_utc: Forecast initialization time
+        client: Data platform client. If None, a new client will be created.
+    """
     # 1. setup connection / session / thing
     if client is None:
         channel = Channel(host=data_platform_host, port=data_platform_port)
@@ -224,17 +238,16 @@ async def save_forecast_to_data_platform(
         logger.debug(f"Saving forecast for GSP ID: {gsp_id}")
 
         # 4. get Location
-        # TODO refactor for all gsps
         location = all_locations[int(gsp_id)]
 
-        # 5. Save create forecast
-        # todo make work for all gsps
+        # 5. Format the forecast values
         forecast_values = get_forecast_values_from_dataarray(
             forecast_da,
             gsp_id=gsp_id,
             init_time_utc=init_time_utc,
             capacity_watts=location.effective_capacity_watts,
         )
+        # 6. Save to data platform
         forecast_request = dp.CreateForecastRequest(
             forecaster=forecaster,
             location_uuid=location.location_uuid,
