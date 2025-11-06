@@ -1,4 +1,5 @@
 """Functions to run the forecaster."""
+import asyncio
 import logging
 import tempfile
 
@@ -280,12 +281,13 @@ class Forecaster:
         )
 
         # save to new dataplatform
-        # TODO
-        import asyncio
-        asyncio.run(save_forecast_to_data_platform(
-            forecast_da=self.da_abs_all,
-            model_tag=self.model_tag,
-            init_time_utc=self.t0,
-        ))
+        try:
+            asyncio.run(save_forecast_to_data_platform(
+                forecast_da=self.da_abs_all,
+                model_tag=self.model_tag,
+                init_time_utc=self.t0,
+            ))
+        except Exception as e:
+            self.logger.error(f"Failed to save forecast to data platform with error {e}")
 
 

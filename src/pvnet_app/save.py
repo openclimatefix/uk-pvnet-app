@@ -187,67 +187,63 @@ async def save_forecast_to_data_platform(
     forecast_da: xr.DataArray,
     model_tag: str,
     init_time_utc: datetime,
+    client: dp.DataPlatformDataServiceStub,
 ) -> None:
     """Save forecast DataArray to data platform."""
-    # 1. big try and except
 
-    try:
-        # 2. setup connection / session / thing
-        # TODO should make this a with statement
+    # 1. setup connection / session / thing
+    if client is None:
         channel = Channel(host=data_platform_host, port=data_platform_port)
         client = dp.DataPlatformDataServiceStub(channel)
 
-        # 3. Get all locations
-        all_locations = await get_all_gsp_and_national_locations(client)
+    # 2. Get all locations
+    all_locations = await get_all_gsp_and_national_locations(client)
 
-        # 4. get or update or create forecaster version ( this is similar to ml_model before)
-        name = model_tag
-        app_version = version("pvnet_app")
+    # 3. get or update or create forecaster version ( this is similar to ml_model before)
+    name = model_tag
+    app_version = version("pvnet_app")
 
-        list_forecasters_request = dp.ListForecastersRequest(latest_versions_only=True)
-        list_forecasters_response = await client.list_forecasters(list_forecasters_request)
-        forecasters = list_forecasters_response.forecasters
+    list_forecasters_request = dp.ListForecastersRequest(latest_versions_only=True)
+    list_forecasters_response = await client.list_forecasters(list_forecasters_request)
+    forecasters = list_forecasters_response.forecasters
 
-        forecasters_filtered = [f for f in forecasters if f.forecaster_name == name]
+    forecasters_filtered = [f for f in forecasters if f.forecaster_name == name]
 
-        if len(forecasters_filtered) > 0:
-            forecaster = forecasters_filtered[0]
-        else:
-            cf_request = dp.CreateForecasterRequest(
-                name=name,
-                version=app_version,
-            )
-            forecaster_response = await client.create_forecaster(cf_request)
-            forecaster = forecaster_response.forecaster
+    if len(forecasters_filtered) > 0:
+        forecaster = forecasters_filtered[0]
+    else:
+        cf_request = dp.CreateForecasterRequest(
+            name=name,
+            version=app_version,
+        )
+        forecaster_response = await client.create_forecaster(cf_request)
+        forecaster = forecaster_response.forecaster
 
-        # now loop over all gsps
-        for gsp_id in forecast_da.gsp_id.values:
-            logger.debug(f"Saving forecast for GSP ID: {gsp_id}")
+    # now loop over all gsps
+    for gsp_id in forecast_da.gsp_id.values:
+        logger.debug(f"Saving forecast for GSP ID: {gsp_id}")
 
-            # 5. get Location
-            # TODO refactor for all gsps
-            location = all_locations[int(gsp_id)]
+        # 4. get Location
+        # TODO refactor for all gsps
+        location = all_locations[int(gsp_id)]
 
-            # 6. Save create forecast
-            # todo make work for all gsps
-            forecast_values = get_forecast_values_from_dataarray(forecast_da,
-                                                                gsp_id=gsp_id,
-                                                                init_time_utc=init_time_utc,
-                                                                capacity_watts=location.effective_capacity_watts)
-            forecast_request = dp.CreateForecastRequest(
-                forecaster=forecaster,
-                location_uuid=location.location_uuid,
-                energy_source=dp.EnergySource.SOLAR,
-                init_time_utc=init_time_utc.to_pydatetime().replace(tzinfo=UTC),
-                values=forecast_values,
-            )
-            _ = await client.create_forecast(forecast_request)
+        # 5. Save create forecast
+        # todo make work for all gsps
+        forecast_values = get_forecast_values_from_dataarray(
+            forecast_da,
+            gsp_id=gsp_id,
+            init_time_utc=init_time_utc,
+            capacity_watts=location.effective_capacity_watts,
+        )
+        forecast_request = dp.CreateForecastRequest(
+            forecaster=forecaster,
+            location_uuid=location.location_uuid,
+            energy_source=dp.EnergySource.SOLAR,
+            init_time_utc=init_time_utc.replace(tzinfo=UTC),
+            values=forecast_values,
+        )
+        _ = await client.create_forecast(forecast_request)
 
-
-    except Exception as e:
-        logger.error(f"Error saving forecast to data platform: {e}")
-
-    channel.close()
 
 
 def get_forecast_values_from_dataarray(
@@ -269,6 +265,7 @@ def get_forecast_values_from_dataarray(
 
     forecast_values = []
     for target_time in pd.to_datetime(da_gsp.target_datetime_utc.values):
+        target_time = target_time.replace(tzinfo=UTC)
         da_gsp_time = da_gsp.sel(target_datetime_utc=target_time)
 
         horizon_mins = int((target_time - init_time_utc).total_seconds() / 60)
@@ -300,8 +297,9 @@ async def get_all_gsp_and_national_locations(
         energy_source_filter=dp.EnergySource.SOLAR,
     )
     location_response = await client.list_locations(all_location_request)
-    location = location_response.locations[0]
-    all_locations = {0: location}
+    if len(location_response.locations) > 0:
+        location = location_response.locations[0]
+        all_locations = {0: location}
 
     all_location_gsp_request = dp.ListLocationsRequest(
         location_type_filter=dp.LocationType.GSP,

@@ -44,7 +44,8 @@ dependencies = [
     "numcodecs<0.16",
     "dp-sdk",
     "betterproto==2.0.0b7",
-    "grpclib==0.4.8"
+    "grpclib==0.4.8",
+    "pytest-asyncio>=1.2.0",
 ]
 
 [dependency-groups]
