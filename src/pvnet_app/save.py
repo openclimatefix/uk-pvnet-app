@@ -280,8 +280,6 @@ def get_forecast_values_from_dataarray(
 
     forecast_values = []
     for target_time in pd.to_datetime(da_gsp.target_datetime_utc.values):
-        logger.info(f"Target time: {target_time}")
-        logger.info(f"{da_gsp.target_datetime_utc.values}")
         da_gsp_time = da_gsp.sel(target_datetime_utc=target_time)
 
         target_time = target_time.replace(tzinfo=UTC)
