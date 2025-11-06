@@ -205,6 +205,8 @@ async def save_forecast_to_data_platform(
         init_time_utc: Forecast initialization time
         client: Data platform client. If None, a new client will be created.
     """
+    logger.info("Saving forecast to data platform")
+
     # 1. setup connection / session / thing
     if client is None:
         channel = Channel(host=data_platform_host, port=data_platform_port)
@@ -278,6 +280,8 @@ def get_forecast_values_from_dataarray(
 
     forecast_values = []
     for target_time in pd.to_datetime(da_gsp.target_datetime_utc.values):
+        logger.info(f"Target time: {target_time}")
+        logger.info(f"{da_gsp.target_datetime_utc.values}")
         da_gsp_time = da_gsp.sel(target_datetime_utc=target_time)
 
         target_time = target_time.replace(tzinfo=UTC)
