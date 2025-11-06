@@ -280,6 +280,7 @@ def get_forecast_values_from_dataarray(
     for target_time in pd.to_datetime(da_gsp.target_datetime_utc.values):
         da_gsp_time = da_gsp.sel(target_datetime_utc=target_time)
 
+        target_time = target_time.replace(tzinfo=UTC)
         horizon_mins = int((target_time - init_time_utc).total_seconds() / 60)
         p50_fraction = da_gsp_time.sel(output_label="forecast_mw").item() * 10**6 / capacity_watts
 

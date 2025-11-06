@@ -83,22 +83,23 @@ async def test_save_to_generation_to_data_platform(data_platform):
     # setup: make fake data
     fake_data = pd.DataFrame(
         {
-            "target_datetime_utc": pd.date_range("2025-01-01", periods=24, freq="30min"),
             "solar_generation_mw": [0.5] * 24,
+            "target_datetime_utc": pd.Timestamp("2025-01-01") + pd.timedelta_range(
+                start=0, periods=24, freq="30min"
+            )
         },
     )
     fake_data["gsp_id"] = 1
     fake_data["output_label"] = "forecast_mw"
-    fake_data["target_datetime_utc"] = pd.to_datetime(fake_data["target_datetime_utc"])
     fake_data = fake_data.set_index(["target_datetime_utc", "gsp_id", "output_label"])
     fake_data = fake_data.to_xarray().to_dataarray()
-
+    
     # Test the functyion
     _ = await save_forecast_to_data_platform(
         fake_data,
         client=client,
         model_tag="test_model",
-        init_time_utc=datetime.datetime(2025, 1, 1),
+        init_time_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
     )
 
     # check: read from the data platform to check it was saved
