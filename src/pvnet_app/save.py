@@ -187,7 +187,7 @@ async def save_forecast_to_data_platform(
     forecast_da: xr.DataArray,
     model_tag: str,
     init_time_utc: datetime,
-    client: dp.DataPlatformDataServiceStub,
+    client: dp.DataPlatformDataServiceStub | None = None,
 ) -> None:
     """Save forecast DataArray to data platform.
 
