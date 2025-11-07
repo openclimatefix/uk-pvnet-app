@@ -3,6 +3,7 @@ import time
 
 import pandas as pd
 import pytest
+import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
@@ -12,26 +13,22 @@ from testcontainers.postgres import PostgresContainer
 from src.pvnet_app.save import save_forecast_to_data_platform
 
 
-@pytest.fixture(scope="session")
-def data_platform():
+@pytest_asyncio.fixture(scope="session")
+async def client():
     """
     Fixture to spin up a PostgreSQL container for the entire test session.
     This fixture uses `testcontainers` to start a fresh PostgreSQL container and provides
     the connection URL dynamically for use in other fixtures.
     """
 
-    env = {
-        "POSTGRES_HOST": "db",
-    }
-
     # we use a specific postgres image with postgis and pgpartman installed
     # TODO make a release of this, not using logging tag.
     with PostgresContainer(
         "ghcr.io/openclimatefix/data-platform-pgdb:logging",
         username="postgres",
-        password="postgres",  # noqa
+        password="postgres",
         dbname="postgres",
-        env=env,
+        env={"POSTGRES_HOST": "db"},
     ) as postgres:
         database_url = postgres.get_connection_url()
         # we need to get ride of psycopg2, so the go driver works
@@ -40,31 +37,28 @@ def data_platform():
         # https://stackoverflow.com/questions/46973456/docker-access-localhost-port-from-container
         database_url = database_url.replace("localhost", "host.docker.internal")
 
-        # set env vars for data
-        env = {"DATABASE_URL": database_url}
-
         with DockerContainer(
-            image="ghcr.io/openclimatefix/data-platform:0.8.0",
-            env=env,
-            ports=[50051],
+            image="ghcr.io/openclimatefix/data-platform:0.10.0", env={"DATABASE_URL": database_url}, ports=[50051]
         ) as data_platform_server:
             time.sleep(1)  # Give some time for the server to start
-            yield data_platform_server
+
+            port = data_platform_server.get_exposed_port(50051)
+            host = data_platform_server.get_container_host_ip()
+            channel = Channel(host=host, port=port)
+            client = dp.DataPlatformDataServiceStub(channel)
+            yield client
+            channel
 
 
-@pytest.mark.asyncio
-async def test_save_to_generation_to_data_platform(data_platform):
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_save_to_generation_to_data_platform(client):
     """
     Test saving data to the Data Platform.
     This test uses the `data_platform` fixture to ensure that the Data Platform service
     is running and can accept data.
     """
-
-    # setup: client
-    port = data_platform.get_exposed_port(50051)
-    host = data_platform.get_container_host_ip()
-    channel = Channel(host=host, port=port)
-    client = dp.DataPlatformDataServiceStub(channel)
 
     # setup: add location
     metadata = Struct(fields={"gsp_id": Value(number_value=1)})

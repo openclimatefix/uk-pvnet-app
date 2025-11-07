@@ -212,7 +212,7 @@ async def save_forecast_to_data_platform(
         channel = Channel(host=data_platform_host, port=data_platform_port)
         client = dp.DataPlatformDataServiceStub(channel)
 
-    # 2. Get all locations
+    # 2. Get all locations (Uk national + GSPs)
     all_locations = await get_all_gsp_and_national_locations(client)
 
     # 3. get or update or create forecaster version ( this is similar to ml_model before)
@@ -305,17 +305,21 @@ def get_forecast_values_from_dataarray(
 async def get_all_gsp_and_national_locations(
     client: dp.DataPlatformDataServiceStub,
 ) -> dict[int, dp.ListLocationsResponseLocationSummary]:
-    """Get all GSP and national locations for solar energy sourc."""
+    """Get all GSP and National locations for solar energy source"""
+
     all_locations = {}
+
+    # National location
     all_location_request = dp.ListLocationsRequest(
         location_type_filter=dp.LocationType.NATION,
         energy_source_filter=dp.EnergySource.SOLAR,
     )
     location_response = await client.list_locations(all_location_request)
-    if len(location_response.locations) > 0:
-        location = location_response.locations[0]
-        all_locations = {0: location}
+    all_uk_location = [loc for loc in location_response.locations if 'uk' in loc.location_name.lower()]
+    if len(all_uk_location) >= 1:
+        all_locations[0] = all_uk_location[0]
 
+    # GSP locations
     all_location_gsp_request = dp.ListLocationsRequest(
         location_type_filter=dp.LocationType.GSP,
         energy_source_filter=dp.EnergySource.SOLAR,
