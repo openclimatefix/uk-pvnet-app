@@ -216,7 +216,7 @@ async def save_forecast_to_data_platform(
     all_locations = await get_all_gsp_and_national_locations(client)
 
     # 3. get or update or create forecaster version ( this is similar to ml_model before)
-    name = model_tag
+    name = model_tag.replace("-", "_")
     app_version = version("pvnet_app")
 
     list_forecasters_request = dp.ListForecastersRequest(latest_versions_only=True)
