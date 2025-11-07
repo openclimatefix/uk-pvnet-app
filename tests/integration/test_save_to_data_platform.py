@@ -26,7 +26,7 @@ async def client():
     with PostgresContainer(
         "ghcr.io/openclimatefix/data-platform-pgdb:logging",
         username="postgres",
-        password="postgres",
+        password="postgres",  #noqa: S106
         dbname="postgres",
         env={"POSTGRES_HOST": "db"},
     ) as postgres:
@@ -38,7 +38,9 @@ async def client():
         database_url = database_url.replace("localhost", "host.docker.internal")
 
         with DockerContainer(
-            image="ghcr.io/openclimatefix/data-platform:0.10.0", env={"DATABASE_URL": database_url}, ports=[50051]
+            image="ghcr.io/openclimatefix/data-platform:0.10.0",
+            env={"DATABASE_URL": database_url},
+            ports=[50051],
         ) as data_platform_server:
             time.sleep(1)  # Give some time for the server to start
 
@@ -47,9 +49,7 @@ async def client():
             channel = Channel(host=host, port=port)
             client = dp.DataPlatformDataServiceStub(channel)
             yield client
-            channel
-
-
+            channel.close()
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -78,8 +78,11 @@ async def test_save_to_generation_to_data_platform(client):
     fake_data = pd.DataFrame(
         {
             "solar_generation_mw": [0.5] * 24,
-            "target_datetime_utc": pd.Timestamp("2025-01-01") + pd.timedelta_range(
-                start=0, periods=24, freq="30min",
+            "target_datetime_utc": pd.Timestamp("2025-01-01")
+            + pd.timedelta_range(
+                start=0,
+                periods=24,
+                freq="30min",
             ),
         },
     )
