@@ -293,9 +293,9 @@ def get_forecast_values_from_dataarray(
             p50_fraction=p50_fraction,
             metadata=metadata,
             other_statistics_fractions={
-                    "p10": 0.01,
-                    "p90": 0.99,
-                },
+                "p10": 0.01,
+                "p90": 0.99,
+            },
         )
 
         forecast_values.append(forecast_value)
@@ -306,8 +306,7 @@ def get_forecast_values_from_dataarray(
 async def get_all_gsp_and_national_locations(
     client: dp.DataPlatformDataServiceStub,
 ) -> dict[int, dp.ListLocationsResponseLocationSummary]:
-    """Get all GSP and National locations for solar energy source"""
-
+    """Get all GSP and National locations for solar energy source."""
     all_locations = {}
 
     # National location
@@ -316,7 +315,9 @@ async def get_all_gsp_and_national_locations(
         energy_source_filter=dp.EnergySource.SOLAR,
     )
     location_response = await client.list_locations(all_location_request)
-    all_uk_location = [loc for loc in location_response.locations if 'uk' in loc.location_name.lower()]
+    all_uk_location = [
+        loc for loc in location_response.locations if "uk" in loc.location_name.lower()
+    ]
     if len(all_uk_location) == 1:
         all_locations[0] = all_uk_location[0]
     elif len(all_uk_location) == 0:
