@@ -291,9 +291,11 @@ def get_forecast_values_from_dataarray(
         forecast_value = dp.CreateForecastRequestForecastValue(
             horizon_mins=horizon_mins,
             p50_fraction=p50_fraction,
-            p10_fraction=0.01,  # TODO add p10
-            p90_fraction=0.99,  # TODO add p90
             metadata=metadata,
+            other_statistics_fractions={
+                    "p10": 0.01,
+                    "p90": 0.99,
+                },
         )
 
         forecast_values.append(forecast_value)

@@ -38,7 +38,7 @@ async def client():
         database_url = database_url.replace("localhost", "host.docker.internal")
 
         with DockerContainer(
-            image="ghcr.io/openclimatefix/data-platform:0.10.0",
+            image="ghcr.io/openclimatefix/data-platform:0.11.0",
             env={"DATABASE_URL": database_url},
             ports=[50051],
         ) as data_platform_server:
