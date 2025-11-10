@@ -2,6 +2,9 @@
 
 The data is processed equivalently to how it is processed in the uk-pvnet-app so that a recent
 live backtest can be performed.
+
+To download the GPS data from the database you will have to first set up a database connection and
+set the environmental variable OCF_DB_URL which is accessed by this script
 """
 
 import os
@@ -288,6 +291,8 @@ def get_db_pvlive_dataset(
     df_pvlive["generation_mw"] = df_pvlive.solar_generation_kw * 1e-3
     del df_pvlive["solar_generation_kw"]
 
+    df_pvlive = df_pvlive.drop_duplicates(subset=["datetime_gmt", "gsp_id"])
+
     return df_pvlive.set_index(["datetime_gmt", "gsp_id"]).to_xarray()
 
 
@@ -417,4 +422,4 @@ if __name__=="__main__":
     ds_pvlive_db = get_db_pvlive_dataset(start_date, end_date, updated=False)
 
     chunk_dict = {"gsp_id": len(ds_pvlive_db.gsp_id), "datetime_gmt": 200}
-    save(ds_pvlive_api, chunk_dict, f"{local_output_dir}/pvlive_db_data.zarr")
+    save(ds_pvlive_db, chunk_dict, f"{local_output_dir}/pvlive_db_data.zarr")
