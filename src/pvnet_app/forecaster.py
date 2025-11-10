@@ -1,6 +1,7 @@
 """Functions to run the forecaster."""
 import asyncio
 import logging
+import os
 import tempfile
 
 import numpy as np
@@ -9,6 +10,8 @@ import torch
 import xarray as xr
 import yaml
 from dateutil.tz import UTC
+from dp_sdk.ocf import dp
+from grpclib.client import Channel
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
@@ -34,6 +37,10 @@ _model_mismatch_msg = (
     "the shape of PVNet output doesn't match the expected shape of the summation model. Combining "
     "may lead to unreliable results even if the shapes match."
 )
+
+data_platform_host = os.getenv("DATA_PLATFORM_HOST", "localhost")
+data_platform_port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
+
 
 
 class Forecaster:
@@ -283,12 +290,18 @@ class Forecaster:
 
         # save to new dataplatform
         try:
-            asyncio.run(save_forecast_to_data_platform(
-                forecast_da=self.da_abs_all,
-                model_tag=self.model_tag,
-                init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
-            ))
+            asyncio.run(self.save_forecast_to_data_platform())
         except Exception as e:
             self.logger.error(f"Failed to save forecast to data platform with error {e}")
 
+    async def save_forecast_to_data_platform(self) -> None:
+        """Save forecast to data platform."""
+        with Channel(host=data_platform_host, port=data_platform_port) as channel:
+            client = dp.DataPlatformDataServiceStub(channel)
+            save_forecast_to_data_platform(
+                forecast_da=self.da_abs_all,
+                model_tag=self.model_tag,
+                init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
+                client=client,
+            )
 

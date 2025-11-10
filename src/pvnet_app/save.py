@@ -187,17 +187,16 @@ async def save_forecast_to_data_platform(
     forecast_da: xr.DataArray,
     model_tag: str,
     init_time_utc: datetime,
-    client: dp.DataPlatformDataServiceStub | None = None,
+    client: dp.DataPlatformDataServiceStub,
 ) -> None:
     """Save forecast DataArray to data platform.
 
     We do the following steps:
-    1. setup connection and client if not provided
-    2. Get all locations from data platform
-    3. get Forecaster
-    4. loop over all gsps: get the location object
-    5. Forecast the forecast values
-    6. Save to the data platform
+    1. Get all locations from data platform
+    2. get Forecaster
+    3. loop over all gsps: get the location object
+    4. Forecast the forecast values
+    5. Save to the data platform
 
     Args:
         forecast_da: DataArray of forecasts for all GSPs
@@ -207,15 +206,10 @@ async def save_forecast_to_data_platform(
     """
     logger.info("Saving forecast to data platform")
 
-    # 1. setup connection / session / thing
-    if client is None:
-        channel = Channel(host=data_platform_host, port=data_platform_port)
-        client = dp.DataPlatformDataServiceStub(channel)
-
-    # 2. Get all locations (Uk national + GSPs)
+    # 1. Get all locations (Uk national + GSPs)
     uk_national_and_gsp_locations = await get_all_gsp_and_national_locations(client)
 
-    # 3. get or update or create forecaster version ( this is similar to ml_model before)
+    # 2. get or update or create forecaster version ( this is similar to ml_model before)
     name = model_tag.replace("-", "_")
     app_version = version("pvnet_app")
 
@@ -239,17 +233,17 @@ async def save_forecast_to_data_platform(
     for gsp_id in forecast_da.gsp_id.values:
         logger.debug(f"Saving forecast for GSP ID: {gsp_id}")
 
-        # 4. get Location
+        # 3. get Location
         location = uk_national_and_gsp_locations[int(gsp_id)]
 
-        # 5. Format the forecast values
+        # 4. Format the forecast values
         forecast_values = get_forecast_values_from_dataarray(
             forecast_da,
             gsp_id=gsp_id,
             init_time_utc=init_time_utc,
             capacity_watts=location.effective_capacity_watts,
         )
-        # 6. Save to data platform
+        # 5. Save to data platform
         forecast_request = dp.CreateForecastRequest(
             forecaster=forecaster,
             location_uuid=location.location_uuid,
