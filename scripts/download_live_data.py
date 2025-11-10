@@ -1,29 +1,27 @@
-"""This script downloads an archive data from the live production system
+"""This script downloads an archive data from the live production system.
 
 The data is processed equivalently to how it is processed in the uk-pvnet-app so that a recent
 live backtest can be performed.
 """
 
+import os
+from datetime import UTC
+
+import dask
+import fsspec
+import icechunk
+import pandas as pd
+import xarray as xr
+import yaml
+from dask.diagnostics import ProgressBar
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
-from sqlalchemy import text
-
-import os
-import fsspec
-from s3fs import S3FileSystem
-import pandas as pd
-from tqdm import tqdm
-import xarray as xr
-import icechunk
-import fsspec
 from pvlive_api import PVLive
-from datetime import timezone
-import yaml
-import dask
-from dask.diagnostics import ProgressBar
+from s3fs import S3FileSystem
+from sqlalchemy import text
+from tqdm import tqdm
 
 from pvnet_app.data.nwp import ECMWFDownloader, UKVDownloader
-
 
 # -------------------------------------------------------------
 # USER VARIABLES
@@ -48,7 +46,7 @@ local_output_dir = "/mnt/storage_u2_30tb_a/uk_live_data"
 @dask.delayed
 def download_zarr(fs: S3FileSystem, s3_path: str, local_dir: str) -> None:
     """Lazily download a file from s3.
-    
+
     Args:
         fs: The fsspec filesystem
         s3_path: The s3 path of the zarr
@@ -59,13 +57,13 @@ def download_zarr(fs: S3FileSystem, s3_path: str, local_dir: str) -> None:
 
 
 def get_nwp_dataset(
-    s3_dir: str, 
-    datetime_fmt: str, 
-    local_dir: str, 
-    start_date: pd.Timestamp, 
+    s3_dir: str,
+    datetime_fmt: str,
+    local_dir: str,
+    start_date: pd.Timestamp,
     end_date:pd.Timestamp,
 ) -> xr.Dataset:
-    """Download a collection of zarrs from s3 and open as a xarray dataset
+    """Download a collection of zarrs from s3 and open as a xarray dataset.
 
     The files are downloaded to a supplied location on local disk before being opened. Files
     that already exist in this location will not be redownloaded. We filter the zarrs to ones which
@@ -73,13 +71,12 @@ def get_nwp_dataset(
 
     Args:
         s3_dir: Where to search for the zarrs
-        datetime_fmt: The datetime format that zarrs are saved under. e.g. r"%Y%m%d%H" for zarr 
+        datetime_fmt: The datetime format that zarrs are saved under. e.g. r"%Y%m%d%H" for zarr
             which is named like 2025120100.zarr
         local_dir: Where to save the zarrs to in the local filesystem
         start_date: The start datetime used to filter the zarrs
         end_date: The end datetime used to filter the zarrs
     """
-
     if datetime_fmt not in [r"%Y%m%d%H", r"%Y-%m-%dT%H:%M"]:
         raise ValueError("This function has not been tested with the datetime format provided")
 
@@ -87,7 +84,7 @@ def get_nwp_dataset(
     glob_pattern = datetime_fmt
     for s, n in [("Y", 4), ("m", 2), ("d", 2), ("H", 2), ("M", 2)]:
         glob_pattern = glob_pattern.replace(r"%"+s, "[0-9]"*n)
-    
+
     # Find the zarr files
     fs = fsspec.filesystem("s3")
     zarr_paths = fs.glob(f"{s3_dir}/{glob_pattern}.zarr")
@@ -97,15 +94,20 @@ def get_nwp_dataset(
     zarr_datetimes = pd.to_datetime(zarr_datetimes, format=datetime_fmt)
 
     # Filter to zarrs with datetime between the start and end dates
-    zarr_paths = [path for path, dt in zip(zarr_paths, zarr_datetimes) if (start_date <= dt <= end_date)]
+    zarr_paths = [
+        path for path, dt in zip(zarr_paths, zarr_datetimes, strict=False)
+        if (start_date <= dt <= end_date)
+    ]
 
-    # Filter out files already downloaded
-    required_zarr_paths = [p for p in zarr_paths if not os.path.exists(f"{local_dir}/{os.path.basename(p)}")]
-    
+    # Filter out files already downloaded
+    required_zarr_paths = [
+        p for p in zarr_paths if not os.path.exists(f"{local_dir}/{os.path.basename(p)}")
+    ]
+
     # Download the files if required
     if len(required_zarr_paths)>0:
 
-        # Download in parallel
+        # Download in parallel
         tasks = [download_zarr(fs, s3_path, local_dir) for s3_path in required_zarr_paths]
         with ProgressBar():
             _ = dask.compute(*tasks, scheduler="threads")
@@ -122,7 +124,7 @@ def filter_sat_times_to_available(ds_sat: xr.Dataset) -> xr.Dataset:
     Due to life-cycling in the s3 bucket, older parts of the icechunk data are deleted but without
     the timestamps being updated. This function filters the timestamps to find the minimum timestamp
     for which the corresponding data has not been deleted by lifecycling.
-    
+
     Args:
         ds_sat: The satellite dataset opened from icechunk
     """
@@ -164,28 +166,27 @@ def filter_sat_times_to_available(ds_sat: xr.Dataset) -> xr.Dataset:
                 if i+1 == lowest_available_index:
                     first_available_index = i+1
 
-        return ds_sat.isel(time=slice(first_available_index, None))            
+        return ds_sat.isel(time=slice(first_available_index, None))
 
 
 def get_sat_dataset(
     s3_path: str,
-    start_date: pd.Timestamp, 
+    start_date: pd.Timestamp,
     end_date:pd.Timestamp,
 ) -> xr.Dataset:
-    """Open the satellite data from s3 incechunk and filter to date period
-    
+    """Open the satellite data from s3 incechunk and filter to date period.
+
     Args:
         s3_path: The path on s3 to the icechunk
         start_date: The start datetime of the period
         end_date: The end datetime of the period
     """
-
     bucket, _, path = s3_path.removeprefix("s3://").partition("/")
     store = icechunk.s3_storage(
         bucket=bucket,
         prefix=path,
         from_env=True,
-        region='eu-west-1',
+        region="eu-west-1",
     )
 
     repo = icechunk.Repository.open(store)
@@ -197,18 +198,17 @@ def get_sat_dataset(
 
 
 def get_api_pvlive_dataset(
-    start_date: pd.Timestamp, 
+    start_date: pd.Timestamp,
     end_date: pd.Timestamp,
 ) -> xr.Dataset:
-    """Get data from PVLive for the given period from the PVLive API
-    
+    """Get data from PVLive for the given period from the PVLive API.
+
     Args:
         start_date: The start datetime of the period
         end_date: The end datetime of the period
     """
-
-    py_start_date = start_date.to_pydatetime().replace(tzinfo=timezone.utc)
-    py_end_date = end_date.to_pydatetime().replace(tzinfo=timezone.utc)
+    py_start_date = start_date.to_pydatetime().replace(tzinfo=UTC)
+    py_end_date = end_date.to_pydatetime().replace(tzinfo=UTC)
 
     pvl = PVLive()
 
@@ -231,7 +231,7 @@ def get_api_pvlive_dataset(
             .to_xarray()
             .expand_dims(gsp_id=[gsp_id])
         )
-        
+
         ds_gsp_list.append(ds)
 
     return xr.concat(ds_gsp_list, dim="gsp_id")
@@ -242,19 +242,18 @@ def get_db_pvlive_dataset(
     end_date: pd.Timestamp,
     updated: bool,
 ) -> xr.Dataset:
-    """Get data from PVLive for the given period from the OCF database
-    
+    """Get data from PVLive for the given period from the OCF database.
+
     Args:
         start_date: The start datetime of the period
         end_date: The end datetime of the period
         updated: Whether to get the in-day initial estimates or the updated values which are created
             the day after.
     """
-
     if "OCF_DB_URL" not in os.environ:
         raise Exception(
             "To get the PVLive values from the database the environmental variable `OCF_DB_URL` "
-            "must be set"
+            "must be set",
         )
 
     db_connection = DatabaseConnection(url=os.environ["OCF_DB_URL"], base=Base_Forecast)
@@ -278,29 +277,28 @@ def get_db_pvlive_dataset(
             WHERE g.regime='{regime}'
             AND g.datetime_utc>='{start_date}'
             AND g.datetime_utc<='{end_date}'
-            """
+            """,
         )
-        
+
         df_pvlive = pd.DataFrame(
             conn.execute(query).fetchall(),
-            columns=["datetime_utc", "solar_generation_kw", "capacity_mwp", "gsp_id"]
+            columns=["datetime_utc", "solar_generation_kw", "capacity_mwp", "gsp_id"],
         )
-        
+
     df_pvlive["generation_mw"] = df_pvlive.solar_generation_kw * 1e-3
     del df_pvlive["solar_generation_kw"]
-        
+
     return df_pvlive.set_index(["datetime_gmt", "gsp_id"]).to_xarray()
 
 
 def save(ds: xr.Dataset, chunk_dict: dict[str, int], save_path: str) -> None:
     """Rechunk and save the xarray dataset to zarr storage.
-    
+
     Args:
         ds: The xarray Dataset to save
         chunk_dict: Dictionary of chunk sizes for all dimensions in the data
         save_path: Path to save the zarr under
     """
-
     if "variable" in ds:
         ds["variable"] = ds["variable"].astype(str)
 
@@ -326,12 +324,12 @@ if __name__=="__main__":
     ds_ecmwf = get_nwp_dataset(
         s3_dir=ecmwf_s3_dir,
         datetime_fmt=r"%Y%m%d%H",  # IFS zarr files in form YYYYmmddHH.zarr
-        start_date=start_date, 
+        start_date=start_date,
         end_date=end_date,
         local_dir=ecmwf_local_dir,
     )
 
-    # Process it to match training data
+    # Process it to match training data
     ds_ecmwf = ECMWFDownloader.rename_variables(ds_ecmwf)
 
     # Save
@@ -340,7 +338,7 @@ if __name__=="__main__":
         "step": 10,
         "latitude": 50,
         "longitude": 50,
-        "variable": len(ds_ecmwf.variable)
+        "variable": len(ds_ecmwf.variable),
     }
 
     save(ds_ecmwf, chunk_dict, f"{local_output_dir}/ecmwf.zarr")
@@ -349,12 +347,12 @@ if __name__=="__main__":
     ds_ukv = get_nwp_dataset(
         s3_dir=ukv_s3_dir,
         datetime_fmt=r"%Y%m%d%H",  # UKV zarr files in form YYYYmmddHH.zarr
-        start_date=start_date, 
+        start_date=start_date,
         end_date=end_date,
         local_dir=ukv_local_dir,
     )
 
-    # Process it to match training data
+    # Process it to match training data
     ds_ukv = ds_ukv.chunk({"step": -1, "variable": -1})
     ds_ukv = UKVDownloader.rename_variables(ds_ukv)
     ds_ukv = UKVDownloader.add_lon_lat_coords(ds_ukv)
@@ -367,7 +365,7 @@ if __name__=="__main__":
         "step": 10,
         "x": 100,
         "y": 100,
-        "variable": len(ds_ukv.variable)
+        "variable": len(ds_ukv.variable),
     }
 
     save(ds_ukv, chunk_dict, f"{local_output_dir}/ukv.zarr")
@@ -376,7 +374,7 @@ if __name__=="__main__":
     ds_cloud = get_nwp_dataset(
         s3_dir=cloud_s3_dir,
         datetime_fmt=r"%Y-%m-%dT%H:%M",  # Cloudcasting zarr files in form YYYY-mm-ddTHH:MM.zarr
-        start_date=start_date, 
+        start_date=start_date,
         end_date=end_date,
         local_dir=cloud_local_dir,
     )
@@ -387,7 +385,7 @@ if __name__=="__main__":
         "step": 10,
         "x_geostationary": 100,
         "y_geostationary": 100,
-        "variable": len(ds_cloud.variable)
+        "variable": len(ds_cloud.variable),
     }
 
     save(ds_cloud, chunk_dict, f"{local_output_dir}/cloudcasting.zarr")
@@ -395,7 +393,7 @@ if __name__=="__main__":
     # Get the satellite data
     ds_sat = get_sat_dataset(sat_s3_icechunk, start_date, end_date)
 
-    # Process it to match training data
+    # Process it to match training data
     area_sring = yaml.dump(ds_sat.attrs["area"])
     ds_sat.attrs["area"] = ds_sat.data.attrs["area"] = area_sring
 
@@ -404,7 +402,7 @@ if __name__=="__main__":
         "time": 12,
         "x_geostationary": 100,
         "y_geostationary": 100,
-        "variable": len(ds_sat.variable)
+        "variable": len(ds_sat.variable),
     }
 
     save(ds_sat, chunk_dict, f"{local_output_dir}/rss.zarr")
