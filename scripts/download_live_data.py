@@ -282,7 +282,7 @@ def get_db_pvlive_dataset(
 
         df_pvlive = pd.DataFrame(
             conn.execute(query).fetchall(),
-            columns=["datetime_utc", "solar_generation_kw", "capacity_mwp", "gsp_id"],
+            columns=["datetime_gmt", "solar_generation_kw", "capacity_mwp", "gsp_id"],
         )
 
     df_pvlive["generation_mw"] = df_pvlive.solar_generation_kw * 1e-3
