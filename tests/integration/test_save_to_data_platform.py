@@ -60,7 +60,20 @@ async def test_save_to_generation_to_data_platform(client):
     is running and can accept data.
     """
 
-    # setup: add location
+    # setup: add location - national
+    metadata = Struct(fields={"gsp_id": Value(number_value=0)})
+    create_location_request = dp.CreateLocationRequest(
+        location_name="uk",
+        energy_source=dp.EnergySource.SOLAR,
+        geometry_wkt="POINT(0 0)",
+        location_type=dp.LocationType.NATION,
+        effective_capacity_watts=10_000_000,
+        metadata=metadata,
+        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
+    )
+    create_location_response = await client.create_location(create_location_request)
+
+    # setup: add location - gsp 1
     metadata = Struct(fields={"gsp_id": Value(number_value=1)})
     create_location_request = dp.CreateLocationRequest(
         location_name="gsp1",

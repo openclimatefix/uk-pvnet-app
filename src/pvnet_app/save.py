@@ -213,7 +213,7 @@ async def save_forecast_to_data_platform(
         client = dp.DataPlatformDataServiceStub(channel)
 
     # 2. Get all locations (Uk national + GSPs)
-    all_locations = await get_all_gsp_and_national_locations(client)
+    uk_national_and_gsp_locations = await get_all_gsp_and_national_locations(client)
 
     # 3. get or update or create forecaster version ( this is similar to ml_model before)
     name = model_tag.replace("-", "_")
@@ -240,7 +240,7 @@ async def save_forecast_to_data_platform(
         logger.debug(f"Saving forecast for GSP ID: {gsp_id}")
 
         # 4. get Location
-        location = all_locations[int(gsp_id)]
+        location = uk_national_and_gsp_locations[int(gsp_id)]
 
         # 5. Format the forecast values
         forecast_values = get_forecast_values_from_dataarray(
@@ -306,7 +306,8 @@ def get_forecast_values_from_dataarray(
 async def get_all_gsp_and_national_locations(
     client: dp.DataPlatformDataServiceStub,
 ) -> dict[int, dp.ListLocationsResponseLocationSummary]:
-    """Get all GSP and National locations for solar energy source."""
+    """Get all GSP and National locations for solar energy source"""
+
     all_locations = {}
 
     # National location
@@ -315,11 +316,13 @@ async def get_all_gsp_and_national_locations(
         energy_source_filter=dp.EnergySource.SOLAR,
     )
     location_response = await client.list_locations(all_location_request)
-    all_uk_location = [
-        loc for loc in location_response.locations if "uk" in loc.location_name.lower()
-    ]
-    if len(all_uk_location) >= 1:
+    all_uk_location = [loc for loc in location_response.locations if 'uk' in loc.location_name.lower()]
+    if len(all_uk_location) == 1:
         all_locations[0] = all_uk_location[0]
+    elif len(all_uk_location) == 0:
+        raise Exception("No UK National location found.")
+    else:
+        raise Exception("Multiple UK National locations found.")
 
     # GSP locations
     all_location_gsp_request = dp.ListLocationsRequest(
