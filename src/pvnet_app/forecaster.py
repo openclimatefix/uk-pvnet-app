@@ -296,7 +296,7 @@ class Forecaster:
 
     async def save_forecast_to_data_platform(self) -> None:
         """Save forecast to data platform."""
-        with Channel(host=data_platform_host, port=data_platform_port) as channel:
+        async with Channel(host=data_platform_host, port=data_platform_port) as channel:
             client = dp.DataPlatformDataServiceStub(channel)
             save_forecast_to_data_platform(
                 forecast_da=self.da_abs_all,
