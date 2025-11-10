@@ -75,7 +75,7 @@ def regrid_nwp_data(
             ds_list.append(regridder(ds_step))
 
         return xr.concat(ds_list, dim="step")
-    
+
     else:
         return regridder(ds)
 
