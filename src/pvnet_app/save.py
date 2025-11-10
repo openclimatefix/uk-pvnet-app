@@ -10,7 +10,6 @@ import pandas as pd
 import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
-from grpclib.client import Channel
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
 from nowcasting_datamodel.read.read_models import get_model
