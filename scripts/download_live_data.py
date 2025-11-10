@@ -277,7 +277,7 @@ def get_db_pvlive_dataset(
             WHERE g.regime='{regime}'
             AND g.datetime_utc>='{start_date}'
             AND g.datetime_utc<='{end_date}'
-            """,
+            """, # noqa: S608
         )
 
         df_pvlive = pd.DataFrame(
