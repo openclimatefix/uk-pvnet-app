@@ -298,7 +298,7 @@ class Forecaster:
         """Save forecast to data platform."""
         async with Channel(host=data_platform_host, port=data_platform_port) as channel:
             client = dp.DataPlatformDataServiceStub(channel)
-            save_forecast_to_data_platform(
+            await save_forecast_to_data_platform(
                 forecast_da=self.da_abs_all,
                 model_tag=self.model_tag,
                 init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
