@@ -52,6 +52,8 @@ this is not set then the `SATELLITE_ZARR_PATH` is used by `.zarr` is repalced wi
 - `RAISE_MODEL_FAILURE`: Option to raise an exception if a model fails to run. If set to "any" it 
   will raise an exception if any model fails. If set to "critical" it will raise an exception if any
   critical model fails. If not set, it will not raise an exception.
+- `DATA_PLATFORM_HOST`: The host address for the data platform, default is localhost.
+- `DATA_PLATFORM_PORT`: The port for the data platform, default is 50051. 
 
 ### Examples
 
