@@ -1,14 +1,13 @@
 """Functions to save forecasts to the database."""
 
 import logging
-import os
 from datetime import UTC, datetime
 from importlib.metadata import version
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-from betterproto.lib.google.protobuf import Struct, Value
+from betterproto.lib.google.protobuf import Struct
 from dp_sdk.ocf import dp
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
@@ -17,10 +16,6 @@ from nowcasting_datamodel.save.save import save as save_sql_forecasts
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
-
-# TODO this might move up to app level later on
-data_platform_host = os.getenv("DATA_PLATFORM_HOST", "localhost")
-data_platform_port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
 
 
 def save_forecast(
@@ -205,28 +200,14 @@ async def save_forecast_to_data_platform(
     """
     logger.info("Saving forecast to data platform")
 
+    # strip out timezone from init_time_utc, this works better with xarray datetime formats
+    init_time_utc = init_time_utc.replace(tzinfo=None)
+
     # 1. Get all locations (Uk national + GSPs)
     uk_national_and_gsp_locations = await get_all_gsp_and_national_locations(client)
 
     # 2. get or update or create forecaster version ( this is similar to ml_model before)
-    name = model_tag.replace("-", "_")
-    app_version = version("pvnet_app")
-
-    list_forecasters_request = dp.ListForecastersRequest(latest_versions_only=True)
-    list_forecasters_response = await client.list_forecasters(list_forecasters_request)
-    forecasters = list_forecasters_response.forecasters
-
-    forecasters_filtered = [f for f in forecasters if f.forecaster_name == name]
-
-    if len(forecasters_filtered) > 0:
-        forecaster = forecasters_filtered[0]
-    else:
-        cf_request = dp.CreateForecasterRequest(
-            name=name,
-            version=app_version,
-        )
-        forecaster_response = await client.create_forecaster(cf_request)
-        forecaster = forecaster_response.forecaster
+    forecaster = await get_forecaster(client=client, model_tag=model_tag)
 
     # now loop over all gsps
     for gsp_id in forecast_da.gsp_id.values:
@@ -237,8 +218,7 @@ async def save_forecast_to_data_platform(
 
         # 4. Format the forecast values
         forecast_values = get_forecast_values_from_dataarray(
-            forecast_da,
-            gsp_id=gsp_id,
+            forecast_da.sel(gsp_id=gsp_id),
             init_time_utc=init_time_utc,
             capacity_watts=location.effective_capacity_watts,
         )
@@ -250,36 +230,49 @@ async def save_forecast_to_data_platform(
             init_time_utc=init_time_utc.replace(tzinfo=UTC),
             values=forecast_values,
         )
+
+        # TODO we could batch these requests for speed
         _ = await client.create_forecast(forecast_request)
 
 
 def get_forecast_values_from_dataarray(
-    forecast_da: xr.DataArray,
-    gsp_id: int,
+    gsp_da: xr.DataArray,
     init_time_utc: datetime,
     capacity_watts: int,
 ) -> list[dp.CreateForecastRequestForecastValue]:
     """Convert a DataArray for a single GSP to a list of ForecastValue objects.
 
     Args:
-        forecast_da: DataArray for a single GSP
-        gsp_id: GSP ID
+        gsp_da: DataArray for a single GSP
         init_time_utc: Forecast initialization time
         capacity_watts: Capacity of the location in watts
-
     """
-    da_gsp = forecast_da.sel(gsp_id=gsp_id)
+    # create horizon mins
+    target_datetime_utc = pd.to_datetime(gsp_da.target_datetime_utc.values)
+    horizon_mins = (target_datetime_utc - init_time_utc).total_seconds() / 60
+    horizon_mins = horizon_mins.astype(int)
+    gsp_da = gsp_da.assign_coords({"horizon_mins": ("target_datetime_utc", horizon_mins)})
+
+    # normalise forecast values by capacity
+    forecast_normalised = 10**6 * gsp_da.sel(output_label="forecast_mw") / capacity_watts
+    gsp_da = xr.concat(
+        [
+            gsp_da,
+            forecast_normalised.expand_dims(dim="output_label").assign_coords(
+                output_label=["forecast_normalised"],
+            ),
+        ],
+        dim="output_label",
+    )
 
     forecast_values = []
-    for target_time in pd.to_datetime(da_gsp.target_datetime_utc.values):
-        da_gsp_time = da_gsp.sel(target_datetime_utc=target_time)
+    for target_time in pd.to_datetime(gsp_da.target_datetime_utc):
+        gsp_time_da = gsp_da.sel(target_datetime_utc=target_time)
 
-        target_time = target_time.replace(tzinfo=UTC)
-        horizon_mins = int((target_time - init_time_utc).total_seconds() / 60)
-        p50_fraction = da_gsp_time.sel(output_label="forecast_mw").item() * 10**6 / capacity_watts
-
-        # TODO tidy this up
-        metadata = Struct(fields={"temp": Value(string_value="temp")})
+        # get data
+        horizon_mins = gsp_time_da.horizon_mins.item()
+        p50_fraction = gsp_time_da.sel(output_label="forecast_normalised").item()
+        metadata = Struct(fields={})
 
         forecast_value = dp.CreateForecastRequestForecastValue(
             horizon_mins=horizon_mins,
@@ -328,3 +321,30 @@ async def get_all_gsp_and_national_locations(
         all_locations[loc.metadata.to_dict()["gsp_id"]["numberValue"]] = loc
 
     return all_locations
+
+
+async def get_forecaster(
+    client: dp.DataPlatformDataServiceStub,
+    model_tag: str = "pvnet_app",
+) -> dp.Forecaster:
+    """Get or create forecaster in data platform."""
+    name = model_tag.replace("-", "_")
+    app_version = version("pvnet_app")
+
+    list_forecasters_request = dp.ListForecastersRequest(latest_versions_only=True)
+    list_forecasters_response = await client.list_forecasters(list_forecasters_request)
+    forecasters = list_forecasters_response.forecasters
+
+    forecasters_filtered = [f for f in forecasters if f.forecaster_name == name]
+
+    if len(forecasters_filtered) > 0:
+        forecaster = forecasters_filtered[0]
+    else:
+        cf_request = dp.CreateForecasterRequest(
+            name=name,
+            version=app_version,
+        )
+        forecaster_response = await client.create_forecaster(cf_request)
+        forecaster = forecaster_response.forecaster
+
+    return forecaster
