@@ -274,6 +274,7 @@ def get_forecast_values_from_dataarray(
         p50_fraction = gsp_time_da.sel(output_label="forecast_normalised").item()
         metadata = Struct(fields={})
 
+        # TODO add p10 and p90 if they exist
         forecast_value = dp.CreateForecastRequestForecastValue(
             horizon_mins=horizon_mins,
             p50_fraction=p50_fraction,
