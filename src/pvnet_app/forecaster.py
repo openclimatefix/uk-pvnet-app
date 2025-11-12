@@ -1,5 +1,4 @@
 """Functions to run the forecaster."""
-import asyncio
 import logging
 import os
 import tempfile
@@ -274,7 +273,7 @@ class Forecaster:
         )
         return da
 
-    def log_forecast_to_database(self, session: Session) -> None:
+    async def log_forecast_to_database(self, session: Session) -> None:
         """Log the compiled forecast to the database."""
         self.logger.debug("Saving ForecastSQL to database")
 
@@ -290,18 +289,13 @@ class Forecaster:
 
         # save to new dataplatform
         try:
-            asyncio.run(self.save_forecast_to_data_platform())
+            async with Channel(host=data_platform_host, port=data_platform_port) as channel:
+                client = dp.DataPlatformDataServiceStub(channel)
+                await save_forecast_to_data_platform(
+                    forecast_da=self.da_abs_all,
+                    model_tag=self.model_tag,
+                    init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
+                    client=client,
+            )
         except Exception as e:
             self.logger.error(f"Failed to save forecast to data platform with error {e}")
-
-    async def save_forecast_to_data_platform(self) -> None:
-        """Save forecast to data platform."""
-        async with Channel(host=data_platform_host, port=data_platform_port) as channel:
-            client = dp.DataPlatformDataServiceStub(channel)
-            await save_forecast_to_data_platform(
-                forecast_da=self.da_abs_all,
-                model_tag=self.model_tag,
-                init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
-                client=client,
-            )
-
