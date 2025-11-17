@@ -1,9 +1,12 @@
 """Functions to save forecasts to the database."""
 
+import asyncio
+import itertools
 import logging
 from datetime import UTC, datetime
 from importlib.metadata import version
 
+import betterproto
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -210,17 +213,18 @@ async def save_forecast_to_data_platform(
     forecaster = await get_forecaster(client=client, model_tag=model_tag)
 
     # now loop over all gsps
+    tasks = []
     for gsp_id in forecast_da.gsp_id.values:
         logger.debug(f"Saving forecast for GSP ID: {gsp_id}")
 
         # 3. get Location
-        location = uk_national_and_gsp_locations[int(gsp_id)]
+        location = uk_national_and_gsp_locations.loc[int(gsp_id)]
 
         # 4. Format the forecast values
         forecast_values = get_forecast_values_from_dataarray(
             forecast_da.sel(gsp_id=gsp_id),
             init_time_utc=init_time_utc,
-            capacity_watts=location.effective_capacity_watts,
+            capacity_watts=float(location.effective_capacity_watts),
         )
         # 5. Save to data platform
         forecast_request = dp.CreateForecastRequest(
@@ -232,7 +236,11 @@ async def save_forecast_to_data_platform(
         )
 
         # TODO we could batch these requests for speed
-        _ = await client.create_forecast(forecast_request)
+        tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
+
+    list_results = await asyncio.gather(*tasks, return_exceptions=True)
+    for exc in filter(lambda x: isinstance(x, Exception), list_results):
+        raise exc
 
     logger.info("Saved forecast to data platform")
 
@@ -240,7 +248,7 @@ async def save_forecast_to_data_platform(
 def get_forecast_values_from_dataarray(
     gsp_da: xr.DataArray,
     init_time_utc: datetime,
-    capacity_watts: int,
+    capacity_watts: float,
 ) -> list[dp.CreateForecastRequestForecastValue]:
     """Convert a DataArray for a single GSP to a list of ForecastValue objects.
 
@@ -307,36 +315,36 @@ def get_forecast_values_from_dataarray(
 
 async def get_all_gsp_and_national_locations(
     client: dp.DataPlatformDataServiceStub,
-) -> dict[int, dp.ListLocationsResponseLocationSummary]:
+) -> pd.DataFrame:
     """Get all GSP and National locations for solar energy source."""
-    all_locations = {}
-
-    # National location
-    all_location_request = dp.ListLocationsRequest(
-        location_type_filter=dp.LocationType.NATION,
-        energy_source_filter=dp.EnergySource.SOLAR,
-    )
-    location_response = await client.list_locations(all_location_request)
-    all_uk_location = [
-        loc for loc in location_response.locations if "uk" in loc.location_name.lower()
+    tasks = [
+        asyncio.create_task(client.list_locations(
+            dp.ListLocationsRequest(
+                location_type_filter=loc_type,
+                energy_source_filter=dp.EnergySource.SOLAR,
+            ),
+        ))
+        for loc_type in [dp.LocationType.GSP, dp.LocationType.NATION]
     ]
-    if len(all_uk_location) == 1:
-        all_locations[0] = all_uk_location[0]
-    elif len(all_uk_location) == 0:
-        raise Exception("No UK National location found.")
-    else:
-        raise Exception("Multiple UK National locations found.")
+    list_results = await asyncio.gather(*tasks, return_exceptions=True)
+    for exc in filter(lambda x: isinstance(x, Exception), list_results):
+        raise exc
 
-    # GSP locations
-    all_location_gsp_request = dp.ListLocationsRequest(
-        location_type_filter=dp.LocationType.GSP,
-        energy_source_filter=dp.EnergySource.SOLAR,
+    locations_df = (
+        # Convert and combine the location lists from the responses into a single DataFrame
+        pd.DataFrame.from_dict(
+            itertools.chain(*[
+                r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)["locations"]
+                for r in list_results],
+            ),
+        )
+        # Filter the returned locations to those with a gsp_id in the metadata; extract it
+        .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
+        .assign(gsp_id=lambda df: df["metadata"].apply(lambda x: x["gsp_id"]["number_value"]))
+        .set_index("gsp_id")
     )
-    location_response = await client.list_locations(all_location_gsp_request)
-    for loc in location_response.locations:
-        all_locations[loc.metadata.to_dict()["gsp_id"]["numberValue"]] = loc
 
-    return all_locations
+    return locations_df
 
 
 async def get_forecaster(
