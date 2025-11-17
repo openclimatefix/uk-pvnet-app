@@ -101,6 +101,17 @@ async def test_save_to_generation_to_data_platform(client):
     )
     fake_data["gsp_id"] = 1
     fake_data["output_label"] = "forecast_mw"
+
+    fake_data_p10 = fake_data.copy()
+    fake_data_p10["solar_generation_mw"] = [0.3] * 24
+    fake_data_p10["output_label"] = "forecast_mw_plevel_10"
+
+    fake_data_p90 = fake_data.copy()
+    fake_data_p90["solar_generation_mw"] = [0.7] * 24
+    fake_data_p90["output_label"] = "forecast_mw_plevel_90"
+
+    fake_data = pd.concat([fake_data, fake_data_p10, fake_data_p90], ignore_index=True)
+
     fake_data = fake_data.set_index(["target_datetime_utc", "gsp_id", "output_label"])
     fake_data = fake_data.to_xarray().to_dataarray()
 

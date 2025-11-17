@@ -234,6 +234,8 @@ async def save_forecast_to_data_platform(
         # TODO we could batch these requests for speed
         _ = await client.create_forecast(forecast_request)
 
+    logger.info("Saved forecast to data platform")
+
 
 def get_forecast_values_from_dataarray(
     gsp_da: xr.DataArray,
@@ -255,11 +257,22 @@ def get_forecast_values_from_dataarray(
 
     # normalise forecast values by capacity
     forecast_normalised = 10**6 * gsp_da.sel(output_label="forecast_mw") / capacity_watts
+    forecast_p10_normalised =\
+        10**6 * gsp_da.sel(output_label="forecast_mw_plevel_10") / capacity_watts
+    forecast_p90_normalised =\
+        10**6 * gsp_da.sel(output_label="forecast_mw_plevel_90") / capacity_watts
+
     gsp_da = xr.concat(
         [
             gsp_da,
             forecast_normalised.expand_dims(dim="output_label").assign_coords(
                 output_label=["forecast_normalised"],
+            ),
+            forecast_p10_normalised.expand_dims(dim="output_label").assign_coords(
+                output_label=["forecast_p10_normalised"],
+            ),
+            forecast_p90_normalised.expand_dims(dim="output_label").assign_coords(
+                output_label=["forecast_p90_normalised"],
             ),
         ],
         dim="output_label",
@@ -272,6 +285,8 @@ def get_forecast_values_from_dataarray(
         # get data
         horizon_mins = gsp_time_da.horizon_mins.item()
         p50_fraction = gsp_time_da.sel(output_label="forecast_normalised").item()
+        p10_fraction = gsp_time_da.sel(output_label="forecast_p10_normalised").item()
+        p90_fraction = gsp_time_da.sel(output_label="forecast_p90_normalised").item()
         metadata = Struct(fields={})
 
         # TODO add p10 and p90 if they exist
@@ -280,8 +295,8 @@ def get_forecast_values_from_dataarray(
             p50_fraction=p50_fraction,
             metadata=metadata,
             other_statistics_fractions={
-                "p10": 0.01,
-                "p90": 0.99,
+                "p10": p10_fraction,
+                "p90": p90_fraction,
             },
         )
 
