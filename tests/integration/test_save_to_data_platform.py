@@ -59,20 +59,6 @@ async def test_save_to_generation_to_data_platform(client):
     This test uses the `data_platform` fixture to ensure that the Data Platform service
     is running and can accept data.
     """
-
-    # setup: add location - national
-    metadata = Struct(fields={"gsp_id": Value(number_value=0)})
-    create_location_request = dp.CreateLocationRequest(
-        location_name="uk",
-        energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POINT(0 0)",
-        location_type=dp.LocationType.NATION,
-        effective_capacity_watts=10_000_000,
-        metadata=metadata,
-        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
-    )
-    create_location_response = await client.create_location(create_location_request)
-
     # setup: add location - gsp 1
     metadata = Struct(fields={"gsp_id": Value(number_value=1)})
     create_location_request = dp.CreateLocationRequest(
@@ -100,15 +86,15 @@ async def test_save_to_generation_to_data_platform(client):
         },
     )
     fake_data["gsp_id"] = 1
-    fake_data["output_label"] = "forecast_mw"
+    fake_data["output_label"] = "forecast_fraction"
 
     fake_data_p10 = fake_data.copy()
     fake_data_p10["solar_generation_mw"] = [0.3] * 24
-    fake_data_p10["output_label"] = "forecast_mw_plevel_10"
+    fake_data_p10["output_label"] = "forecast_fraction_plevel_10"
 
     fake_data_p90 = fake_data.copy()
     fake_data_p90["solar_generation_mw"] = [0.7] * 24
-    fake_data_p90["output_label"] = "forecast_mw_plevel_90"
+    fake_data_p90["output_label"] = "forecast_fraction_plevel_90"
 
     fake_data = pd.concat([fake_data, fake_data_p10, fake_data_p90], ignore_index=True)
 
@@ -117,7 +103,8 @@ async def test_save_to_generation_to_data_platform(client):
 
     # Test the functyion
     _ = await save_forecast_to_data_platform(
-        fake_data,
+        forecast_normed_da=fake_data,
+        locations_gsp_uuid_map={1: location_uuid},
         client=client,
         model_tag="test_model",
         init_time_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
