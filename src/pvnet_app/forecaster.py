@@ -308,13 +308,10 @@ class Forecaster:
     ) -> None:
         """Save the compiled forecast to the data platform."""
         self.logger.debug("Saving forecast to data platform")
-        try:
-            await save_forecast_to_data_platform(
-                forecast_normed_da=self.da_normed_all,
-                locations_gsp_uuid_map=locations_gsp_uuid_map,
-                model_tag=self.model_tag,
-                init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
-                client=client,
-        )
-        except Exception as e:
-            self.logger.error(f"Failed to save forecast to data platform with error {e}")
+        await save_forecast_to_data_platform(
+            forecast_normed_da=self.da_normed_all,
+            locations_gsp_uuid_map=locations_gsp_uuid_map,
+            model_tag=self.model_tag,
+            init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
+            client=client,
+    )

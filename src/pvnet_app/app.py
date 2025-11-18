@@ -328,15 +328,20 @@ def app(
 
     channel = Channel(
         os.getenv("DATA_PLATFORM_HOST", "localhost"),
-        os.getenv(int(os.getenv("DATA_PLATFORM_PORT", "50051"))),
+        int(os.getenv("DATA_PLATFORM_PORT", "50051")),
     )
     client = dp.DataPlatformDataServiceStub(channel)
-    gsp_uuid_map = asyncio.run(fetch_dp_gsp_uuid_map(client=client))
-    for forecaster in forecasters.values():
-        asyncio.run(forecaster.save_forecast_to_dataplatform(
-            locations_gsp_uuid_map=gsp_uuid_map,
-            client=client,
-        ))
+    try:
+        gsp_uuid_map = asyncio.run(fetch_dp_gsp_uuid_map(client=client))
+        for forecaster in forecasters.values():
+            asyncio.run(forecaster.save_forecast_to_dataplatform(
+                locations_gsp_uuid_map=gsp_uuid_map,
+                client=client,
+            ))
+    except Exception as e:
+        logger.error(f"Failed to save forecast to data platform with error {e}")
+    finally:
+        channel.close()
 
     logger.info("Finished forecast")
 
