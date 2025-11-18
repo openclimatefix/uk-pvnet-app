@@ -1,8 +1,8 @@
 """Application to run inference for PVNet multiple models."""
-
 import asyncio
 import logging
 import os
+from functools import wraps
 from importlib.metadata import version
 
 import pandas as pd
@@ -63,8 +63,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ---------------------------------------------------------------------------
 # APP MAIN
 
+app = typer.Typer()
 
-def app(
+@app.command()
+@lambda f: wraps(f)(lambda *a, **kw: asyncio.run(f(*a, **kw)))
+async def main(
     t0: str | None = None,
     gsp_ids: list[int] | None = None,
     write_predictions: bool = True,
@@ -321,9 +324,9 @@ def app(
     # Write predictions to database
     logger.info("Writing to database")
 
-    with db_connection.get_session() as session, session.no_autoflush:
-        for forecaster in forecasters.values():
-            forecaster.log_forecast_to_database(session=session)
+    #with db_connection.get_session() as session, session.no_autoflush:
+    #    for forecaster in forecasters.values():
+    #        forecaster.log_forecast_to_database(session=session)
 
 
     channel = Channel(
@@ -332,12 +335,12 @@ def app(
     )
     client = dp.DataPlatformDataServiceStub(channel)
     try:
-        gsp_uuid_map = asyncio.run(fetch_dp_gsp_uuid_map(client=client))
+        gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
         for forecaster in forecasters.values():
-            asyncio.run(forecaster.save_forecast_to_dataplatform(
+            await forecaster.save_forecast_to_dataplatform(
                 locations_gsp_uuid_map=gsp_uuid_map,
                 client=client,
-            ))
+            )
     except Exception as e:
         logger.error(f"Failed to save forecast to data platform with error {e}")
     finally:
@@ -352,6 +355,5 @@ def app(
             raise_if_missing=raise_model_failure,
         )
 
-
 if __name__ == "__main__":
-    typer.run(app)
+    app()

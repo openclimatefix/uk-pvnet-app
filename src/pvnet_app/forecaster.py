@@ -256,7 +256,7 @@ class Forecaster:
             dim="gsp_id",
         ).to_dataset(dim="output_label")
         for var in ds_normed_all.data_vars:
-            ds_normed_all = ds_normed_all.rename({var: var.replace("_mw_", "_fraction_")})
+            ds_normed_all = ds_normed_all.rename({var: var.replace("_mw", "_fraction")})
 
         # Store the compiled predictions internally
         self.da_abs_all = xr.concat([da_abs_national, da_abs], dim="gsp_id")

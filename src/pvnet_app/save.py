@@ -10,6 +10,7 @@ import betterproto
 import numpy as np
 import pandas as pd
 import xarray as xr
+from betterproto.lib.google.protobuf import Struct
 from dp_sdk.ocf import dp
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
@@ -227,9 +228,10 @@ async def save_forecast_to_data_platform(
             init_time_utc=init_time_utc.replace(tzinfo=UTC),
             values=forecast_values,
         )
+        forecast_request.SerializeToString()
         tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
-    logger.info("Saving forecasts to Data Platform")
+    logger.info(f"Saving {len(tasks)} forecasts to Data Platform")
     list_results = await asyncio.gather(*tasks, return_exceptions=True)
     for exc in filter(lambda x: isinstance(x, Exception), list_results):
         raise exc
@@ -252,9 +254,9 @@ def map_values_da_to_dp_requests(
     horizons_mins = (target_datetime_utc - init_time_utc).total_seconds() / 60
     horizons_mins = horizons_mins.astype(int)
 
-    p50s = gsp_normed_da.sel(output_label="forecast_fraction").values
-    p10s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_10").values
-    p90s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_90").values
+    p50s = gsp_normed_da.sel(output_label="forecast_fraction").values.astype(float)
+    p10s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_10").values.astype(float)
+    p90s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_90").values.astype(float)
 
     forecast_values = []
     for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
@@ -262,6 +264,7 @@ def map_values_da_to_dp_requests(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=h,
                 p50_fraction=p50,
+                metadata=Struct().from_pydict({}),
                 other_statistics_fractions={
                     "p10": p10,
                     "p90": p90,
@@ -299,12 +302,10 @@ async def fetch_dp_gsp_uuid_map(
         )
         # Filter the returned locations to those with a gsp_id in the metadata; extract it
         .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
-        .assign(gsp_id=lambda df: df["metadata"].apply(lambda x: x["gsp_id"]["number_value"]))
-        .set_index("gsp_id")
-        .loc[:, ["gsp_id", "location_uuid"]]
+        .assign(gsp_id=lambda df: df["metadata"].apply(lambda x: int(x["gsp_id"]["number_value"])))
+        .set_index("gsp_id", drop=False, inplace=False)
     )
-
-    return locations_df.to_dict(orient="index")
+    return locations_df.apply(lambda row: row["location_uuid"], axis=1).to_dict()
 
 
 async def create_forecaster_if_not_exists(
@@ -316,7 +317,7 @@ async def create_forecaster_if_not_exists(
     app_version = version("pvnet_app")
 
     list_forecasters_request = dp.ListForecastersRequest(
-        forecaster_names_filter=name,
+        forecaster_names_filter=[name],
     )
     list_forecasters_response = await client.list_forecasters(list_forecasters_request)
 
