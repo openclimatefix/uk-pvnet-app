@@ -1,6 +1,5 @@
 """Functions to run the forecaster."""
 import logging
-import os
 import tempfile
 
 import numpy as np
@@ -10,7 +9,6 @@ import xarray as xr
 import yaml
 from dateutil.tz import UTC
 from dp_sdk.ocf import dp
-from grpclib.client import Channel
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
@@ -36,10 +34,6 @@ _model_mismatch_msg = (
     "the shape of PVNet output doesn't match the expected shape of the summation model. Combining "
     "may lead to unreliable results even if the shapes match."
 )
-
-data_platform_host = os.getenv("DATA_PLATFORM_HOST", "localhost")
-data_platform_port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
-
 
 
 class Forecaster:
@@ -90,6 +84,10 @@ class Forecaster:
             model_config.summation.commit,
             device,
         )
+
+        # Values
+        self.da_abs_all: xr.DataArray
+        self.da_normed_all: xr.DataArray
 
         # These are the valid times this forecast will predict for
         self.valid_times = t0 + pd.timedelta_range(
@@ -182,19 +180,14 @@ class Forecaster:
             gsp_ids,
         )
 
-        # Multiply normalised forecasts by capacities and clip negatives
-        self.logger.debug(f"Converting to absolute MW using {self.gsp_capacities}")
-        da_abs = da_normed.clip(0, None) * self.gsp_capacities.values[:, None, None]
-
-        max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
-        self.logger.debug(f"Maximum predictions: {max_preds}")
+        self.logger.debug("Clipping negatives, applying sundown mask")
+        da_normed = da_normed.clip(0, None)
 
         # Calculate and apply sundown mask from solar elevation
         # - In the batch the solar elevation angle is scaled to the range [0, 1]
         elevation = (batch["solar_elevation"] - 0.5) * 180
         # - We only need elevation mask for forecasted values, not history
         elevation = elevation[:, -normed_preds.shape[1]:]
-
         da_sundown_mask = xr.DataArray(
             data=elevation < MIN_DAY_ELEVATION,
             dims=["gsp_id", "target_datetime_utc"],
@@ -203,7 +196,13 @@ class Forecaster:
                 "target_datetime_utc": self.valid_times,
             },
         )
-        da_abs = da_abs.where(~da_sundown_mask).fillna(0.0)
+        da_normed = da_normed.where(~da_sundown_mask).fillna(0.0)
+
+        self.logger.debug("Converting to absolute MW")
+        da_abs = da_normed * self.gsp_capacities.values[:, None, None]
+
+        max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
+        self.logger.debug(f"Maximum predictions: {max_preds}")
 
         if self.summation_model is None:
             self.logger.debug("Summing across GSPs to produce national forecast")
@@ -235,18 +234,33 @@ class Forecaster:
                 gsp_ids=[0],
             )
 
-            # Multiply normalised forecasts by capacity, clip negatives
-            da_abs_national = da_normed_national.clip(0, None) * self.national_capacity
+            # Clip negatives, apply sundown mask
+            # All GSPs must be masked to mask national
+            da_normed_national = (
+                da_normed_national
+                .clip(0, None)
+                .where(~da_sundown_mask.all(dim="gsp_id"))
+                .fillna(0.0)
+            )
 
-            # Apply sundown mask - All GSPs must be masked to mask national
-            da_abs_national = da_abs_national.where(~da_sundown_mask.all(dim="gsp_id")).fillna(0.0)
+            # Convert to absolute MW
+            da_abs_national = da_normed_national * self.national_capacity
 
         self.logger.debug(
             f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}",
         )
 
+        # Rename the labels in the normalized dataset
+        ds_normed_all = xr.concat(
+            [da_normed_national, da_normed],
+            dim="gsp_id",
+        ).to_dataset(dim="output_label")
+        for var in ds_normed_all.data_vars:
+            ds_normed_all = ds_normed_all.rename({var: var.replace("_mw_", "_fraction_")})
+
         # Store the compiled predictions internally
         self.da_abs_all = xr.concat([da_abs_national, da_abs], dim="gsp_id")
+        self.da_normed_all = ds_normed_all.to_array(dim="output_label")
 
     def preds_to_dataarray(
         self,
@@ -273,7 +287,7 @@ class Forecaster:
         )
         return da
 
-    async def log_forecast_to_database(self, session: Session) -> None:
+    def log_forecast_to_database(self, session: Session) -> None:
         """Log the compiled forecast to the database."""
         self.logger.debug("Saving ForecastSQL to database")
 
@@ -287,15 +301,20 @@ class Forecaster:
             save_gsp_sum=self.save_gsp_sum,
         )
 
-        # save to new dataplatform
+    async def save_forecast_to_dataplatform(
+        self,
+        client: dp.DataPlatformDataServiceStub,
+        locations_gsp_uuid_map: dict[int, str],
+    ) -> None:
+        """Save the compiled forecast to the data platform."""
+        self.logger.debug("Saving forecast to data platform")
         try:
-            async with Channel(host=data_platform_host, port=data_platform_port) as channel:
-                client = dp.DataPlatformDataServiceStub(channel)
-                await save_forecast_to_data_platform(
-                    forecast_da=self.da_abs_all,
-                    model_tag=self.model_tag,
-                    init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
-                    client=client,
-            )
+            await save_forecast_to_data_platform(
+                forecast_normed_da=self.da_normed_all,
+                locations_gsp_uuid_map=locations_gsp_uuid_map,
+                model_tag=self.model_tag,
+                init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
+                client=client,
+        )
         except Exception as e:
             self.logger.error(f"Failed to save forecast to data platform with error {e}")

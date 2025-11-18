@@ -9,6 +9,8 @@ import pandas as pd
 import sentry_sdk
 import torch
 import typer
+from dp_sdk.ocf import dp
+from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from ocf_data_sampler.load.gsp import get_gsp_boundaries
@@ -21,6 +23,7 @@ from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownl
 from pvnet_app.data.satellite import SatelliteDownloader, get_satellite_source_paths
 from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_configs.pydantic_models import get_all_models
+from pvnet_app.save import fetch_dp_gsp_uuid_map
 from pvnet_app.utils import check_model_runs_finished, get_boolean_env_var, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
@@ -320,7 +323,20 @@ def app(
 
     with db_connection.get_session() as session, session.no_autoflush:
         for forecaster in forecasters.values():
-            asyncio.run(forecaster.log_forecast_to_database(session=session))
+            forecaster.log_forecast_to_database(session=session)
+
+
+    channel = Channel(
+        os.getenv("DATA_PLATFORM_HOST", "localhost"),
+        os.getenv(int(os.getenv("DATA_PLATFORM_PORT", "50051"))),
+    )
+    client = dp.DataPlatformDataServiceStub(channel)
+    gsp_uuid_map = asyncio.run(fetch_dp_gsp_uuid_map(client=client))
+    for forecaster in forecasters.values():
+        asyncio.run(forecaster.save_forecast_to_dataplatform(
+            locations_gsp_uuid_map=gsp_uuid_map,
+            client=client,
+        ))
 
     logger.info("Finished forecast")
 
