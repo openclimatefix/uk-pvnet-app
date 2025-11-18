@@ -67,7 +67,7 @@ app = typer.Typer()
 
 @app.command()
 @lambda f: wraps(f)(lambda *a, **kw: asyncio.run(f(*a, **kw)))
-async def main(
+async def run(
     t0: str | None = None,
     gsp_ids: list[int] | None = None,
     write_predictions: bool = True,

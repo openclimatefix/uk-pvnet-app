@@ -9,7 +9,7 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 
-from pvnet_app.app import app
+from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
 NUM_GSPS = 331
@@ -88,7 +88,7 @@ def test_app(
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
-        app(t0=test_t0)
+        run(t0=test_t0)
 
     model_configs = get_all_models(get_critical_only=False)
     check_number_of_forecasts(model_configs, db_session)
@@ -116,7 +116,7 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
-        app(t0=test_t0)
+        run(t0=test_t0)
 
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run

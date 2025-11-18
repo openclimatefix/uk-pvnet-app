@@ -68,7 +68,7 @@ dev = [
 
 [project.scripts]
 # Put entrypoints in here
-pvnet-app = "pvnet_app.app:app"
+pvnet-app = "pvnet_app.app:run"
 
 [project.urls]
 repository = "https://github.com/openclimatefix/uk-pvnet-app"
