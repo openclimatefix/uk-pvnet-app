@@ -148,5 +148,4 @@ docstring-code-line-length = 100
 
 [tool.uv.sources]
 dp-sdk = { url = "https://github.com/openclimatefix/data-platform/releases/download/v0.13.2/dp_sdk-0.13.2-py3-none-any.whl" }
-esmpy = { path = "../esmf/src/addon/esmpy" }
 
