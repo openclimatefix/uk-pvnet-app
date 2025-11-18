@@ -228,7 +228,6 @@ async def save_forecast_to_data_platform(
             init_time_utc=init_time_utc.replace(tzinfo=UTC),
             values=forecast_values,
         )
-        forecast_request.SerializeToString()
         tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
     logger.info(f"Saving {len(tasks)} forecasts to Data Platform")

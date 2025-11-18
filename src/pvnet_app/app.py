@@ -1,4 +1,5 @@
 """Application to run inference for PVNet multiple models."""
+import asyncio
 import logging
 import os
 from importlib.metadata import version
@@ -348,3 +349,9 @@ async def run(
             raise_if_missing=raise_model_failure,
         )
 
+def main() -> None:
+    """Main entrypoint to the inference app."""
+    asyncio.run(run())
+
+if __name__ == "__main__":
+    main()
