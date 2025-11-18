@@ -254,6 +254,8 @@ def map_values_da_to_dp_requests(
     horizons_mins = (target_datetime_utc - init_time_utc).total_seconds() / 60
     horizons_mins = horizons_mins.astype(int)
 
+    # Reduce singular dimensions
+    gsp_normed_da = gsp_normed_da.squeeze(drop=True)
     p50s = gsp_normed_da.sel(output_label="forecast_fraction").values.astype(float)
     p10s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_10").values.astype(float)
     p90s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_90").values.astype(float)
