@@ -11,6 +11,7 @@ from testcontainers.postgres import PostgresContainer
 
 from src.pvnet_app.save import save_forecast_to_data_platform
 
+
 def client():
     """
     Fixture to spin up a PostgreSQL container for the entire test session.
