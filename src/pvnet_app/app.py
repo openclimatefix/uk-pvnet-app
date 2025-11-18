@@ -1,14 +1,11 @@
 """Application to run inference for PVNet multiple models."""
-import asyncio
 import logging
 import os
-from functools import wraps
 from importlib.metadata import version
 
 import pandas as pd
 import sentry_sdk
 import torch
-import typer
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
@@ -63,10 +60,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ---------------------------------------------------------------------------
 # APP MAIN
 
-app = typer.Typer()
-
-@app.command()
-@lambda f: wraps(f)(lambda *a, **kw: asyncio.run(f(*a, **kw)))
 async def run(
     t0: str | None = None,
     gsp_ids: list[int] | None = None,
@@ -324,9 +317,9 @@ async def run(
     # Write predictions to database
     logger.info("Writing to database")
 
-    #with db_connection.get_session() as session, session.no_autoflush:
-    #    for forecaster in forecasters.values():
-    #        forecaster.log_forecast_to_database(session=session)
+    with db_connection.get_session() as session, session.no_autoflush:
+        for forecaster in forecasters.values():
+            forecaster.log_forecast_to_database(session=session)
 
 
     channel = Channel(
@@ -355,5 +348,3 @@ async def run(
             raise_if_missing=raise_model_failure,
         )
 
-if __name__ == "__main__":
-    app()

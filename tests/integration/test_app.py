@@ -1,6 +1,7 @@
 import os
 import tempfile
 
+import pytest
 import zarr
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
@@ -49,7 +50,8 @@ def check_number_of_forecasts(model_configs, db_session):
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_num_forecast_values
 
 
-def test_app(
+@pytest.mark.asyncio(loop_scope="session")
+async def test_app(
     test_t0,
     db_session,
     nwp_ukv_data,
@@ -88,13 +90,14 @@ def test_app(
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
-        run(t0=test_t0)
+        await run(t0=test_t0)
 
     model_configs = get_all_models(get_critical_only=False)
     check_number_of_forecasts(model_configs, db_session)
 
 
-def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
+@pytest.mark.asyncio(loop_scope="session")
+async def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     """Test the app for the case when no satellite data is available"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -116,7 +119,7 @@ def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
-        run(t0=test_t0)
+        await run(t0=test_t0)
 
     # Only the models which don't use satellite will be run in this case
     # The models below are the only ones which should have been run

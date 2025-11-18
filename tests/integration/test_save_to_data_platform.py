@@ -3,7 +3,6 @@ import time
 
 import pandas as pd
 import pytest
-import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
@@ -12,9 +11,7 @@ from testcontainers.postgres import PostgresContainer
 
 from src.pvnet_app.save import save_forecast_to_data_platform
 
-
-@pytest_asyncio.fixture(scope="session")
-async def client():
+def client():
     """
     Fixture to spin up a PostgreSQL container for the entire test session.
     This fixture uses `testcontainers` to start a fresh PostgreSQL container and provides
