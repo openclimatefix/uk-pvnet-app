@@ -181,7 +181,8 @@ def convert_dataarray_to_forecasts(
 
 
 async def save_forecast_to_data_platform(
-    forecast_da: xr.DataArray,
+    forecast_normed_da: xr.DataArray,
+    locations_gsp_uuid_map: dict[int, str],
     model_tag: str,
     init_time_utc: datetime,
     client: dp.DataPlatformDataServiceStub,
@@ -196,7 +197,8 @@ async def save_forecast_to_data_platform(
     5. Save to the data platform
 
     Args:
-        forecast_da: DataArray of forecasts for all GSPs
+        forecast_normed_da: DataArray of normalized forecasts for all GSPs
+        locations_gsp_uuid_map: Mapping of GSP IDs to location UUIDs
         model_tag: the name of the model to saved to the database
         init_time_utc: Forecast initialization time
         client: Data platform client. If None, a new client will be created.
@@ -206,117 +208,78 @@ async def save_forecast_to_data_platform(
     # strip out timezone from init_time_utc, this works better with xarray datetime formats
     init_time_utc = init_time_utc.replace(tzinfo=None)
 
-    # 1. Get all locations (Uk national + GSPs)
-    uk_national_and_gsp_locations = await get_all_gsp_and_national_locations(client)
-
     # 2. get or update or create forecaster version ( this is similar to ml_model before)
-    forecaster = await get_forecaster(client=client, model_tag=model_tag)
+    forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag)
 
     # now loop over all gsps
+    logger.debug("Processing forecasts for Data Platform")
     tasks = []
-    for gsp_id in forecast_da.gsp_id.values:
-        logger.debug(f"Saving forecast for GSP ID: {gsp_id}")
-
-        # 3. get Location
-        location = uk_national_and_gsp_locations.loc[int(gsp_id)]
-
+    for gsp_id in forecast_normed_da.gsp_id.values:
         # 4. Format the forecast values
-        forecast_values = get_forecast_values_from_dataarray(
-            forecast_da.sel(gsp_id=gsp_id),
+        forecast_values = map_values_da_to_dp_requests(
+            forecast_normed_da.sel(gsp_id=gsp_id),
             init_time_utc=init_time_utc,
-            capacity_watts=float(location.effective_capacity_watts),
         )
         # 5. Save to data platform
         forecast_request = dp.CreateForecastRequest(
             forecaster=forecaster,
-            location_uuid=location.location_uuid,
+            location_uuid=locations_gsp_uuid_map[int(gsp_id)],
             energy_source=dp.EnergySource.SOLAR,
             init_time_utc=init_time_utc.replace(tzinfo=UTC),
             values=forecast_values,
         )
-
-        # TODO we could batch these requests for speed
         tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
+    logger.info(f"Saving {len(tasks)} forecasts to Data Platform")
     list_results = await asyncio.gather(*tasks, return_exceptions=True)
     for exc in filter(lambda x: isinstance(x, Exception), list_results):
         raise exc
 
-    logger.info("Saved forecast to data platform")
+    logger.info("Saved forecast to Data Platform")
 
 
-def get_forecast_values_from_dataarray(
-    gsp_da: xr.DataArray,
+def map_values_da_to_dp_requests(
+    gsp_normed_da: xr.DataArray,
     init_time_utc: datetime,
-    capacity_watts: float,
 ) -> list[dp.CreateForecastRequestForecastValue]:
     """Convert a DataArray for a single GSP to a list of ForecastValue objects.
 
     Args:
-        gsp_da: DataArray for a single GSP
+        gsp_normed_da: Normalized DataArray for a single GSP
         init_time_utc: Forecast initialization time
-        capacity_watts: Capacity of the location in watts
     """
     # create horizon mins
-    target_datetime_utc = pd.to_datetime(gsp_da.target_datetime_utc.values)
-    horizon_mins = (target_datetime_utc - init_time_utc).total_seconds() / 60
-    horizon_mins = horizon_mins.astype(int)
-    gsp_da = gsp_da.assign_coords({"horizon_mins": ("target_datetime_utc", horizon_mins)})
+    target_datetime_utc = pd.to_datetime(gsp_normed_da.target_datetime_utc.values)
+    horizons_mins = (target_datetime_utc - init_time_utc).total_seconds() / 60
+    horizons_mins = horizons_mins.astype(int)
 
-    # normalise forecast values by capacity
-    forecast_normalised = 10**6 * gsp_da.sel(output_label="forecast_mw") / capacity_watts
-    forecast_p10_normalised =\
-        10**6 * gsp_da.sel(output_label="forecast_mw_plevel_10") / capacity_watts
-    forecast_p90_normalised =\
-        10**6 * gsp_da.sel(output_label="forecast_mw_plevel_90") / capacity_watts
-
-    gsp_da = xr.concat(
-        [
-            gsp_da,
-            forecast_normalised.expand_dims(dim="output_label").assign_coords(
-                output_label=["forecast_normalised"],
-            ),
-            forecast_p10_normalised.expand_dims(dim="output_label").assign_coords(
-                output_label=["forecast_p10_normalised"],
-            ),
-            forecast_p90_normalised.expand_dims(dim="output_label").assign_coords(
-                output_label=["forecast_p90_normalised"],
-            ),
-        ],
-        dim="output_label",
-    )
+    # Reduce singular dimensions
+    gsp_normed_da = gsp_normed_da.squeeze(drop=True)
+    p50s = gsp_normed_da.sel(output_label="forecast_fraction").values.astype(float)
+    p10s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_10").values.astype(float)
+    p90s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_90").values.astype(float)
 
     forecast_values = []
-    for target_time in pd.to_datetime(gsp_da.target_datetime_utc):
-        gsp_time_da = gsp_da.sel(target_datetime_utc=target_time)
-
-        # get data
-        horizon_mins = gsp_time_da.horizon_mins.item()
-        p50_fraction = gsp_time_da.sel(output_label="forecast_normalised").item()
-        p10_fraction = gsp_time_da.sel(output_label="forecast_p10_normalised").item()
-        p90_fraction = gsp_time_da.sel(output_label="forecast_p90_normalised").item()
-        metadata = Struct(fields={})
-
-        # TODO add p10 and p90 if they exist
-        forecast_value = dp.CreateForecastRequestForecastValue(
-            horizon_mins=horizon_mins,
-            p50_fraction=p50_fraction,
-            metadata=metadata,
-            other_statistics_fractions={
-                "p10": p10_fraction,
-                "p90": p90_fraction,
-            },
+    for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
+        forecast_values.append(
+            dp.CreateForecastRequestForecastValue(
+                horizon_mins=h,
+                p50_fraction=p50,
+                metadata=Struct().from_pydict({}),
+                other_statistics_fractions={
+                    "p10": p10,
+                    "p90": p90,
+                },
+            ),
         )
-
-        forecast_values.append(forecast_value)
 
     return forecast_values
 
 
-async def get_all_gsp_and_national_locations(
+async def fetch_dp_gsp_uuid_map(
     client: dp.DataPlatformDataServiceStub,
-) -> pd.DataFrame:
-    """Get all GSP and National locations for solar energy source."""
+) -> dict[int, str]:
+    """Fetch all GSP locations from data platform and map to their uuids."""
     tasks = [
         asyncio.create_task(client.list_locations(
             dp.ListLocationsRequest(
@@ -340,35 +303,46 @@ async def get_all_gsp_and_national_locations(
         )
         # Filter the returned locations to those with a gsp_id in the metadata; extract it
         .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
-        .assign(gsp_id=lambda df: df["metadata"].apply(lambda x: x["gsp_id"]["number_value"]))
-        .set_index("gsp_id")
+        .assign(gsp_id=lambda df: df["metadata"].apply(lambda x: int(x["gsp_id"]["number_value"])))
+        .set_index("gsp_id", drop=False, inplace=False)
     )
+    return locations_df.apply(lambda row: row["location_uuid"], axis=1).to_dict()
 
-    return locations_df
 
-
-async def get_forecaster(
+async def create_forecaster_if_not_exists(
     client: dp.DataPlatformDataServiceStub,
     model_tag: str = "pvnet_app",
 ) -> dp.Forecaster:
-    """Get or create forecaster in data platform."""
+    """Create the current forecaster if it does not exist."""
     name = model_tag.replace("-", "_")
     app_version = version("pvnet_app")
 
-    list_forecasters_request = dp.ListForecastersRequest(latest_versions_only=True)
+    list_forecasters_request = dp.ListForecastersRequest(
+        forecaster_names_filter=[name],
+    )
     list_forecasters_response = await client.list_forecasters(list_forecasters_request)
-    forecasters = list_forecasters_response.forecasters
 
-    forecasters_filtered = [f for f in forecasters if f.forecaster_name == name]
-
-    if len(forecasters_filtered) > 0:
-        forecaster = forecasters_filtered[0]
+    if len(list_forecasters_response.forecasters) > 0:
+        filtered_forecasters = [
+            f for f in list_forecasters_response.forecasters if f.forecaster_version == app_version
+        ]
+        if len(filtered_forecasters) == 1:
+            # Forecaster exists, return it
+            return filtered_forecasters[0]
+        else:
+            # Forecaster version does not exist, update it
+            update_forecaster_request = dp.UpdateForecasterRequest(
+                name=name,
+                new_version=app_version,
+            )
+            update_forecaster_response = await client.update_forecaster(update_forecaster_request)
+            return update_forecaster_response.forecaster
     else:
-        cf_request = dp.CreateForecasterRequest(
+        # Forecaster does not exist, create it
+        create_forecaster_request = dp.CreateForecasterRequest(
             name=name,
             version=app_version,
         )
-        forecaster_response = await client.create_forecaster(cf_request)
-        forecaster = forecaster_response.forecaster
+        create_forecaster_response = await client.create_forecaster(create_forecaster_request)
+        return create_forecaster_response.forecaster
 
-    return forecaster
