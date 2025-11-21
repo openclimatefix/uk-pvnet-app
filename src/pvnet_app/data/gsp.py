@@ -14,12 +14,12 @@ def get_gsp_locations() -> pd.DataFrame:
     return pd.read_csv(gsp_coordinates_path, index_col="gsp_id")
 
 
-def get_gsp_and_national_capacities(
+def get_gsp_capacities(
     db_connection: DatabaseConnection,
     gsp_ids: list[int],
     t0: pd.Timestamp,
 ) -> pd.Series:
-    """Get GSP and national capacities from the database.
+    """Get GSP capacities from the database.
 
     Args:
         db_connection: Database connection object
@@ -61,7 +61,7 @@ def create_null_generation_data(db_connection: DatabaseConnection, t0: pd.Timest
     gen_data = np.full((len(time_utc), len(df_locs)), fill_value=-1, dtype=np.float32)
 
     # Get capacities from database
-    capacities = get_gsp_and_national_capacities(
+    capacities = get_gsp_capacities(
         db_connection=db_connection,
         gsp_ids=df_locs.index.values.tolist(),
         t0=t0,
