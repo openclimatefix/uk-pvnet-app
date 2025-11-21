@@ -41,7 +41,7 @@ def get_uk_centroid_coords() -> tuple[float, float]:
     """Get the UK centroid longitude and latitude."""
     df_loc = get_gsp_locations()
 
-    longitude = df_loc.loc[0].latitude.item()
+    longitude = df_loc.loc[0].longitude.item()
     latitude = df_loc.loc[0].latitude.item()
 
     return longitude, latitude
