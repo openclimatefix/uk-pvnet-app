@@ -21,9 +21,9 @@ from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 
 from pvnet_app.config import modify_data_config_for_production
+from pvnet_app.data.gsp import get_gsp_locations
 from pvnet_app.model_configs.pydantic_models import ModelConfig
 from pvnet_app.save import save_forecast, save_forecast_to_data_platform
-from pvnet_app.data.gsp import get_gsp_locations
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -38,8 +38,7 @@ _model_mismatch_msg = (
 
 
 def get_uk_centroid_coords() -> tuple[float, float]:
-    """Get the UK centroid longitude and latitude"""
-
+    """Get the UK centroid longitude and latitude."""
     df_loc = get_gsp_locations()
 
     longitude = df_loc.loc[0].latitude.item()
@@ -232,7 +231,7 @@ class Forecaster:
                 pvnet_inputs=None,
                 valid_times=self.valid_times,
                 relative_capacities=self.gsp_capacities / self.national_capacity,
-                longitude=self.longitude, 
+                longitude=self.longitude,
                 latitude=self.latitude,
                 target=None,
             )
