@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.model_configs.pydantic_models import ModelConfig
 from pvnet_app.save import save_forecast, save_forecast_to_data_platform
+from pvnet_app.data.gsp import get_gsp_locations
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -34,6 +35,17 @@ _model_mismatch_msg = (
     "the shape of PVNet output doesn't match the expected shape of the summation model. Combining "
     "may lead to unreliable results even if the shapes match."
 )
+
+
+def get_uk_centroid_coords() -> tuple[float, float]:
+    """Get the UK centroid longitude and latitude"""
+
+    df_loc = get_gsp_locations()
+
+    longitude = df_loc.loc[0].latitude.item()
+    latitude = df_loc.loc[0].latitude.item()
+
+    return longitude, latitude
 
 
 class Forecaster:
@@ -84,6 +96,9 @@ class Forecaster:
             model_config.summation.commit,
             device,
         )
+
+        # Get the UK centroid coordinates
+        self.longitude, self.latitude = get_uk_centroid_coords()
 
         # Values
         self.da_abs_all: xr.DataArray
@@ -199,7 +214,7 @@ class Forecaster:
         da_normed = da_normed.where(~da_sundown_mask).fillna(0.0)
 
         self.logger.debug("Converting to absolute MW")
-        da_abs = da_normed * self.gsp_capacities.values[:, None, None]
+        da_abs = da_normed * self.gsp_capacities[:, None, None]
 
         max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
         self.logger.debug(f"Maximum predictions: {max_preds}")
@@ -216,7 +231,9 @@ class Forecaster:
             inputs = construct_sum_sample(
                 pvnet_inputs=None,
                 valid_times=self.valid_times,
-                relative_capacities=self.gsp_capacities.values / self.national_capacity,
+                relative_capacities=self.gsp_capacities / self.national_capacity,
+                longitude=self.longitude, 
+                latitude=self.latitude,
                 target=None,
             )
             inputs["pvnet_outputs"] = normed_preds

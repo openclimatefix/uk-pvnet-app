@@ -173,8 +173,8 @@ async def run(
 
     ds_gen.to_zarr(generation_path)
 
-    national_capacity = ds_gen.sel(time_utc=t0, location_id=0).capacity_mw.item()
-    gsp_capacities = ds_gen.sel(time_utc=t0, location_id=slice(1, None)).capacity_mw.values
+    national_capacity = ds_gen.sel(time_utc=t0, location_id=0).capacity_mwp.item()
+    gsp_capacities = ds_gen.sel(time_utc=t0, location_id=slice(1, None)).capacity_mwp.values
     gsp_ids = ds_gen.location_id.values
 
     data_downloaders = []

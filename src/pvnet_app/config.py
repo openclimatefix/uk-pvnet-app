@@ -48,7 +48,7 @@ def populate_config_with_data_data_filepaths(config: dict) -> dict:
     }
 
     # Set the GSP input path to null. We don't need it in production
-    config["input_data"]["gsp"]["zarr_path"] = generation_path
+    config["input_data"]["generation"]["zarr_path"] = generation_path
 
     # Replace satellite data path
     if "satellite" in config["input_data"] and \

@@ -518,7 +518,7 @@ class SatelliteDownloader:
         # Select the most recent satellite data and load it into memory
         ds = self.choose_and_load_satellite_data()
 
-        if self.data_is_okay(ds, self.gsp_ids):
+        if self.data_is_okay(ds):
             ds = self.process(ds).compute()
             self.resave(ds)
 

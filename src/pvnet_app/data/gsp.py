@@ -58,12 +58,12 @@ def create_null_generation_data(db_connection: DatabaseConnection, t0: pd.Timest
     interval_end = pd.Timedelta("3D")
     time_utc = pd.date_range(t0 + interval_start, t0 + interval_end, freq="30min")
 
-    gen_data = np.full((len(time_utc), len(df_locs)), fill_value=np.nan)
+    gen_data = np.full((len(time_utc), len(df_locs)), fill_value=-1, dtype=np.float32)
 
     # Get capacities from database
     capacities = get_gsp_and_national_capacities(
         db_connection=db_connection,
-        gsp_ids=list(df_locs.index.values),
+        gsp_ids=df_locs.index.values.tolist(),
         t0=t0,
     )
 
