@@ -11,12 +11,12 @@ from dp_sdk.ocf import dp
 from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
-from ocf_data_sampler.load.gsp import get_gsp_boundaries
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
+from pvnet_app.consts import generation_path
 from pvnet_app.config import load_yaml_config
 from pvnet_app.data.batch_validation import check_batch
-from pvnet_app.data.gsp import get_gsp_and_national_capacities
+from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader, get_satellite_source_paths
 from pvnet_app.forecaster import Forecaster
@@ -63,15 +63,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 async def run(
     t0: str | None = None,
-    gsp_ids: list[int] | None = None,
     write_predictions: bool = True,
 ) -> None:
     """Inference function to run PVNet.
 
     Args:
         t0 (str): Datetime at which forecast is made
-        gsp_ids (array_like): List of gsp_ids to make predictions for. This list of GSPs are summed
-            to national.
         write_predictions (bool): Whether to write prediction to the database. Else returns as
             DataArray for local testing.
 
@@ -111,9 +108,6 @@ async def run(
         t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor("30min")
     else:
         t0 = pd.Timestamp(t0).floor("30min")
-
-    if gsp_ids is not None and len(gsp_ids) == 0:
-            raise ValueError("No GSP IDs provided")
 
     # --- Unpack the environment variables
     run_critical_models_only = get_boolean_env_var("RUN_CRITICAL_MODELS_ONLY", default=False)
@@ -171,16 +165,18 @@ async def run(
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
-    if gsp_ids is None:
-        gsp_ids = get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
-
     # --- Get capacities from the database
     logger.info("Loading capacities from the database")
-    gsp_capacities, national_capacity = get_gsp_and_national_capacities(
+    ds_gen = create_null_generation_data(
         db_connection=db_connection,
-        gsp_ids=gsp_ids,
         t0=t0,
     )
+
+    ds_gen.to_zarr(generation_path)
+
+    national_capacity = ds_gen.sel(time_utc=t0, location_id=0).capacity_mw.item()
+    gsp_capacities = ds_gen.sel(time_utc=t0, location_id=slice(1, None)).capacity_mw.values
+    gsp_ids = ds_gen.location_id.values
 
     data_downloaders = []
 
@@ -192,7 +188,6 @@ async def run(
             t0=t0,
             source_path_5=sat_source_path_5,
             source_path_15=sat_source_path_15,
-            gsp_ids=gsp_ids,
         )
         sat_downloader.run()
 
