@@ -13,8 +13,8 @@ from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
-from pvnet_app.consts import generation_path
 from pvnet_app.config import load_yaml_config
+from pvnet_app.consts import generation_path
 from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
@@ -132,7 +132,6 @@ async def run(
     logger.info(f"Using `pvnet` library version: {pvnet_version}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Making forecast for init time: {t0}")
-    logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
     logger.info(f"Running critical models only: {run_critical_models_only}")
     logger.info(f"Allow adjuster: {allow_adjuster}")
     logger.info(f"Allow saving GSP sum: {allow_save_gsp_sum}")

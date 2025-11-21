@@ -1,14 +1,16 @@
 """Functions to get GSP data from the database."""
+from importlib.resources import files
+
 import numpy as np
 import pandas as pd
 import xarray as xr
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
-from importlib.resources import files
 
 
 def get_gsp_locations() -> pd.DataFrame:
-    gsp_coordinates_path = files("pvnet_app.data").joinpath(f"uk_gsp_locations_20250109.csv")
+    """Load the GSP locations metadata."""
+    gsp_coordinates_path = files("pvnet_app.data").joinpath("uk_gsp_locations_20250109.csv")
     return pd.read_csv(gsp_coordinates_path, index_col="gsp_id")
 
 
@@ -23,11 +25,6 @@ def get_gsp_and_national_capacities(
         db_connection: Database connection object
         gsp_ids: List of GSP IDs to get capacities for
         t0: Reference timestamp for getting capacities
-
-    Returns:
-        Tuple containing:
-        - Pandas series of most recent GSP capacities
-        - National capacity value
     """
     with db_connection.get_session() as session:
         # Get GSP capacities
@@ -45,11 +42,18 @@ def get_gsp_and_national_capacities(
 
 
 def create_null_generation_data(db_connection: DatabaseConnection, t0: pd.Timestamp) -> xr.Dataset:
+    """Create generation-like xarray-data.
 
+    The generation values are all set to NaN. The capacities are loaded from the database.
+
+    Args:
+        db_connection: Database connection object
+        t0: The forecast init-time
+    """
     # Load the GSP location data
     df_locs = get_gsp_locations()
 
-    # Generate null genration values
+    # Generate null genration values
     interval_start = -pd.Timedelta("2D")
     interval_end = pd.Timedelta("3D")
     time_utc = pd.date_range(t0 + interval_start, t0 + interval_end, freq="30min")
@@ -60,7 +64,7 @@ def create_null_generation_data(db_connection: DatabaseConnection, t0: pd.Timest
     capacities = get_gsp_and_national_capacities(
         db_connection=db_connection,
         gsp_ids=list(df_locs.index.values),
-        t0=t0
+        t0=t0,
     )
 
     cap_data = np.tile(capacities,(len(time_utc),1))
@@ -76,7 +80,7 @@ def create_null_generation_data(db_connection: DatabaseConnection, t0: pd.Timest
             "location_id": ("location_id", df_locs.index.values),
             "longitude": ("location_id", df_locs.longitude.values),
             "latitude": ("location_id", df_locs.latitude.values),
-        }
+        },
     )
 
     return ds_gen

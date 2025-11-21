@@ -10,7 +10,7 @@ import yaml
 from dateutil.tz import UTC
 from dp_sdk.ocf import dp
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
-from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
+from ocf_data_sampler.torch_datasets.pvnet_dataset import PVNetConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
     batch_to_tensor,
     copy_batch_to_device,
@@ -156,7 +156,7 @@ class Forecaster:
                 output_path=temp_path,
             )
 
-            dataset = PVNetUKConcurrentDataset(config_filename=temp_path, gsp_ids=self.gsp_ids)
+            dataset = PVNetConcurrentDataset(config_filename=temp_path)
 
         return dataset.get_sample(self.t0)
 
@@ -165,7 +165,7 @@ class Forecaster:
         """Make predictions for the batch and store results internally."""
         self.logger.debug(f"Predicting for model: {self.model_tag}")
 
-        gsp_ids = batch["gsp_id"]
+        gsp_ids = batch["location_id"]
         self.logger.debug(f"GSPs: {gsp_ids}")
 
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)

@@ -2,11 +2,11 @@
 import yaml
 
 from pvnet_app.consts import (
-    nwp_cloudcasting_path, 
-    nwp_ecmwf_path, 
-    nwp_ukv_path, 
-    sat_path, 
     generation_path,
+    nwp_cloudcasting_path,
+    nwp_ecmwf_path,
+    nwp_ukv_path,
+    sat_path,
 )
 
 

@@ -11,8 +11,8 @@ import zarr
 from ocf_data_sampler.config.load import load_yaml_configuration
 from ocf_data_sampler.load.utils import make_spatial_coords_increasing
 from ocf_data_sampler.select.geospatial import convert_coordinates
-from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
 from ocf_data_sampler.select.location import Location
+from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
 
 from pvnet_app.consts import sat_path
 from pvnet_app.data.gsp import get_gsp_locations
