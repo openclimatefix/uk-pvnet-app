@@ -392,12 +392,13 @@ async def make_forecaster_adjuster(
         delta_fractions = [d.delta_fraction for d in deltas if d.horizon_mins == horizon_mins]
         delta_fraction = delta_fractions[0] if len(delta_fractions) > 0 else 0
 
-        new_p50 = max(0.0, min(1.0, fv.p50_fraction + delta_fraction))
+        # delta values are forecast - observed, so we need to subtract
+        new_p50 = max(0.0, min(1.0, fv.p50_fraction - delta_fraction))
 
         # adjust p10 and p90s
         new_other_statistics = {}
         for key, val in fv.other_statistics_fractions.items():
-            new_val = max(0.0, min(1.0, val + delta_fraction))
+            new_val = max(0.0, min(1.0, val - delta_fraction))
             new_other_statistics[key] = new_val
 
         new_forecast_values.append(
