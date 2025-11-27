@@ -230,6 +230,18 @@ async def save_forecast_to_data_platform(
         )
         tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
+        if gsp_id == 0:
+            # make forecast
+            adjusted_forecast_request = await make_forecaster_adjuster(
+                client,
+                location_uuid=locations_gsp_uuid_map[int(gsp_id)],
+                init_time_utc=init_time_utc,
+                forecast_values=forecast_values,
+                model_tag=model_tag,
+                forecaster=forecaster,
+            )
+            tasks.append(asyncio.create_task(client.create_forecast(adjusted_forecast_request)))
+
     logger.info(f"Saving {len(tasks)} forecasts to Data Platform")
     list_results = await asyncio.gather(*tasks, return_exceptions=True)
     for exc in filter(lambda x: isinstance(x, Exception), list_results):
@@ -281,12 +293,14 @@ async def fetch_dp_gsp_uuid_map(
 ) -> dict[int, str]:
     """Fetch all GSP locations from data platform and map to their uuids."""
     tasks = [
-        asyncio.create_task(client.list_locations(
-            dp.ListLocationsRequest(
-                location_type_filter=loc_type,
-                energy_source_filter=dp.EnergySource.SOLAR,
+        asyncio.create_task(
+            client.list_locations(
+                dp.ListLocationsRequest(
+                    location_type_filter=loc_type,
+                    energy_source_filter=dp.EnergySource.SOLAR,
+                ),
             ),
-        ))
+        )
         for loc_type in [dp.LocationType.GSP, dp.LocationType.NATION]
     ]
     list_results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -296,9 +310,13 @@ async def fetch_dp_gsp_uuid_map(
     locations_df = (
         # Convert and combine the location lists from the responses into a single DataFrame
         pd.DataFrame.from_dict(
-            itertools.chain(*[
-                r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)["locations"]
-                for r in list_results],
+            itertools.chain(
+                *[
+                    r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)[
+                        "locations"
+                    ]
+                    for r in list_results
+                ],
             ),
         )
         # Filter the returned locations to those with a gsp_id in the metadata; extract it
@@ -346,3 +364,72 @@ async def create_forecaster_if_not_exists(
         create_forecaster_response = await client.create_forecaster(create_forecaster_request)
         return create_forecaster_response.forecaster
 
+
+async def make_forecaster_adjuster(
+    client: dp.DataPlatformDataServiceStub,
+    location_uuid: str,
+    init_time_utc: datetime,
+    forecast_values: list[dp.CreateForecastRequestForecastValue],
+    model_tag: str,
+    forecaster: dp.Forecaster,
+) -> dp.CreateForecastRequest:
+    """Make a forecaster adjuster based on week average deltas."""
+    # get delta values
+    deltas_request = dp.GetWeekAverageDeltasRequest(
+        location_uuid=location_uuid,
+        energy_source=dp.EnergySource.SOLAR,
+        pivot_timestamp_utc=init_time_utc.replace(tzinfo=UTC),
+        forecaster=forecaster,
+        observer_name="pvlive_day_after",
+    )
+    deltas_response = await client.get_week_average_deltas(deltas_request)
+    deltas = deltas_response.deltas
+
+    # adjust the current forecast values
+    new_forecast_values = []
+    for fv in forecast_values:
+        horizon_mins = fv.horizon_mins
+        delta_fractions = [d.delta_fraction for d in deltas if d.horizon_mins == horizon_mins]
+        delta_fraction = delta_fractions[0] if len(delta_fractions) > 0 else 0
+
+        # limit adjusted fractions to 10% of fv.p50_fraction
+        max_delta = 0.1 * fv.p50_fraction
+        if delta_fraction > max_delta:
+            delta_fraction = max_delta
+        elif delta_fraction < -max_delta:
+            delta_fraction = -max_delta
+
+        # delta values are forecast - observed, so we need to subtract
+        new_p50 = max(0.0, min(1.0, fv.p50_fraction - delta_fraction))
+
+        # adjust p10 and p90s
+        new_other_statistics = {}
+        for key, val in fv.other_statistics_fractions.items():
+            new_val = max(0.0, min(1.0, val - delta_fraction))
+            new_other_statistics[key] = new_val
+
+        new_forecast_values.append(
+            dp.CreateForecastRequestForecastValue(
+                horizon_mins=fv.horizon_mins,
+                p50_fraction=new_p50,
+                metadata=fv.metadata,
+                other_statistics_fractions=new_other_statistics,
+            ),
+        )
+
+    # make new forecast
+    forecaster = await create_forecaster_if_not_exists(
+        client=client,
+        model_tag=model_tag + "_adjuster",
+    )
+
+    # make forecast
+    adjusted_forecast_request = dp.CreateForecastRequest(
+        forecaster=forecaster,
+        location_uuid=location_uuid,
+        energy_source=dp.EnergySource.SOLAR,
+        init_time_utc=init_time_utc.replace(tzinfo=UTC),
+        values=new_forecast_values,
+    )
+
+    return adjusted_forecast_request
