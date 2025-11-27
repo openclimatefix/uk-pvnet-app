@@ -392,28 +392,21 @@ async def make_forecaster_adjuster(
         delta_fractions = [d.delta_fraction for d in deltas if d.horizon_mins == horizon_mins]
         delta_fraction = delta_fractions[0] if len(delta_fractions) > 0 else 0
 
-        # limit adjusted fractions to 10% of fv.p50_fraction
-        max_delta = 0.1 * fv.p50_fraction
-        if delta_fraction > max_delta:
-            delta_fraction = max_delta
-        elif delta_fraction < -max_delta:
-            delta_fraction = -max_delta
-
-        # limit adjust to 1000 MW
+        # get location
         list_location_response = await client.list_locations(
-                dp.ListLocationsRequest(
-                    location_type_filter=dp.LocationType.NATION,
-                    energy_source_filter=dp.EnergySource.SOLAR,
-                ),
-            )
+            dp.ListLocationsRequest(
+                location_type_filter=dp.LocationType.NATION,
+                energy_source_filter=dp.EnergySource.SOLAR,
+            ),
+        )
         locations = list_location_response.locations
         location = next(loc for loc in locations if loc.location_uuid == location_uuid)
         capacity_mw = location.effective_capacity_watts / 1_000_000.0
-        max_delta_absolute = 1000.0 / capacity_mw
-        if delta_fraction > max_delta_absolute:
-            delta_fraction = max_delta_absolute
-        elif delta_fraction < -max_delta_absolute:
-            delta_fraction = -max_delta_absolute
+
+        delta_fraction = limit_adjuster(
+            delta_fraction=delta_fraction,
+            value_fraction=fv.p50_fraction,
+            capacity_mw=capacity_mw)
 
         # delta values are forecast - observed, so we need to subtract
         new_p50 = max(0.0, min(1.0, fv.p50_fraction - delta_fraction))
@@ -449,3 +442,22 @@ async def make_forecaster_adjuster(
     )
 
     return adjusted_forecast_request
+
+
+def limit_adjuster(delta_fraction:float, value_fraction:float, capacity_mw: float) -> float:
+    """Limit the adjuster to 10% of forecast and max 1000 MW."""
+    # limit adjusted fractions to 10% of fv.p50_fraction
+    max_delta = 0.1 * value_fraction
+    if delta_fraction > max_delta:
+        delta_fraction = max_delta
+    elif delta_fraction < -max_delta:
+        delta_fraction = -max_delta
+
+    # limit adjust to 1000 MW
+    max_delta_absolute = 1000.0 / capacity_mw
+    if delta_fraction > max_delta_absolute:
+        delta_fraction = max_delta_absolute
+    elif delta_fraction < -max_delta_absolute:
+        delta_fraction = -max_delta_absolute
+
+    return delta_fraction
