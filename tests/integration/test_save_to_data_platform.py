@@ -169,7 +169,8 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     forecast_data_p90["output_label"] = "forecast_fraction_plevel_90"
 
     forecast_data = pd.concat(
-        [forecast_data, forecast_data_p10, forecast_data_p90], ignore_index=True,
+        [forecast_data, forecast_data_p10, forecast_data_p90],
+        ignore_index=True,
     )
 
     # add gsp 1 data
@@ -260,10 +261,24 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     # limited to 10% of 0.5 = 0.05, so we should be limited to 0.5 +/- 0.05
     count = 0
     async for d in stream_forecast_data_response:
+        # p50
         new_value = 0.5 + 0.01 * count
         if new_value > 0.55:
             new_value = 0.55
 
         assert np.isclose(d.p50_fraction, new_value, atol=1e-4)
+
+        # p10
+        new_value_p10 = 0.3 + 0.01 * count
+        if new_value_p10 > 0.35:
+            new_value_p10 = 0.35
+        assert np.isclose(d.other_statistics_fractions['p10'], new_value_p10)
+
+        # p90
+        new_value_p90 = 0.7 + 0.01 * count
+        if new_value_p90 > 0.75:
+            new_value_p90 = 0.75
+        assert np.isclose(d.other_statistics_fractions['p90'], new_value_p90)
+
         count += 1
     assert count == 24
