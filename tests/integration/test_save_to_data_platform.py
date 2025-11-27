@@ -259,6 +259,7 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     # the observed values are 0.5, 0.51, 0.52, ...
     # the deltas are 0, -0.01, -0.02, ...
     # limited to 10% of 0.5 = 0.05, so we should be limited to 0.5 +/- 0.05
+    # Also there are checks for p10 and p90
     count = 0
     async for d in stream_forecast_data_response:
         # p50
