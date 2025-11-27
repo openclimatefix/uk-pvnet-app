@@ -1,6 +1,7 @@
 import datetime
 import time
 
+import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
@@ -10,7 +11,7 @@ from grpclib.client import Channel
 from testcontainers.core.container import DockerContainer
 from testcontainers.postgres import PostgresContainer
 
-from src.pvnet_app.save import save_forecast_to_data_platform
+from src.pvnet_app.save import create_forecaster_if_not_exists, save_forecast_to_data_platform
 
 
 # @pytest.fixture(scope="session")
@@ -39,7 +40,7 @@ async def client():
         database_url = database_url.replace("localhost", "host.docker.internal")
 
         with DockerContainer(
-            image="ghcr.io/openclimatefix/data-platform:0.11.0",
+            image="ghcr.io/openclimatefix/data-platform:0.14.0",
             env={"DATABASE_URL": database_url},
             ports=[50051],
         ) as data_platform_server:
@@ -50,16 +51,12 @@ async def client():
             channel = Channel(host=host, port=port)
             client = dp.DataPlatformDataServiceStub(channel)
 
-            # setup observer
-            create_observer_request = dp.CreateObserverRequest(name="pvlive_day_after")
-            _ = await client.create_observer(create_observer_request)
-
             yield client
             channel.close()
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_save_to_generation_to_data_platform(client):
+async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataServiceStub):
     """
     Test saving data to the Data Platform.
     This test uses the `data_platform` fixture to ensure that the Data Platform service
@@ -96,6 +93,46 @@ async def test_save_to_generation_to_data_platform(client):
     create_location_response = await client.create_location(create_location_request)
     location_uuid_1 = create_location_response.location_uuid
 
+    # setup observer
+    create_observer_request = dp.CreateObserverRequest(name="pvlive_day_after")
+    _ = await client.create_observer(create_observer_request)
+
+    # add fake generation data
+    create_observation_request = dp.CreateObservationsRequest(
+        location_uuid=location_uuid_0,
+        energy_source=dp.EnergySource.SOLAR,
+        observer_name="pvlive_day_after",
+        values=[
+            dp.CreateObservationsRequestValue(
+                timestamp_utc=datetime.datetime(
+                    2024,
+                    12,
+                    31,
+                    tzinfo=datetime.UTC,
+                )
+                + datetime.timedelta(minutes=30 * i),
+                value_watts=500_000 + 10_000 * i,  # go from 0.5MW to 0.98MW
+            ) for i in range(49)
+        ],
+    )
+    _ = await client.create_observations(create_observation_request)
+
+    # add a fake forecast
+    forecaster = await create_forecaster_if_not_exists(client, model_tag="test_model")
+    create_forecast_request = dp.CreateForecastRequest(
+        location_uuid=location_uuid_0,
+        forecaster=forecaster,
+        energy_source=dp.EnergySource.SOLAR,
+        init_time_utc=datetime.datetime(2024, 12, 31, tzinfo=datetime.UTC),
+        values=[
+            dp.CreateForecastRequestForecastValue(
+                horizon_mins=30 * i,
+                p50_fraction=0.5,
+            ) for i in range(48)
+        ],
+    )
+    _ = await client.create_forecast(create_forecast_request)
+
     # setup: make fake data
     fake_data = pd.DataFrame(
         {
@@ -129,7 +166,7 @@ async def test_save_to_generation_to_data_platform(client):
     fake_data = fake_data.set_index(["target_datetime_utc", "gsp_id", "output_label"])
     fake_data = fake_data.to_xarray().to_dataarray()
 
-    # Test the functyion
+    # Test the function
     _ = await save_forecast_to_data_platform(
         forecast_normed_da=fake_data,
         locations_gsp_uuid_map={0: location_uuid_0, 1: location_uuid_1},
@@ -164,13 +201,14 @@ async def test_save_to_generation_to_data_platform(client):
     get_latest_forecasts_response = await client.get_latest_forecasts(
         get_latest_forecasts_request,
     )
-    assert len(get_latest_forecasts_response.forecasts) == 2
+    assert len(get_latest_forecasts_response.forecasts) == 3
     forecast = get_latest_forecasts_response.forecasts[0]
     assert forecast.forecaster.forecaster_name == "test_model"
-    forecast = get_latest_forecasts_response.forecasts[1]
-    assert forecast.forecaster.forecaster_name == "test_model_adjuster"
+    forecast_adjuster = get_latest_forecasts_response.forecasts[1]
+    assert forecast_adjuster.forecaster.forecaster_name == "test_model_adjuster"
 
-    # check: the number of forecast values
+
+    # check: the number of forecast values for non-adjusted forecast
     stream_forecast_data_request = dp.StreamForecastDataRequest(
         energy_source=dp.EnergySource.SOLAR,
         location_uuid=location_uuid_0,
@@ -186,5 +224,33 @@ async def test_save_to_generation_to_data_platform(client):
     count = 0
     async for d in stream_forecast_data_response:
         assert d.p50_fraction == 0.5
+        count += 1
+    assert count == 24
+
+    # check: the number of forecast values, for adjuster forecast
+    stream_forecast_data_request = dp.StreamForecastDataRequest(
+        energy_source=dp.EnergySource.SOLAR,
+        location_uuid=location_uuid_0,
+        forecasters=forecast_adjuster.forecaster,
+        time_window=dp.TimeWindow(
+            start_timestamp_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
+            end_timestamp_utc=datetime.datetime(2025, 1, 2, tzinfo=datetime.UTC),
+        ),
+    )
+    stream_forecast_data_response = client.stream_forecast_data(
+        stream_forecast_data_request,
+    )
+    # lets check that the adjusted forecast p50,
+    # The previous days forecast was 0.5 and
+    # the observed values are 0.5, 0.51, 0.52, ...
+    # the deltas are 0, -0.01, -0.02, ...
+    # limited to 10% of 0.5 = 0.05, so we should be limited to 0.5 +/- 0.05
+    count = 0
+    async for d in stream_forecast_data_response:
+        new_value = 0.5 + 0.01 * count
+        if new_value > 0.55:
+            new_value = 0.55
+
+        assert np.isclose(d.p50_fraction, new_value, atol=1e-4)
         count += 1
     assert count == 24
