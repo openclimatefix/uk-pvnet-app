@@ -254,7 +254,7 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     stream_forecast_data_response = client.stream_forecast_data(
         stream_forecast_data_request,
     )
-    # 8. lets check that the adjusted forecast p50,
+    # 8. check the adjusted forecast p50 values
     # The previous days forecast was 0.5 and
     # the observed values are 0.5, 0.51, 0.52, ...
     # the deltas are 0, -0.01, -0.02, ...
