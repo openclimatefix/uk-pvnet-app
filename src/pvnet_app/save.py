@@ -393,16 +393,16 @@ async def make_forecaster_adjuster(
         delta_fraction = delta_fractions[0] if len(delta_fractions) > 0 else 0
 
         # get location
-        list_location_response = await client.list_locations(
-            dp.ListLocationsRequest(
-                location_type_filter=dp.LocationType.NATION,
-                energy_source_filter=dp.EnergySource.SOLAR,
+        location = await client.get_location(
+            dp.GetLocationRequest(
+                location_uuid=location_uuid,
+                energy_source=dp.EnergySource.SOLAR,
+                include_geometry=False,
             ),
         )
-        locations = list_location_response.locations
-        location = next(loc for loc in locations if loc.location_uuid == location_uuid)
         capacity_mw = location.effective_capacity_watts / 1_000_000.0
 
+        # limit adjuster
         delta_fraction = limit_adjuster(
             delta_fraction=delta_fraction,
             value_fraction=fv.p50_fraction,
