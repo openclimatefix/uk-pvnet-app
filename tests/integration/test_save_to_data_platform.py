@@ -28,7 +28,7 @@ async def client():
     with PostgresContainer(
         "ghcr.io/openclimatefix/data-platform-pgdb:logging",
         username="postgres",
-        password="postgres",  #noqa: S106
+        password="postgres",  # noqa: S106
         dbname="postgres",
         env={"POSTGRES_HOST": "db"},
     ) as postgres:
@@ -64,8 +64,18 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
 
     For gsp_id 0, we expect 2 forecasts, one normal and one with the adjusted values
     For gsp_id 1, we expect 1 forecast, only the normal one
+
+    In this test we
+    1. select up locations gsp 0 and gsp 1
+    2. add some fake generation data for gsp 0 on 2024-12-31
+    3. add a fake forecast for gsp 0 on 2024-12-31
+    4. Make forecast data for 2025-01-01 for both gsp 0 and gsp 1
+    5. call the save_forecast_to_data_platform function
+    6. check that the forecasts were saved correctly
+    7. check that the forecast values are correctly
+    8. check that the adjusted forecast values are limited correctly
     """
-    # setup: add location - gsp 1
+    # 1. setup: add location - gsp 1
     metadata = Struct(fields={"gsp_id": Value(number_value=0)})
     create_location_request = dp.CreateLocationRequest(
         location_name="gsp0",
@@ -97,7 +107,7 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     create_observer_request = dp.CreateObserverRequest(name="pvlive_day_after")
     _ = await client.create_observer(create_observer_request)
 
-    # add fake generation data
+    # 2. add fake generation data
     create_observation_request = dp.CreateObservationsRequest(
         location_uuid=location_uuid_0,
         energy_source=dp.EnergySource.SOLAR,
@@ -112,12 +122,13 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
                 )
                 + datetime.timedelta(minutes=30 * i),
                 value_watts=500_000 + 10_000 * i,  # go from 0.5MW to 0.98MW
-            ) for i in range(49)
+            )
+            for i in range(49)
         ],
     )
     _ = await client.create_observations(create_observation_request)
 
-    # add a fake forecast
+    # 3. add a fake forecast
     forecaster = await create_forecaster_if_not_exists(client, model_tag="test_model")
     create_forecast_request = dp.CreateForecastRequest(
         location_uuid=location_uuid_0,
@@ -128,13 +139,14 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=30 * i,
                 p50_fraction=0.5,
-            ) for i in range(48)
+            )
+            for i in range(48)
         ],
     )
     _ = await client.create_forecast(create_forecast_request)
 
-    # setup: make fake data
-    fake_data = pd.DataFrame(
+    # setup: make forecast data
+    forecast_data = pd.DataFrame(
         {
             "solar_generation_mw": [0.5] * 24,
             "target_datetime_utc": pd.Timestamp("2025-01-01")
@@ -145,37 +157,39 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
             ),
         },
     )
-    fake_data["gsp_id"] = 0
-    fake_data["output_label"] = "forecast_fraction"
+    forecast_data["gsp_id"] = 0
+    forecast_data["output_label"] = "forecast_fraction"
 
-    fake_data_p10 = fake_data.copy()
-    fake_data_p10["solar_generation_mw"] = [0.3] * 24
-    fake_data_p10["output_label"] = "forecast_fraction_plevel_10"
+    forecast_data_p10 = forecast_data.copy()
+    forecast_data_p10["solar_generation_mw"] = [0.3] * 24
+    forecast_data_p10["output_label"] = "forecast_fraction_plevel_10"
 
-    fake_data_p90 = fake_data.copy()
-    fake_data_p90["solar_generation_mw"] = [0.7] * 24
-    fake_data_p90["output_label"] = "forecast_fraction_plevel_90"
+    forecast_data_p90 = forecast_data.copy()
+    forecast_data_p90["solar_generation_mw"] = [0.7] * 24
+    forecast_data_p90["output_label"] = "forecast_fraction_plevel_90"
 
-    fake_data = pd.concat([fake_data, fake_data_p10, fake_data_p90], ignore_index=True)
+    forecast_data = pd.concat(
+        [forecast_data, forecast_data_p10, forecast_data_p90], ignore_index=True,
+    )
 
     # add gsp 1 data
-    fake_data_gsp1 = fake_data.copy()
-    fake_data_gsp1["gsp_id"] = 1
-    fake_data = pd.concat([fake_data, fake_data_gsp1], ignore_index=True)
+    forecast_data_gsp1 = forecast_data.copy()
+    forecast_data_gsp1["gsp_id"] = 1
+    forecast_data = pd.concat([forecast_data, forecast_data_gsp1], ignore_index=True)
 
-    fake_data = fake_data.set_index(["target_datetime_utc", "gsp_id", "output_label"])
-    fake_data = fake_data.to_xarray().to_dataarray()
+    forecast_data = forecast_data.set_index(["target_datetime_utc", "gsp_id", "output_label"])
+    forecast_data_da = forecast_data.to_xarray().to_dataarray()
 
-    # Test the function
+    # 5. Test the function
     _ = await save_forecast_to_data_platform(
-        forecast_normed_da=fake_data,
+        forecast_normed_da=forecast_data_da,
         locations_gsp_uuid_map={0: location_uuid_0, 1: location_uuid_1},
         client=client,
         model_tag="test_model",
         init_time_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
     )
 
-    # check: read from the data platform to check it was saved
+    # 6. check: read from the data platform to check it was saved
     list_forecasters_response = await client.list_forecasters(dp.ListForecastersRequest())
     assert len(list_forecasters_response.forecasters) == 2
 
@@ -207,7 +221,6 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     forecast_adjuster = get_latest_forecasts_response.forecasts[1]
     assert forecast_adjuster.forecaster.forecaster_name == "test_model_adjuster"
 
-
     # check: the number of forecast values for non-adjusted forecast
     stream_forecast_data_request = dp.StreamForecastDataRequest(
         energy_source=dp.EnergySource.SOLAR,
@@ -227,7 +240,7 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
         count += 1
     assert count == 24
 
-    # check: the number of forecast values, for adjuster forecast
+    # 7. check: the number of forecast values, for adjuster forecast
     stream_forecast_data_request = dp.StreamForecastDataRequest(
         energy_source=dp.EnergySource.SOLAR,
         location_uuid=location_uuid_0,
@@ -240,7 +253,7 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     stream_forecast_data_response = client.stream_forecast_data(
         stream_forecast_data_request,
     )
-    # lets check that the adjusted forecast p50,
+    # 8. lets check that the adjusted forecast p50,
     # The previous days forecast was 0.5 and
     # the observed values are 0.5, 0.51, 0.52, ...
     # the deltas are 0, -0.01, -0.02, ...
