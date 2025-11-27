@@ -75,13 +75,13 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     7. check that the forecast values are correctly
     8. check that the adjusted forecast values are limited correctly
     """
-    # 1. setup: add location - gsp 1
+    # 1. setup: add location - gsp 0
     metadata = Struct(fields={"gsp_id": Value(number_value=0)})
     create_location_request = dp.CreateLocationRequest(
         location_name="gsp0",
         energy_source=dp.EnergySource.SOLAR,
         geometry_wkt="POINT(0 0)",
-        location_type=dp.LocationType.GSP,
+        location_type=dp.LocationType.NATION,
         effective_capacity_watts=1_000_000,
         metadata=metadata,
         valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),

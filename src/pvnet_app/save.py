@@ -399,6 +399,22 @@ async def make_forecaster_adjuster(
         elif delta_fraction < -max_delta:
             delta_fraction = -max_delta
 
+        # limit adjust to 1000 MW
+        list_location_response = await client.list_locations(
+                dp.ListLocationsRequest(
+                    location_type_filter=dp.LocationType.NATION,
+                    energy_source_filter=dp.EnergySource.SOLAR,
+                ),
+            )
+        locations = list_location_response.locations
+        location = next(loc for loc in locations if loc.location_uuid == location_uuid)
+        capacity_mw = location.effective_capacity_watts / 1_000_000.0
+        max_delta_absolute = 1000.0 / capacity_mw
+        if delta_fraction > max_delta_absolute:
+            delta_fraction = max_delta_absolute
+        elif delta_fraction < -max_delta_absolute:
+            delta_fraction = -max_delta_absolute
+
         # delta values are forecast - observed, so we need to subtract
         new_p50 = max(0.0, min(1.0, fv.p50_fraction - delta_fraction))
 
