@@ -273,13 +273,13 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
         new_value_p10 = 0.3 + 0.01 * count
         if new_value_p10 > 0.35:
             new_value_p10 = 0.35
-        assert np.isclose(d.other_statistics_fractions["p10_fraction"], new_value_p10)
+        assert np.isclose(d.other_statistics_fractions["p10"], new_value_p10)
 
         # p90
         new_value_p90 = 0.7 + 0.01 * count
         if new_value_p90 > 0.75:
             new_value_p90 = 0.75
-        assert np.isclose(d.other_statistics_fractions["p90_fraction"], new_value_p90)
+        assert np.isclose(d.other_statistics_fractions["p90"], new_value_p90)
 
         count += 1
     assert count == 24
