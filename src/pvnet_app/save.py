@@ -280,7 +280,7 @@ def map_values_da_to_dp_requests(
                 metadata=Struct().from_pydict({}),
                 other_statistics_fractions={
                     "p10": p10,
-                    "p90: p90,
+                    "p90": p90,
                 },
             ),
         )
