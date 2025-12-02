@@ -1,6 +1,6 @@
 # pvnet_app
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-15-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-16-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 [![ease of contribution: medium](https://img.shields.io/badge/ease%20of%20contribution:%20medium-f4900c)](https://github.com/openclimatefix#how-easy-is-it-to-get-involved)
@@ -165,6 +165,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     </tr>
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/r-ram-kumar-71bb75144/"><img src="https://avatars.githubusercontent.com/u/114728749?v=4?s=100" width="100px;" alt="RAM KUMAR R"/><br /><sub><b>RAM KUMAR R</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=ram-from-tvl" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/rdsingh120"><img src="https://avatars.githubusercontent.com/u/82333889?v=4?s=100" width="100px;" alt="Ripudaman Singh"/><br /><sub><b>Ripudaman Singh</b></sub></a><br /><a href="https://github.com/openclimatefix/uk-pvnet-app/commits?author=rdsingh120" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
