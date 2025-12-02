@@ -11,7 +11,11 @@ from grpclib.client import Channel
 from testcontainers.core.container import DockerContainer
 from testcontainers.postgres import PostgresContainer
 
-from src.pvnet_app.save import create_forecaster_if_not_exists, save_forecast_to_data_platform
+from src.pvnet_app.save import (
+    create_forecaster_if_not_exists,
+    limit_adjuster,
+    save_forecast_to_data_platform,
+)
 
 
 # @pytest.fixture(scope="session")
@@ -75,13 +79,13 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     7. check that the forecast values are correctly
     8. check that the adjusted forecast values are limited correctly
     """
-    # 1. setup: add location - gsp 1
+    # 1. setup: add location - gsp 0
     metadata = Struct(fields={"gsp_id": Value(number_value=0)})
     create_location_request = dp.CreateLocationRequest(
         location_name="gsp0",
         energy_source=dp.EnergySource.SOLAR,
         geometry_wkt="POINT(0 0)",
-        location_type=dp.LocationType.GSP,
+        location_type=dp.LocationType.NATION,
         effective_capacity_watts=1_000_000,
         metadata=metadata,
         valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
@@ -283,3 +287,27 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
 
         count += 1
     assert count == 24
+
+
+@pytest.mark.parametrize(
+    "forecast_fraction,delta_fraction,capacity_mw,expected",
+    [
+        # no change
+        (0.5, 0.01, 1, 0.01),
+        # limit to 10% of 0.5 = 0.05
+        (0.5, 0.1, 1, 0.05),
+        # limit to 10% of 0.5 = 0.05
+        (0.5, 0.2, 1, 0.05),
+        # limit to 10% of 0.5 = 0.05
+        (0.5, -0.2, 1, -0.05),
+        # Delta 0.06 is 1.2 MW, and .06< 10% of 0.8, no change
+        (0.8, 0.06, 20, 0.06),
+        # Delta 0.06 is 1200 MW  -> 1000 MW -> 0.05 fraction
+        (0.8, 0.06, 20_000, 0.05),
+        # Delta 0.06 is 1200 MW  -> 1000 MW -> 0.05 fraction
+        (0.8, -0.06, 20_000, -0.05),
+    ],
+)
+def test_limit_adjuster(forecast_fraction, delta_fraction, capacity_mw, expected):
+    """Test the limit_adjuster function."""
+    assert limit_adjuster(delta_fraction, forecast_fraction, capacity_mw) == expected
