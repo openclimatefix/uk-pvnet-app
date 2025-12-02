@@ -14,7 +14,7 @@ RELATIVE_MAX_FORECAST = 1.1
 # A forecast is bad if above this absolute value
 # Note: The all time peak generation as of 2025-05-20 was 13.2 GW
 #  - See https://www.solar.sheffield.ac.uk/pvlive/
-ABSOLUTE_MAX_FORECAST = 15_000
+ABSOLUTE_MAX_FORECAST = 17_000
 
 # The UK's longitude and latitude - used for solar position calculations
 UK_LONGITUDE = -3.4360
