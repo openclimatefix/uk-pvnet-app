@@ -429,7 +429,7 @@ async def make_forecaster_adjuster(
     # make new forecast
     forecaster = await create_forecaster_if_not_exists(
         client=client,
-        model_tag=model_tag + "_adjuster",
+        model_tag=model_tag + "_adjust",
     )
 
     # make forecast
