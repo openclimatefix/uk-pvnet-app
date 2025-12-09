@@ -224,7 +224,7 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     forecast = get_latest_forecasts_response.forecasts[0]
     assert forecast.forecaster.forecaster_name == "test_model"
     forecast_adjuster = get_latest_forecasts_response.forecasts[1]
-    assert forecast_adjuster.forecaster.forecaster_name == "test_model_adjuster"
+    assert forecast_adjuster.forecaster.forecaster_name == "test_model_adjust"
 
     # check: the number of forecast values for non-adjusted forecast
     stream_forecast_data_request = dp.StreamForecastDataRequest(
