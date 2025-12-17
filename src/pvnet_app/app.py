@@ -330,7 +330,7 @@ async def run(
     with db_connection.get_session() as session, session.no_autoflush:
         for forecaster in forecasters.values():
             forecaster.log_forecast_to_database(session=session)
-    
+
     try:
         gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
         for forecaster in forecasters.values():
