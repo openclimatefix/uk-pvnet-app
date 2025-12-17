@@ -10,7 +10,7 @@ import yaml
 from dateutil.tz import UTC
 from dp_sdk.ocf import dp
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
-from ocf_data_sampler.torch_datasets.datasets.pvnet_uk import PVNetUKConcurrentDataset
+from ocf_data_sampler.torch_datasets.pvnet_dataset import PVNetConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
     batch_to_tensor,
     copy_batch_to_device,
@@ -21,6 +21,7 @@ from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
 
 from pvnet_app.config import modify_data_config_for_production
+from pvnet_app.data.gsp import get_gsp_locations
 from pvnet_app.model_configs.pydantic_models import ModelConfig
 from pvnet_app.save import save_forecast, save_forecast_to_data_platform
 
@@ -34,6 +35,16 @@ _model_mismatch_msg = (
     "the shape of PVNet output doesn't match the expected shape of the summation model. Combining "
     "may lead to unreliable results even if the shapes match."
 )
+
+
+def get_uk_centroid_coords() -> tuple[float, float]:
+    """Get the UK centroid longitude and latitude."""
+    df_loc = get_gsp_locations()
+
+    longitude = df_loc.loc[0].longitude.item()
+    latitude = df_loc.loc[0].latitude.item()
+
+    return longitude, latitude
 
 
 class Forecaster:
@@ -84,6 +95,9 @@ class Forecaster:
             model_config.summation.commit,
             device,
         )
+
+        # Get the UK centroid coordinates
+        self.longitude, self.latitude = get_uk_centroid_coords()
 
         # Values
         self.da_abs_all: xr.DataArray
@@ -156,7 +170,7 @@ class Forecaster:
                 output_path=temp_path,
             )
 
-            dataset = PVNetUKConcurrentDataset(config_filename=temp_path, gsp_ids=self.gsp_ids)
+            dataset = PVNetConcurrentDataset(config_filename=temp_path)
 
         return dataset.get_sample(self.t0)
 
@@ -165,7 +179,7 @@ class Forecaster:
         """Make predictions for the batch and store results internally."""
         self.logger.debug(f"Predicting for model: {self.model_tag}")
 
-        gsp_ids = batch["gsp_id"]
+        gsp_ids = batch["location_id"]
         self.logger.debug(f"GSPs: {gsp_ids}")
 
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
@@ -199,7 +213,7 @@ class Forecaster:
         da_normed = da_normed.where(~da_sundown_mask).fillna(0.0)
 
         self.logger.debug("Converting to absolute MW")
-        da_abs = da_normed * self.gsp_capacities.values[:, None, None]
+        da_abs = da_normed * self.gsp_capacities[:, None, None]
 
         max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
         self.logger.debug(f"Maximum predictions: {max_preds}")
@@ -216,7 +230,9 @@ class Forecaster:
             inputs = construct_sum_sample(
                 pvnet_inputs=None,
                 valid_times=self.valid_times,
-                relative_capacities=self.gsp_capacities.values / self.national_capacity,
+                relative_capacities=self.gsp_capacities / self.national_capacity,
+                longitude=self.longitude,
+                latitude=self.latitude,
                 target=None,
             )
             inputs["pvnet_outputs"] = normed_preds

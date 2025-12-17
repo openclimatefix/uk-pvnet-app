@@ -20,15 +20,15 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "PVNet-summation==1.1.0",
+    "PVNet-summation==1.2.0",
     "fsspec[s3]==2025.2.0",
     "huggingface-hub==0.28.1",
-    "nowcasting_datamodel==1.7.2",
+    "nowcasting_datamodel==1.7.6",
     "numpy==2.0.0",
-    "ocf_data_sampler==0.6.0",
+    "ocf_data_sampler==1.0.0",
     "pandas==2.2.3",
-    "pvnet==5.2.0",
-    "pydantic==2.5.3",
+    "pvnet==5.3.0",
+    "pydantic==2.12.3",
     "pytorch-lightning==2.3.3",
     "requests==2.32.3",
     "sentry-sdk==2.21.0",
@@ -75,7 +75,7 @@ pvnet-app = "pvnet_app.app:main"
 repository = "https://github.com/openclimatefix/uk-pvnet-app"
 
 [tool.setuptools.package-data]
-"*" = ["*.nc", "*.yaml"]
+"*" = ["*.nc", "*.yaml", "*.csv"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
