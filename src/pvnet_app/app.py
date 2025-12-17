@@ -168,6 +168,14 @@ async def run(
         data_config_paths[model_config.name] = data_config_path
         data_configs.append(load_yaml_config(data_config_path))
 
+    # Setup dataplafrom
+    logger.info("Writing to data platform")
+    channel = Channel(
+        os.getenv("DATA_PLATFORM_HOST", "localhost"),
+        int(os.getenv("DATA_PLATFORM_PORT", "50051")),
+    )
+    client = dp.DataPlatformDataServiceStub(channel)
+
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
@@ -176,10 +184,11 @@ async def run(
 
     # --- Get capacities from the database
     logger.info("Loading capacities from the database")
-    gsp_capacities, national_capacity = get_gsp_and_national_capacities(
+    gsp_capacities, national_capacity = await get_gsp_and_national_capacities(
         db_connection=db_connection,
         gsp_ids=gsp_ids,
         t0=t0,
+        client=client,
     )
 
     data_downloaders = []
@@ -321,13 +330,7 @@ async def run(
     with db_connection.get_session() as session, session.no_autoflush:
         for forecaster in forecasters.values():
             forecaster.log_forecast_to_database(session=session)
-
-
-    channel = Channel(
-        os.getenv("DATA_PLATFORM_HOST", "localhost"),
-        int(os.getenv("DATA_PLATFORM_PORT", "50051")),
-    )
-    client = dp.DataPlatformDataServiceStub(channel)
+    
     try:
         gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
         for forecaster in forecasters.values():
