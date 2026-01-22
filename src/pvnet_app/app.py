@@ -127,6 +127,8 @@ async def run(
     sun_elevation_lower_limit = float(os.getenv("FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT", 10))
 
     db_url = os.environ["DB_URL"]  # Will raise KeyError if not set
+    data_platform_host = os.getenv("DATA_PLATFORM_HOST", "localhost")
+    data_platform_port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
     ecmwf_source_path = os.getenv("NWP_ECMWF_ZARR_PATH", None)
     ukv_source_path = os.getenv("NWP_UKV_ZARR_PATH", None)
@@ -322,19 +324,22 @@ async def run(
         for forecaster in forecasters.values():
             forecaster.log_forecast_to_database(session=session)
 
-
-    channel = Channel(
-        os.getenv("DATA_PLATFORM_HOST", "localhost"),
-        int(os.getenv("DATA_PLATFORM_PORT", "50051")),
-    )
+    logger.info("Writing to data platform")
+    channel = Channel(data_platform_host, data_platform_port)
     client = dp.DataPlatformDataServiceStub(channel)
     try:
         gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
-        for forecaster in forecasters.values():
-            await forecaster.save_forecast_to_dataplatform(
+
+        tasks = [
+            forecaster.save_forecast_to_dataplatform(
                 locations_gsp_uuid_map=gsp_uuid_map,
                 client=client,
             )
+            for forecaster in forecasters.values()
+        ]
+        await asyncio.gather(*tasks)
+
+
     except Exception as e:
         logger.error(f"Failed to save forecast to data platform with error {e}")
     finally:
