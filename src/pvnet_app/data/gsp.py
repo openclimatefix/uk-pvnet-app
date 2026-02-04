@@ -42,17 +42,18 @@ def get_gsp_and_national_capacities(
                 datetime_utc=t0 - pd.Timedelta(days=2),
             )
 
-        # Do basic sanity checking    
+        # Do basic sanity checking
         if np.isnan(all_capacities).any():
             raise ValueError("Capacities contain NaNs")
-        
+
         if len(all_capacities)!=len(gsp_ids):
             raise ValueError("Not enough capacities returned")
-        
+
         national_capacity = all_capacities[0].item()
         gsp_capacities = all_capacities[1:]
 
-    except:
+    except Exception as e:
+        logger.error(f"Error in loading GSP capacities from database: {e}")
         logger.warning(
             "We couldnt load all the capacities from the database, "
             "so we are using back up ones from 2026-02-04",
