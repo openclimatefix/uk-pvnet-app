@@ -46,7 +46,7 @@ def get_gsp_and_national_capacities(
         if np.isnan(all_capacities).any():
             raise ValueError("Capacities contain NaNs")
 
-        if len(all_capacities)!=len(gsp_ids):
+        if len(all_capacities)!=(len(gsp_ids)+1):
             raise ValueError("Not enough capacities returned")
 
         national_capacity = all_capacities[0].item()
