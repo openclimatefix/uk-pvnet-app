@@ -1,9 +1,9 @@
 """Functions to get GSP data from the database."""
-
 import asyncio
 import itertools
 import logging
 import os
+from importlib.resources import files
 
 import betterproto
 import numpy as np
@@ -13,6 +13,13 @@ from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 
 logger = logging.getLogger(__name__)
+
+
+BACKUP_CAPACITIES: pd.Series = pd.read_csv(
+    files("pvnet_app.data").joinpath("gsp_backup_capacities_2026_02_04.csv"),
+    index_col="gsp_id",
+)["capacity_mwp"]
+
 
 
 read_data_platform_flag = os.getenv("DATA_PLATFORM_READ_CAPACITIES", "false").lower() == "true"
@@ -41,72 +48,94 @@ async def get_gsp_and_national_capacities(
         - Pandas series of most recent GSP capacities
         - National capacity value
     """
-    if read_data_platform:
-        logger.info("Reading capacities from data platform")
+    try:
 
-        tasks = [
-            asyncio.create_task(
-                client.list_locations(
-                    dp.ListLocationsRequest(
-                        location_type_filter=loc_type,
-                        energy_source_filter=dp.EnergySource.SOLAR,
+        if read_data_platform:
+            logger.info("Reading capacities from data platform")
+
+            tasks = [
+                asyncio.create_task(
+                    client.list_locations(
+                        dp.ListLocationsRequest(
+                            location_type_filter=loc_type,
+                            energy_source_filter=dp.EnergySource.SOLAR,
+                        ),
                     ),
-                ),
-            )
-            for loc_type in [dp.LocationType.GSP, dp.LocationType.NATION]
-        ]
+                )
+                for loc_type in [dp.LocationType.GSP, dp.LocationType.NATION]
+            ]
 
-        list_results = await asyncio.gather(*tasks, return_exceptions=True)
-        for exc in filter(lambda x: isinstance(x, Exception), list_results):
-            raise exc
+            list_results = await asyncio.gather(*tasks, return_exceptions=True)
+            for exc in filter(lambda x: isinstance(x, Exception), list_results):
+                raise exc
 
-        locations_df = (
-            # Convert and combine the location lists from the responses into a single DataFrame
-            pd.DataFrame.from_dict(
-                itertools.chain(
-                    *[
-                        r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)[
-                            "locations"
-                        ]
-                        for r in list_results
-                    ],
-                ),
+            locations_df = (
+                # Convert and combine the location lists from the responses into a single DataFrame
+                pd.DataFrame.from_dict(
+                    itertools.chain(
+                        *[
+                            r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)[
+                                "locations"
+                            ]
+                            for r in list_results
+                        ],
+                    ),
+                )
+                # Filter the returned locations to those with a gsp_id in the metadata; extract it
+                .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
+                .assign(
+                    gsp_id=lambda df: df["metadata"]
+                    .apply(lambda x: int(x["gsp_id"]["number_value"])),
+                )
+                .set_index("gsp_id", drop=False, inplace=False)
             )
-            # Filter the returned locations to those with a gsp_id in the metadata; extract it
-            .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
-            .assign(
-                gsp_id=lambda df: df["metadata"].apply(lambda x: int(x["gsp_id"]["number_value"])),
+
+            # reduce to the columns we need (in mw)
+            locations_df = (
+                locations_df["effective_capacity_watts"].astype(float) / 1000
             )
-            .set_index("gsp_id", drop=False, inplace=False)
+
+            # only select the gsp_ids we want + national (gsp_id 0)
+            locations_df = locations_df.loc[[0, *gsp_ids]]
+
+            # order by index (gsp_id)
+            all_capacities_mw = locations_df.sort_index()
+
+        else:
+            logger.info("Reading capacities from nowcasting database")
+
+            with db_connection.get_session() as session:
+                # Get GSP capacities
+                all_capacities_mw = get_latest_gsp_capacities(
+                    session=session,
+                    gsp_ids=[0, *gsp_ids],
+                    datetime_utc=t0 - pd.Timedelta(days=2),
+                )
+
+        # Do basic sanity checking
+        if np.isnan(all_capacities_mw).any():
+            raise ValueError("Capacities contain NaNs")
+
+        national_capacity = all_capacities_mw[0].item()
+        gsp_capacities = all_capacities_mw[1:]
+
+        # Do basic sanity checking
+        if np.isnan(all_capacities_mw).any():
+            raise ValueError("Capacities contain NaNs")
+
+        if len(all_capacities_mw)!=(len(gsp_ids)+1):
+            raise ValueError("Not enough capacities returned")
+
+        national_capacity = all_capacities_mw[0].item()
+        gsp_capacities = all_capacities_mw[1:]
+
+    except Exception as e:
+        logger.error(f"Error in loading GSP capacities from database: {e}")
+        logger.warning(
+            "We couldnt load all the capacities from the database, "
+            "so we are using back up ones from 2026-02-04",
         )
-
-        # reduce to the columns we need (in mw)
-        locations_df = (
-            locations_df["effective_capacity_watts"].astype(float) / 1000
-        )  # convert to MW
-
-        # only select the gsp_ids we want + national (gsp_id 0)
-        locations_df = locations_df.loc[[0, *gsp_ids]]
-
-        # order by index (gsp_id)
-        all_capacities_mw = locations_df.sort_index()
-
-    else:
-        logger.info("Reading capacities from nowcasting database")
-
-        with db_connection.get_session() as session:
-            # Get GSP capacities
-            all_capacities_mw = get_latest_gsp_capacities(
-                session=session,
-                gsp_ids=[0, *gsp_ids],
-                datetime_utc=t0 - pd.Timedelta(days=2),
-            )
-
-    # Do basic sanity checking
-    if np.isnan(all_capacities_mw).any():
-        raise ValueError("Capacities contain NaNs")
-
-    national_capacity = all_capacities_mw[0].item()
-    gsp_capacities = all_capacities_mw[1:]
+        national_capacity = BACKUP_CAPACITIES.loc[0].item()
+        gsp_capacities = BACKUP_CAPACITIES.loc[gsp_ids]
 
     return gsp_capacities, national_capacity

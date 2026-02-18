@@ -16,6 +16,7 @@ from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
     copy_batch_to_device,
 )
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
+from pvnet.utils import validate_batch_against_config
 from pvnet_summation.data.datamodule import construct_sample as construct_sum_sample
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from sqlalchemy.orm import Session
@@ -170,7 +171,8 @@ class Forecaster:
 
         batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
-        # Run batch through model
+        # Validate and then run batch through model
+        validate_batch_against_config(batch=batch, model=self.model)
         normed_preds = self.model(batch).detach().cpu().numpy()
 
         # Convert GSP results to xarray DataArray
