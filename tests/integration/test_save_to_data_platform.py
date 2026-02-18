@@ -1,15 +1,10 @@
 import datetime
-import time
+from uuid import UUID
 
 import numpy as np
 import pandas as pd
 import pytest
-import pytest_asyncio
-from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
-from grpclib.client import Channel
-from testcontainers.core.container import DockerContainer
-from testcontainers.postgres import PostgresContainer
 
 from src.pvnet_app.save import (
     create_forecaster_if_not_exists,
@@ -18,49 +13,12 @@ from src.pvnet_app.save import (
 )
 
 
-# @pytest.fixture(scope="session")
-@pytest_asyncio.fixture(scope="session")
-async def client():
-    """
-    Fixture to spin up a PostgreSQL container for the entire test session.
-    This fixture uses `testcontainers` to start a fresh PostgreSQL container and provides
-    the connection URL dynamically for use in other fixtures.
-    """
-
-    # we use a specific postgres image with postgis and pgpartman installed
-    # TODO make a release of this, not using logging tag.
-    with PostgresContainer(
-        "ghcr.io/openclimatefix/data-platform-pgdb:logging",
-        username="postgres",
-        password="postgres",  # noqa: S106
-        dbname="postgres",
-        env={"POSTGRES_HOST": "db"},
-    ) as postgres:
-        database_url = postgres.get_connection_url()
-        # we need to get ride of psycopg2, so the go driver works
-        database_url = database_url.replace("postgresql+psycopg2", "postgres")
-        # we need to change to host.docker.internal so the data platform container can see it
-        # https://stackoverflow.com/questions/46973456/docker-access-localhost-port-from-container
-        database_url = database_url.replace("localhost", "host.docker.internal")
-
-        with DockerContainer(
-            image="ghcr.io/openclimatefix/data-platform:0.14.0",
-            env={"DATABASE_URL": database_url},
-            ports=[50051],
-        ) as data_platform_server:
-            time.sleep(1)  # Give some time for the server to start
-
-            port = data_platform_server.get_exposed_port(50051)
-            host = data_platform_server.get_container_host_ip()
-            channel = Channel(host=host, port=port)
-            client = dp.DataPlatformDataServiceStub(channel)
-
-            yield client
-            channel.close()
-
-
-@pytest.mark.asyncio(loop_scope="session")
-async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataServiceStub):
+@pytest.mark.asyncio(loop_scope="module")
+async def test_save_to_generation_to_data_platform(
+    client: dp.DataPlatformDataServiceStub,
+    national_location: UUID,
+    gsp_1_location: UUID,
+):
     """
     Test saving data to the Data Platform.
     This test uses the `data_platform` fixture to ensure that the Data Platform service
@@ -79,33 +37,9 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     7. check that the forecast values are correctly
     8. check that the adjusted forecast values are limited correctly
     """
-    # 1. setup: add location - gsp 0
-    metadata = Struct(fields={"gsp_id": Value(number_value=0)})
-    create_location_request = dp.CreateLocationRequest(
-        location_name="gsp0",
-        energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POINT(0 0)",
-        location_type=dp.LocationType.NATION,
-        effective_capacity_watts=1_000_000,
-        metadata=metadata,
-        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
-    )
-    create_location_response = await client.create_location(create_location_request)
-    location_uuid_0 = create_location_response.location_uuid
-
-    # setup: add location - gsp 1
-    metadata = Struct(fields={"gsp_id": Value(number_value=1)})
-    create_location_request = dp.CreateLocationRequest(
-        location_name="gsp1",
-        energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POINT(0 0)",
-        location_type=dp.LocationType.GSP,
-        effective_capacity_watts=1_000_000,
-        metadata=metadata,
-        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
-    )
-    create_location_response = await client.create_location(create_location_request)
-    location_uuid_1 = create_location_response.location_uuid
+    # 1. setup: add location - gsp 0 and 1
+    location_uuid_0 = national_location
+    location_uuid_1 = gsp_1_location
 
     # setup observer
     create_observer_request = dp.CreateObserverRequest(name="pvlive_day_after")
