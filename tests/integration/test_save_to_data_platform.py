@@ -1,9 +1,9 @@
 import datetime
+from uuid import UUID
 
 import numpy as np
 import pandas as pd
 import pytest
-from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 
 from src.pvnet_app.save import (
@@ -13,8 +13,12 @@ from src.pvnet_app.save import (
 )
 
 
-@pytest.mark.asyncio(loop_scope="session")
-async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataServiceStub):
+@pytest.mark.asyncio(loop_scope="module")
+async def test_save_to_generation_to_data_platform(
+    client: dp.DataPlatformDataServiceStub,
+    national_location: UUID,
+    gsp_1_location: UUID,
+):
     """
     Test saving data to the Data Platform.
     This test uses the `data_platform` fixture to ensure that the Data Platform service
@@ -33,33 +37,9 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     7. check that the forecast values are correctly
     8. check that the adjusted forecast values are limited correctly
     """
-    # 1. setup: add location - gsp 0
-    metadata = Struct(fields={"gsp_id": Value(number_value=0)})
-    create_location_request = dp.CreateLocationRequest(
-        location_name="gsp0",
-        energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POINT(0 0)",
-        location_type=dp.LocationType.NATION,
-        effective_capacity_watts=1_000_000,
-        metadata=metadata,
-        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
-    )
-    create_location_response = await client.create_location(create_location_request)
-    location_uuid_0 = create_location_response.location_uuid
-
-    # setup: add location - gsp 1
-    metadata = Struct(fields={"gsp_id": Value(number_value=1)})
-    create_location_request = dp.CreateLocationRequest(
-        location_name="gsp1",
-        energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POINT(0 0)",
-        location_type=dp.LocationType.GSP,
-        effective_capacity_watts=1_000_000,
-        metadata=metadata,
-        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
-    )
-    create_location_response = await client.create_location(create_location_request)
-    location_uuid_1 = create_location_response.location_uuid
+    # 1. setup: add location - gsp 0 and 1
+    location_uuid_0 = national_location
+    location_uuid_1 = gsp_1_location
 
     # setup observer
     create_observer_request = dp.CreateObserverRequest(name="pvlive_day_after")

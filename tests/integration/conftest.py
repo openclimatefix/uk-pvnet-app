@@ -1,14 +1,17 @@
 
+import datetime
 import time
+from uuid import UUID
 
 import pytest_asyncio
+from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
 from testcontainers.core.container import DockerContainer
 from testcontainers.postgres import PostgresContainer
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module")
 async def client():
     """
     Fixture to spin up a PostgreSQL container for the entire test session.
@@ -46,3 +49,36 @@ async def client():
 
             yield client
             channel.close()
+
+
+@pytest_asyncio.fixture(scope="module")
+async def national_location(client) -> UUID:
+      # 1. setup: add location - gsp 0
+    metadata = Struct(fields={"gsp_id": Value(number_value=0)})
+    create_location_request = dp.CreateLocationRequest(
+        location_name="gsp0",
+        energy_source=dp.EnergySource.SOLAR,
+        geometry_wkt="POINT(0 0)",
+        location_type=dp.LocationType.NATION,
+        effective_capacity_watts=1_000_001,
+        metadata=metadata,
+        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
+    )
+    create_location_response = await client.create_location(create_location_request)
+    return create_location_response.location_uuid
+
+@pytest_asyncio.fixture(scope="module")
+async def gsp_1_location(client) -> UUID:
+    # setup: add location - gsp 1
+    metadata = Struct(fields={"gsp_id": Value(number_value=1)})
+    create_location_request = dp.CreateLocationRequest(
+        location_name="gsp1",
+        energy_source=dp.EnergySource.SOLAR,
+        geometry_wkt="POINT(0 0)",
+        location_type=dp.LocationType.GSP,
+        effective_capacity_watts=999_000,
+        metadata=metadata,
+        valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
+    )
+    create_location_response = await client.create_location(create_location_request)
+    return create_location_response.location_uuid
