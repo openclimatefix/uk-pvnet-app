@@ -474,7 +474,7 @@ def limit_adjuster(delta_fraction:float, value_fraction:float, capacity_mw: floa
     return delta_fraction
 
 
-async def get_metadata_for_forecast(client: dp.Client, location_uuid:str) -> dict:
+async def get_metadata_for_forecast(client: dp.DataPlatformDataServiceStub, location_uuid:str) -> dict:
     """Get metadata for the forecast."""
     app_version = version("pvnet_app")
     metadata = Struct().from_pydict({"app_version": app_version})
@@ -484,7 +484,8 @@ async def get_metadata_for_forecast(client: dp.Client, location_uuid:str) -> dic
                                     energy_source=dp.EnergySource.SOLAR,
                                     observer_name="pvlive_in_day")
     gsp_last_updated = await client.get_latest_observations(gsp_request)
-    metadata["gsp_last_updated"] = gsp_last_updated
+    if len(gsp_last_updated.observations) > 0:
+        metadata["gsp_last_updated"] = gsp_last_updated.observations[-1].observation_time_utc
 
 
     # add nwp last updated time, load file from s3 if exists
