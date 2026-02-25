@@ -212,7 +212,7 @@ async def save_forecast_to_data_platform(
 
     # 1. get metadata for the forecast
     metadata = await get_metadata_for_forecast(
-        client=client, location_uuid=locations_gsp_uuid_map[0]
+        client=client, location_uuid=locations_gsp_uuid_map[0],
     )
 
     # 2. get or update or create forecaster version ( this is similar to ml_model before)
@@ -420,7 +420,7 @@ async def make_forecaster_adjuster(
 
         # limit adjuster
         delta_fraction = limit_adjuster(
-            delta_fraction=delta_fraction, value_fraction=fv.p50_fraction, capacity_mw=capacity_mw
+            delta_fraction=delta_fraction, value_fraction=fv.p50_fraction, capacity_mw=capacity_mw,
         )
 
         # delta values are forecast - observed, so we need to subtract
@@ -480,7 +480,7 @@ def limit_adjuster(delta_fraction: float, value_fraction: float, capacity_mw: fl
 
 
 async def get_metadata_for_forecast(
-    client: dp.DataPlatformDataServiceStub, location_uuid: str
+    client: dp.DataPlatformDataServiceStub, location_uuid: str,
 ) -> dict:
     """Get metadata for the forecast."""
     app_version = version("pvnet_app")
