@@ -3,10 +3,12 @@
 import asyncio
 import itertools
 import logging
+import os
 from datetime import UTC, datetime
 from importlib.metadata import version
 
 import betterproto
+import fsspec
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -190,7 +192,7 @@ async def save_forecast_to_data_platform(
     """Save forecast DataArray to data platform.
 
     We do the following steps:
-    1. Get all locations from data platform
+    1. Get the metadata for the forecast
     2. get Forecaster
     3. loop over all gsps: get the location object
     4. Forecast the forecast values
@@ -208,6 +210,9 @@ async def save_forecast_to_data_platform(
     # strip out timezone from init_time_utc, this works better with xarray datetime formats
     init_time_utc = init_time_utc.replace(tzinfo=None)
 
+    # 1. get metadata for the forecast
+    metadata= get_metadata_for_forecast(client=client)
+
     # 2. get or update or create forecaster version ( this is similar to ml_model before)
     forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag)
 
@@ -221,15 +226,14 @@ async def save_forecast_to_data_platform(
             init_time_utc=init_time_utc,
         )
         # 5. Save to data platform
-        app_version = version("pvnet_app")
         forecast_request = dp.CreateForecastRequest(
             forecaster=forecaster,
             location_uuid=locations_gsp_uuid_map[int(gsp_id)],
             energy_source=dp.EnergySource.SOLAR,
             init_time_utc=init_time_utc.replace(tzinfo=UTC),
             values=forecast_values,
-            metadata=Struct().from_pydict({"app_version": app_version})
-        )
+            metadata=metadata)
+
         tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
         if gsp_id == 0:
@@ -241,6 +245,7 @@ async def save_forecast_to_data_platform(
                 forecast_values=forecast_values,
                 model_tag=model_tag,
                 forecaster=forecaster,
+                metadata=metadata,
             )
             tasks.append(asyncio.create_task(client.create_forecast(adjusted_forecast_request)))
 
@@ -335,7 +340,7 @@ async def create_forecaster_if_not_exists(
 ) -> dp.Forecaster:
     """Create the current forecaster if it does not exist."""
     name = model_tag.replace("-", "_")
-    # we are not using app version any more, 
+    # we are not using app version any more,
     # this is stored in the forecast metadata
     version = "2.0.0"
 
@@ -376,6 +381,7 @@ async def make_forecaster_adjuster(
     forecast_values: list[dp.CreateForecastRequestForecastValue],
     model_tag: str,
     forecaster: dp.Forecaster,
+    metadata:dict = {},
 ) -> dp.CreateForecastRequest:
     """Make a forecaster adjuster based on week average deltas."""
     # get delta values
@@ -437,14 +443,13 @@ async def make_forecaster_adjuster(
     )
 
     # make forecast
-    app_version = version("pvnet_app")
     adjusted_forecast_request = dp.CreateForecastRequest(
         forecaster=forecaster,
         location_uuid=location_uuid,
         energy_source=dp.EnergySource.SOLAR,
         init_time_utc=init_time_utc.replace(tzinfo=UTC),
         values=new_forecast_values,
-        metadata=Struct().from_pydict({"app_version": app_version})
+        metadata=metadata,
     )
 
     return adjusted_forecast_request
@@ -467,3 +472,42 @@ def limit_adjuster(delta_fraction:float, value_fraction:float, capacity_mw: floa
         delta_fraction = -max_delta_absolute
 
     return delta_fraction
+
+
+async def get_metadata_for_forecast(client: dp.Client, location_uuid:str) -> dict:
+    """Get metadata for the forecast."""
+    app_version = version("pvnet_app")
+    metadata = Struct().from_pydict({"app_version": app_version})
+
+    # add gsp last updated time
+    gsp_request = dp.GetLatestObservationsRequest(location_uuids=[location_uuid],
+                                    energy_source=dp.EnergySource.SOLAR,
+                                    observer_name="pvlive_in_day")
+    gsp_last_updated = await client.get_latest_observations(gsp_request)
+    metadata["gsp_last_updated"] = gsp_last_updated
+
+
+    # add nwp last updated time, load file from s3 if exists
+    nwp_last_update = datetime(1970,1,1, tzinfo=UTC)
+    env_vars = ["NWP_ECMWF_ZARR_PATH","NWP_UKV_ZARR_PATH"]
+    for env_var in env_vars:
+        file = os.getenv(env_var)
+        fs = fsspec.open(file).fs
+        modified_date = fs.modified(file)
+        if modified_date > nwp_last_update:
+            nwp_last_update = modified_date
+
+    # add satellite last updated time, load file from s3 if it exists
+    satellite_last_update = datetime(1970,1,1, tzinfo=UTC)
+    env_vars = ["SATELLITE_ZARR_PATH"]
+    for env_var in env_vars:
+        file = os.getenv(env_var)
+        fs = fsspec.open(file).fs
+        modified_date = fs.modified(file)
+        if modified_date > satellite_last_update:
+            satellite_last_update = modified_date
+
+    metadata["nwp_last_updated"] = nwp_last_update
+    metadata["satellite_last_updated"] = satellite_last_update
+
+    return metadata
