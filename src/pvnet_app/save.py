@@ -498,6 +498,7 @@ async def get_metadata_for_forecast(client: dp.DataPlatformDataServiceStub,
         file = os.getenv(env_var + "/.zattrs")
         fs = fsspec.open(file).fs
         modified_date = fs.modified(file)
-        metadata[env_var] = modified_date
+        name = env_var.lower().replace("_zarr_path", "")
+        metadata[f"{name}_last_modified"] = modified_date
 
     return metadata
