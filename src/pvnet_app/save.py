@@ -211,7 +211,9 @@ async def save_forecast_to_data_platform(
     init_time_utc = init_time_utc.replace(tzinfo=None)
 
     # 1. get metadata for the forecast
-    metadata = await get_metadata_for_forecast(client=client, location_uuid=locations_gsp_uuid_map[0])
+    metadata = await get_metadata_for_forecast(
+        client=client, location_uuid=locations_gsp_uuid_map[0]
+    )
 
     # 2. get or update or create forecaster version ( this is similar to ml_model before)
     forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag)
@@ -232,7 +234,8 @@ async def save_forecast_to_data_platform(
             energy_source=dp.EnergySource.SOLAR,
             init_time_utc=init_time_utc.replace(tzinfo=UTC),
             values=forecast_values,
-            metadata=metadata)
+            metadata=metadata,
+        )
 
         tasks.append(asyncio.create_task(client.create_forecast(forecast_request)))
 
@@ -381,7 +384,7 @@ async def make_forecaster_adjuster(
     forecast_values: list[dp.CreateForecastRequestForecastValue],
     model_tag: str,
     forecaster: dp.Forecaster,
-    metadata:dict | None = None,
+    metadata: dict | None = None,
 ) -> dp.CreateForecastRequest:
     """Make a forecaster adjuster based on week average deltas."""
     if metadata is None:
@@ -417,9 +420,8 @@ async def make_forecaster_adjuster(
 
         # limit adjuster
         delta_fraction = limit_adjuster(
-            delta_fraction=delta_fraction,
-            value_fraction=fv.p50_fraction,
-            capacity_mw=capacity_mw)
+            delta_fraction=delta_fraction, value_fraction=fv.p50_fraction, capacity_mw=capacity_mw
+        )
 
         # delta values are forecast - observed, so we need to subtract
         new_p50 = max(0.0, min(1.0, fv.p50_fraction - delta_fraction))
@@ -458,7 +460,7 @@ async def make_forecaster_adjuster(
     return adjusted_forecast_request
 
 
-def limit_adjuster(delta_fraction:float, value_fraction:float, capacity_mw: float) -> float:
+def limit_adjuster(delta_fraction: float, value_fraction: float, capacity_mw: float) -> float:
     """Limit the adjuster to 10% of forecast and max 1000 MW."""
     # limit adjusted fractions to 10% of fv.p50_fraction
     max_delta = 0.1 * value_fraction
@@ -477,23 +479,25 @@ def limit_adjuster(delta_fraction:float, value_fraction:float, capacity_mw: floa
     return delta_fraction
 
 
-async def get_metadata_for_forecast(client: dp.DataPlatformDataServiceStub,
-                                    location_uuid:str) -> dict:
+async def get_metadata_for_forecast(
+    client: dp.DataPlatformDataServiceStub, location_uuid: str
+) -> dict:
     """Get metadata for the forecast."""
     app_version = version("pvnet_app")
     metadata = Struct().from_pydict({"app_version": app_version})
 
     # add gsp last updated time
-    gsp_request = dp.GetLatestObservationsRequest(location_uuids=[location_uuid],
-                                    energy_source=dp.EnergySource.SOLAR,
-                                    observer_name="pvlive_in_day")
+    gsp_request = dp.GetLatestObservationsRequest(
+        location_uuids=[location_uuid],
+        energy_source=dp.EnergySource.SOLAR,
+        observer_name="pvlive_in_day",
+    )
     gsp_last_updated = await client.get_latest_observations(gsp_request)
     if len(gsp_last_updated.observations) > 0:
         metadata["gsp_last_updated"] = gsp_last_updated.observations[-1].observation_time_utc
 
-
     # add nwp and satellite last updated time, load file from s3 if exists
-    env_vars = ["NWP_ECMWF_ZARR_PATH","NWP_UKV_ZARR_PATH", "SATELLITE_ZARR_PATH"]
+    env_vars = ["NWP_ECMWF_ZARR_PATH", "NWP_UKV_ZARR_PATH", "SATELLITE_ZARR_PATH"]
     for env_var in env_vars:
         file = os.getenv(env_var + "/.zattrs")
         if file is not None:
