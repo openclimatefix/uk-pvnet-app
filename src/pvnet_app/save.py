@@ -211,7 +211,7 @@ async def save_forecast_to_data_platform(
     init_time_utc = init_time_utc.replace(tzinfo=None)
 
     # 1. get metadata for the forecast
-    metadata= get_metadata_for_forecast(client=client)
+    metadata= get_metadata_for_forecast(client=client, location_uuid=locations_gsp_uuid_map[0])
 
     # 2. get or update or create forecaster version ( this is similar to ml_model before)
     forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag)
