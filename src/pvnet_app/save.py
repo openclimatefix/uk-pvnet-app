@@ -381,9 +381,12 @@ async def make_forecaster_adjuster(
     forecast_values: list[dp.CreateForecastRequestForecastValue],
     model_tag: str,
     forecaster: dp.Forecaster,
-    metadata:dict = {},
+    metadata:dict | None = None,
 ) -> dp.CreateForecastRequest:
     """Make a forecaster adjuster based on week average deltas."""
+    if metadata is None:
+        metadata = {}
+
     # get delta values
     deltas_request = dp.GetWeekAverageDeltasRequest(
         location_uuid=location_uuid,
@@ -474,7 +477,8 @@ def limit_adjuster(delta_fraction:float, value_fraction:float, capacity_mw: floa
     return delta_fraction
 
 
-async def get_metadata_for_forecast(client: dp.DataPlatformDataServiceStub, location_uuid:str) -> dict:
+async def get_metadata_for_forecast(client: dp.DataPlatformDataServiceStub,
+                                    location_uuid:str) -> dict:
     """Get metadata for the forecast."""
     app_version = version("pvnet_app")
     metadata = Struct().from_pydict({"app_version": app_version})
@@ -488,27 +492,12 @@ async def get_metadata_for_forecast(client: dp.DataPlatformDataServiceStub, loca
         metadata["gsp_last_updated"] = gsp_last_updated.observations[-1].observation_time_utc
 
 
-    # add nwp last updated time, load file from s3 if exists
-    nwp_last_update = datetime(1970,1,1, tzinfo=UTC)
-    env_vars = ["NWP_ECMWF_ZARR_PATH","NWP_UKV_ZARR_PATH"]
+    # add nwp and satellite last updated time, load file from s3 if exists
+    env_vars = ["NWP_ECMWF_ZARR_PATH","NWP_UKV_ZARR_PATH", "SATELLITE_ZARR_PATH"]
     for env_var in env_vars:
-        file = os.getenv(env_var)
+        file = os.getenv(env_var + "/.zattrs")
         fs = fsspec.open(file).fs
         modified_date = fs.modified(file)
-        if modified_date > nwp_last_update:
-            nwp_last_update = modified_date
-
-    # add satellite last updated time, load file from s3 if it exists
-    satellite_last_update = datetime(1970,1,1, tzinfo=UTC)
-    env_vars = ["SATELLITE_ZARR_PATH"]
-    for env_var in env_vars:
-        file = os.getenv(env_var)
-        fs = fsspec.open(file).fs
-        modified_date = fs.modified(file)
-        if modified_date > satellite_last_update:
-            satellite_last_update = modified_date
-
-    metadata["nwp_last_updated"] = nwp_last_update
-    metadata["satellite_last_updated"] = satellite_last_update
+        metadata[env_var] = modified_date
 
     return metadata
