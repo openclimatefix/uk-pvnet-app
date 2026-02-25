@@ -211,7 +211,7 @@ async def save_forecast_to_data_platform(
     init_time_utc = init_time_utc.replace(tzinfo=None)
 
     # 1. get metadata for the forecast
-    metadata= get_metadata_for_forecast(client=client, location_uuid=locations_gsp_uuid_map[0])
+    metadata = await get_metadata_for_forecast(client=client, location_uuid=locations_gsp_uuid_map[0])
 
     # 2. get or update or create forecaster version ( this is similar to ml_model before)
     forecaster = await create_forecaster_if_not_exists(client=client, model_tag=model_tag)
@@ -496,9 +496,10 @@ async def get_metadata_for_forecast(client: dp.DataPlatformDataServiceStub,
     env_vars = ["NWP_ECMWF_ZARR_PATH","NWP_UKV_ZARR_PATH", "SATELLITE_ZARR_PATH"]
     for env_var in env_vars:
         file = os.getenv(env_var + "/.zattrs")
-        fs = fsspec.open(file).fs
-        modified_date = fs.modified(file)
-        name = env_var.lower().replace("_zarr_path", "")
-        metadata[f"{name}_last_modified"] = modified_date
+        if file is not None:
+            fs = fsspec.open(file).fs
+            modified_date = fs.modified(file)
+            name = env_var.lower().replace("_zarr_path", "")
+            metadata[f"{name}_last_modified"] = modified_date
 
     return metadata
