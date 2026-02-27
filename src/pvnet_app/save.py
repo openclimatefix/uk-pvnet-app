@@ -485,7 +485,6 @@ async def get_metadata_for_forecast(
     """Get metadata for the forecast."""
     app_version = version("pvnet_app")
     metadata = {"app_version": app_version}
-    print(metadata)
 
     # add gsp last updated time
     gsp_request = dp.GetLatestObservationsRequest(

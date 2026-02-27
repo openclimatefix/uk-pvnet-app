@@ -1,12 +1,12 @@
 import datetime
 import time
+from importlib.metadata import version
 
 import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
-from importlib.metadata import version
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
 from testcontainers.core.container import DockerContainer
@@ -224,7 +224,7 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     assert len(get_latest_forecasts_response.forecasts) == 3
     forecast = get_latest_forecasts_response.forecasts[0]
     assert forecast.forecaster.forecaster_name == "test_model"
-    assert forecast.metadata.fields["app_version"] == version('pvnet-app')
+    assert forecast.metadata.fields["app_version"] == version("pvnet-app")
     forecast_adjuster = get_latest_forecasts_response.forecasts[1]
     assert forecast_adjuster.forecaster.forecaster_name == "test_model_adjust"
 
