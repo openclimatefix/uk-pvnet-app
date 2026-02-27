@@ -481,10 +481,11 @@ def limit_adjuster(delta_fraction: float, value_fraction: float, capacity_mw: fl
 
 async def get_metadata_for_forecast(
     client: dp.DataPlatformDataServiceStub, location_uuid: str,
-) -> dict:
+) -> Struct:
     """Get metadata for the forecast."""
     app_version = version("pvnet_app")
-    metadata = Struct().from_pydict({"app_version": app_version})
+    metadata = {"app_version": app_version}
+    print(metadata)
 
     # add gsp last updated time
     gsp_request = dp.GetLatestObservationsRequest(
@@ -506,4 +507,6 @@ async def get_metadata_for_forecast(
             name = env_var.lower().replace("_zarr_path", "")
             metadata[f"{name}_last_modified"] = modified_date
 
-    return metadata
+    metadata_struct = Struct().from_pydict(metadata)
+    return metadata_struct
+
