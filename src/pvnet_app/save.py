@@ -227,7 +227,7 @@ async def save_forecast_to_data_platform(
             forecast_normed_da.sel(gsp_id=gsp_id),
             init_time_utc=init_time_utc,
         )
-        
+
         # 5. Save to data platform
         forecast_request = dp.CreateForecastRequest(
             forecaster=forecaster,
@@ -388,9 +388,6 @@ async def make_forecaster_adjuster(
     metadata: dict | None = None,
 ) -> dp.CreateForecastRequest:
     """Make a forecaster adjuster based on week average deltas."""
-    if metadata is None:
-        metadata = {}
-
     # get delta values
     deltas_request = dp.GetWeekAverageDeltasRequest(
         location_uuid=location_uuid,
@@ -499,9 +496,9 @@ async def get_metadata_for_forecast(
     # add nwp and satellite last updated time, load file from s3 if exists
     env_vars = ["NWP_ECMWF_ZARR_PATH", "NWP_UKV_ZARR_PATH", "SATELLITE_ZARR_PATH"]
     for env_var in env_vars:
-        file = os.getenv(env_var + "/.zattrs")
+        file = os.getenv(env_var)
         if file is not None:
-            fs = fsspec.open(file).fs
+            fs = fsspec.open(f"{file}/.zattrs").fs
             modified_date = fs.modified(file)
             name = env_var.lower().replace("_zarr_path", "")
             metadata[f"{name}_last_modified"] = Value(timestamp_value=modified_date)
