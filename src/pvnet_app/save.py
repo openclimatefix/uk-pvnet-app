@@ -499,9 +499,10 @@ async def get_metadata_for_forecast(
         file = os.getenv(env_var)
         if file is not None:
             fs = fsspec.open(f"{file}/.zattrs").fs
-            modified_date = fs.modified(file)
-            name = env_var.lower().replace("_zarr_path", "")
-            metadata[f"{name}_last_modified"] = Value(timestamp_value=modified_date)
+            if fs.exists(file):
+                modified_date = fs.modified(file)
+                name = env_var.lower().replace("_zarr_path", "")
+                metadata[f"{name}_last_modified"] = Value(timestamp_value=modified_date)
 
     metadata = Struct(fields=metadata)
     return metadata
