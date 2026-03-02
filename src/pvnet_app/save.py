@@ -484,7 +484,7 @@ async def get_metadata_for_forecast(
 ) -> Struct:
     """Get metadata for the forecast."""
     app_version = version("pvnet_app")
-    metadata = {"app_version": app_version}
+    metadata = {"app_version": app_version.encode("utf-8")}
 
     # add gsp last updated time
     gsp_request = dp.GetLatestObservationsRequest(
@@ -506,6 +506,6 @@ async def get_metadata_for_forecast(
             name = env_var.lower().replace("_zarr_path", "")
             metadata[f"{name}_last_modified"] = modified_date
 
-    metadata_struct = Struct().from_pydict(metadata)
+    metadata_struct = Struct().from_dict(metadata)
     return metadata_struct
 
