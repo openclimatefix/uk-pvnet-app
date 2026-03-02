@@ -346,7 +346,7 @@ async def create_forecaster_if_not_exists(
     name = model_tag.replace("-", "_")
     # we are not using app version any more,
     # this is stored in the forecast metadata
-    version = "2.0.0"
+    version = "2.8.0"
 
     list_forecasters_request = dp.ListForecastersRequest(
         forecaster_names_filter=[name],
