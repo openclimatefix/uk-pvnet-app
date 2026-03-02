@@ -491,7 +491,7 @@ async def get_metadata_for_forecast(
     )
     gsp_last_updated = await client.get_latest_observations(gsp_request)
     if len(gsp_last_updated.observations) > 0:
-        metadata["gsp_last_updated"] = gsp_last_updated.observations[-1].observation_time_utc
+        metadata["gsp_last_updated"] = gsp_last_updated.observations[-1].timestamp_utc
 
     # add nwp and satellite last updated time, load file from s3 if exists
     env_vars = ["NWP_ECMWF_ZARR_PATH", "NWP_UKV_ZARR_PATH", "SATELLITE_ZARR_PATH"]
