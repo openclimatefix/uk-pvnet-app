@@ -12,7 +12,7 @@ import fsspec
 import numpy as np
 import pandas as pd
 import xarray as xr
-from betterproto.lib.google.protobuf import Struct
+from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
@@ -227,6 +227,7 @@ async def save_forecast_to_data_platform(
             forecast_normed_da.sel(gsp_id=gsp_id),
             init_time_utc=init_time_utc,
         )
+        
         # 5. Save to data platform
         forecast_request = dp.CreateForecastRequest(
             forecaster=forecaster,
@@ -483,8 +484,7 @@ async def get_metadata_for_forecast(
     client: dp.DataPlatformDataServiceStub, location_uuid: str,
 ) -> Struct:
     """Get metadata for the forecast."""
-    app_version = version("pvnet_app")
-    metadata = {"app_version": app_version.encode("utf-8")}
+    metadata = {"app_version": Value(string_value=version("pvnet_app"))}
 
     # add gsp last updated time
     gsp_request = dp.GetLatestObservationsRequest(
@@ -504,8 +504,8 @@ async def get_metadata_for_forecast(
             fs = fsspec.open(file).fs
             modified_date = fs.modified(file)
             name = env_var.lower().replace("_zarr_path", "")
-            metadata[f"{name}_last_modified"] = modified_date
+            metadata[f"{name}_last_modified"] = Value(timestamp_value=modified_date)
 
-    metadata_struct = Struct().from_dict(metadata)
-    return metadata_struct
+    metadata = Struct(fields=metadata)
+    return metadata
 

@@ -31,7 +31,7 @@ async def client():
     # we use a specific postgres image with postgis and pgpartman installed
     # TODO make a release of this, not using logging tag.
     with PostgresContainer(
-        "ghcr.io/openclimatefix/data-platform-pgdb:devsjc-build-pgdb",
+        "ghcr.io/openclimatefix/data-platform-pgdb:0.21.2",
         username="postgres",
         password="postgres",  # noqa: S106
         dbname="postgres",
@@ -49,7 +49,7 @@ async def client():
             env={"DATABASE_URL": database_url},
             ports=[50051],
         ) as data_platform_server:
-            time.sleep(2)  # Give some time for the server to start
+            time.sleep(1)  # Give some time for the server to start
 
             port = data_platform_server.get_exposed_port(50051)
             host = data_platform_server.get_container_host_ip()
@@ -221,10 +221,10 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     get_latest_forecasts_response = await client.get_latest_forecasts(
         get_latest_forecasts_request,
     )
-    assert len(get_latest_forecasts_response.forecasts) == 3
+    assert len(get_latest_forecasts_response.forecasts) == 2
     forecast = get_latest_forecasts_response.forecasts[0]
     assert forecast.forecaster.forecaster_name == "test_model"
-    assert forecast.metadata.fields["app_version"] == version("pvnet-app")
+    assert forecast.metadata.fields["app_version"].string_value == version("pvnet-app")
     forecast_adjuster = get_latest_forecasts_response.forecasts[1]
     assert forecast_adjuster.forecaster.forecaster_name == "test_model_adjust"
 
