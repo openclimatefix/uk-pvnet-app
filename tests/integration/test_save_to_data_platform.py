@@ -31,7 +31,7 @@ async def client():
     # we use a specific postgres image with postgis and pgpartman installed
     # TODO make a release of this, not using logging tag.
     with PostgresContainer(
-        "ghcr.io/openclimatefix/data-platform-pgdb:0.21.2",
+        f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
         username="postgres",
         password="postgres",  # noqa: S106
         dbname="postgres",
@@ -45,7 +45,7 @@ async def client():
         database_url = database_url.replace("localhost", "host.docker.internal")
 
         with DockerContainer(
-            image="ghcr.io/openclimatefix/data-platform:0.21.1",
+            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
             env={"DATABASE_URL": database_url},
             ports=[50051],
         ) as data_platform_server:
