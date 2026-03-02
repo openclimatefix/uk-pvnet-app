@@ -385,7 +385,7 @@ async def make_forecaster_adjuster(
     forecast_values: list[dp.CreateForecastRequestForecastValue],
     model_tag: str,
     forecaster: dp.Forecaster,
-    metadata: dict | None = None,
+    metadata: Struct | None = None,
 ) -> dp.CreateForecastRequest:
     """Make a forecaster adjuster based on week average deltas."""
     # get delta values
