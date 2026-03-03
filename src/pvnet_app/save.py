@@ -492,7 +492,7 @@ async def get_metadata_for_forecast(
     gsp_last_updated = await client.get_latest_observations(gsp_request)
     if len(gsp_last_updated.observations) > 0:
         metadata["gsp_last_updated"] \
-            = Value(timestamp_value=gsp_last_updated.observations[-1].timestamp_utc)
+            = Value(string_value=gsp_last_updated.observations[-1].timestamp_utc.isoformat())
 
     # add nwp and satellite last updated time, load file from s3 if exists
     env_vars = ["NWP_ECMWF_ZARR_PATH", "NWP_UKV_ZARR_PATH", "SATELLITE_ZARR_PATH"]
@@ -503,7 +503,7 @@ async def get_metadata_for_forecast(
                 fs = fsspec.open(f"{file}/.zattrs").fs
                 modified_date = fs.modified(file)
                 name = env_var.lower().replace("_zarr_path", "")
-                metadata[f"{name}_last_modified"] = Value(timestamp_value=modified_date)
+                metadata[f"{name}_last_modified"] = Value(string_value=modified_date.isoformat())
             except Exception as e:
                 logger.debug(f"Could not get metadata for {env_var}: {e}")
 
