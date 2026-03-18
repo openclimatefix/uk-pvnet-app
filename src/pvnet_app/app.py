@@ -339,9 +339,6 @@ async def run(
         ]
         await asyncio.gather(*tasks)
 
-
-    except Exception as e:
-        logger.error(f"Failed to save forecast to data platform with error {e}")
     finally:
         channel.close()
 
