@@ -499,17 +499,11 @@ async def get_metadata_for_forecast(
     for env_var in env_vars:
         file = os.getenv(env_var)
         if file is not None:
-            try:
-                fs = fsspec.open(f"{file}/.zattrs").fs
-                if "zip" in file:
-                    modified_date = fs.modified(file)
-                else:
-                    modified_date = fs.modified(f"{file}/.zattrs")
+            fs = fsspec.open(f"{file}/.zattrs").fs
+            modified_date = fs.modified(file) if "zip" in file else fs.modified(f"{file}/.zattrs")
 
-                name = env_var.lower().replace("_zarr_path", "")
-                metadata[f"{name}_last_modified"] = Value(string_value=modified_date.isoformat())
-            except Exception as e:
-                logger.debug(f"Could not get metadata for {env_var}: {e}")
+            name = env_var.lower().replace("_zarr_path", "")
+            metadata[f"{name}_last_modified"] = Value(string_value=modified_date.isoformat())
 
     metadata = Struct(fields=metadata)
     return metadata

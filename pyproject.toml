@@ -46,6 +46,7 @@ dependencies = [
     "betterproto==2.0.0b7",
     "grpclib==0.4.8",
     "pytest-asyncio>=1.2.0",
+    "h5py<3.16.0",
 ]
 
 [dependency-groups]
