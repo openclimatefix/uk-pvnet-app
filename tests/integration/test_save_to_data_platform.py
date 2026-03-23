@@ -8,6 +8,7 @@ import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
+from grpclib.exceptions import GRPCError
 
 from src.pvnet_app.save import (
     create_forecaster_if_not_exists,
@@ -53,9 +54,9 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     # 1. setup: add location - gsp 0
     metadata = Struct(fields={"gsp_id": Value(number_value=0)})
     create_location_request = dp.CreateLocationRequest(
-        location_name="gsp0",
+        location_name="test_save_gsp0",
         energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POINT(0 0)",
+        geometry_wkt="POINT(10 10)",
         location_type=dp.LocationType.NATION,
         effective_capacity_watts=1_000_000,
         metadata=metadata,
@@ -67,9 +68,9 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     # setup: add location - gsp 1
     metadata = Struct(fields={"gsp_id": Value(number_value=1)})
     create_location_request = dp.CreateLocationRequest(
-        location_name="gsp1",
+        location_name="test_save_gsp1",
         energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POINT(0 0)",
+        geometry_wkt="POINT(11 11)",
         location_type=dp.LocationType.GSP,
         effective_capacity_watts=1_000_000,
         metadata=metadata,

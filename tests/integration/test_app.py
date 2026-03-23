@@ -18,7 +18,7 @@ from nowcasting_datamodel.models.forecast import (
 from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
-NUM_GSPS = 342
+NUM_GSPS = 331
 
 
 @pytest_asyncio.fixture(scope="module")
@@ -27,7 +27,7 @@ async def setup_dp_locations(dp_client):
     channel = Channel(host=host, port=port)
     client = dp.DataPlatformDataServiceStub(channel)
 
-    for i in range(NUM_GSPS + 1):
+    for i in range(341 + 1):
         metadata = Struct(fields={"gsp_id": Value(number_value=i)})
         location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
 
@@ -54,14 +54,11 @@ def check_number_of_forecasts(model_configs, db_session):
     # Check correct number of forecasts have been made
     # (Number of GSPs + 1 National + maybe GSP-sum) forecasts
     # Forecast made with multiple models
-
-    # Based on get_gsp_boundaries(version="20250109").iloc[1:].index
-    num_active_gsps = 331
     expected_num_forecasts = 0
     expected_num_forecast_values = 0
     for model_config in model_configs:
         # The number of forecasts
-        num_forecasts = num_active_gsps + 1 + model_config.save_gsp_sum
+        num_forecasts = NUM_GSPS + 1 + model_config.save_gsp_sum
         expected_num_forecasts += num_forecasts
         # The number of forecast values - 16 for intraday, 36 for day-ahead)
         expected_num_forecast_values += num_forecasts * (72 if model_config.is_day_ahead else 16)
@@ -79,9 +76,7 @@ def check_number_of_forecasts(model_configs, db_session):
 
     expected_num_forecast_values = 0
     for model_config in model_configs:
-        num_forecasts = (
-            1 + num_active_gsps * model_config.save_gsp_to_recent + model_config.save_gsp_sum
-        )
+        num_forecasts = 1 + NUM_GSPS * model_config.save_gsp_to_recent + model_config.save_gsp_sum
         expected_num_forecast_values += num_forecasts * (72 if model_config.is_day_ahead else 16)
 
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_num_forecast_values
