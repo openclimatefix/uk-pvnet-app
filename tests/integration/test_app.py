@@ -18,7 +18,7 @@ from nowcasting_datamodel.models.forecast import (
 from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
-NUM_GSPS = 331
+NUM_GSPS = 342
 
 
 @pytest_asyncio.fixture(scope="module")
