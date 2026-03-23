@@ -1,8 +1,13 @@
 import os
+import datetime
 import tempfile
 
 import pytest
+import pytest_asyncio
 import zarr
+from betterproto.lib.google.protobuf import Struct, Value
+from dp_sdk.ocf import dp
+from grpclib.client import Channel
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
     ForecastValueLatestSQL,
@@ -18,6 +23,29 @@ NUM_GSPS = 331
 
 def check_number_of_forecasts(model_configs, db_session):
     """Check the app has added the expected number of forecast values to the database"""
+
+@pytest_asyncio.fixture(scope="module")
+async def setup_dp_locations(dp_client):
+    host, port = dp_client
+    channel = Channel(host=host, port=port)
+    client = dp.DataPlatformDataServiceStub(channel)
+
+    for i in range(15):
+        metadata = Struct(fields={"gsp_id": Value(number_value=i)})
+        location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
+        
+        req = dp.CreateLocationRequest(
+            location_name=f"gsp{i}",
+            energy_source=dp.EnergySource.SOLAR,
+            geometry_wkt="POINT(0 0)",
+            location_type=location_type,
+            effective_capacity_watts=1_000_000,
+            metadata=metadata,
+            valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC)
+        )
+        await client.create_location(req)
+        
+    channel.close()
 
     # Check correct number of forecasts have been made
     # (Number of GSPs + 1 National + maybe GSP-sum) forecasts
@@ -52,6 +80,8 @@ def check_number_of_forecasts(model_configs, db_session):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app(
+    dp_client,
+    setup_dp_locations,
     test_t0,
     db_session,
     nwp_ukv_data,
@@ -97,7 +127,7 @@ async def test_app(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
+async def test_app_no_sat(dp_client, setup_dp_locations, test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
     """Test the app for the case when no satellite data is available"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
