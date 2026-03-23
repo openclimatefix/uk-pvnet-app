@@ -8,7 +8,6 @@ import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
-from grpclib.exceptions import GRPCError
 
 from src.pvnet_app.save import (
     create_forecaster_if_not_exists,
