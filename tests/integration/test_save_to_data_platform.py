@@ -171,7 +171,10 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     )
 
     # 6. check: read from the data platform to check it was saved
-    list_forecasters_response = await client.list_forecasters(dp.ListForecastersRequest())
+    # Filter to only the forecasters created by this test (shared dp_client may have others)
+    list_forecasters_response = await client.list_forecasters(
+        dp.ListForecastersRequest(forecaster_names_filter=["test_model", "test_model_adjust"])
+    )
     assert len(list_forecasters_response.forecasters) == 2
 
     # check: There is a forecast object for gsp_id 1
