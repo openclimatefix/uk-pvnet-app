@@ -42,6 +42,9 @@ async def setup_dp_locations(dp_client):
         )
         await client.create_location(req)
 
+    # Setup observer
+    await client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
+
     channel.close()
 
 
