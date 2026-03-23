@@ -26,8 +26,8 @@ async def setup_dp_locations(dp_client):
     host, port = dp_client
     channel = Channel(host=host, port=port)
     client = dp.DataPlatformDataServiceStub(channel)
-
-    for i in range(341 + 1):
+    total_gsps = 342
+    for i in range(total_gsps + 1):
         metadata = Struct(fields={"gsp_id": Value(number_value=i)})
         location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
 
