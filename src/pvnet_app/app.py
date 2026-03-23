@@ -327,23 +327,18 @@ async def run(
     logger.info("Writing to data platform")
     channel = Channel(data_platform_host, data_platform_port)
     client = dp.DataPlatformDataServiceStub(channel)
-    try:
-        gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+   
+    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
 
-        tasks = [
-            forecaster.save_forecast_to_dataplatform(
-                locations_gsp_uuid_map=gsp_uuid_map,
-                client=client,
-            )
-            for forecaster in forecasters.values()
-        ]
-        await asyncio.gather(*tasks)
-
-
-    except Exception as e:
-        logger.error(f"Failed to save forecast to data platform with error {e}")
-    finally:
-        channel.close()
+    tasks = [
+        forecaster.save_forecast_to_dataplatform(
+            locations_gsp_uuid_map=gsp_uuid_map,
+            client=client,
+        )
+        for forecaster in forecasters.values()
+    ]
+    await asyncio.gather(*tasks)
+    channel.close()
 
     logger.info("Finished forecast")
 
