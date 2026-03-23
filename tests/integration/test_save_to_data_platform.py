@@ -1,5 +1,4 @@
 import datetime
-import time
 from importlib.metadata import version
 
 import numpy as np
@@ -9,8 +8,6 @@ import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
-from testcontainers.core.container import DockerContainer
-from testcontainers.postgres import PostgresContainer
 
 from src.pvnet_app.save import (
     create_forecaster_if_not_exists,
@@ -21,47 +18,23 @@ from src.pvnet_app.save import (
 
 # @pytest.fixture(scope="session")
 @pytest_asyncio.fixture(scope="session")
-async def client():
+async def client(dp_client):
     """
-    Fixture to spin up a PostgreSQL container for the entire test session.
-    This fixture uses `testcontainers` to start a fresh PostgreSQL container and provides
-    the connection URL dynamically for use in other fixtures.
+    Fixture to create a gRPC client connected to the shared Data Platform server.
     """
+    host, port = dp_client
+    channel = Channel(host=host, port=port)
+    client_stub = dp.DataPlatformDataServiceStub(channel)
 
-    # we use a specific postgres image with postgis and pgpartman installed
-    # TODO make a release of this, not using logging tag.
-    with PostgresContainer(
-        f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
-        username="postgres",
-        password="postgres",  # noqa: S106
-        dbname="postgres",
-        env={"POSTGRES_HOST": "db"},
-    ) as postgres:
-        database_url = postgres.get_connection_url()
-        # we need to get ride of psycopg2, so the go driver works
-        database_url = database_url.replace("postgresql+psycopg2", "postgres")
-        # we need to change to host.docker.internal so the data platform container can see it
-        # https://stackoverflow.com/questions/46973456/docker-access-localhost-port-from-container
-        database_url = database_url.replace("localhost", "host.docker.internal")
-
-        with DockerContainer(
-            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
-            env={"DATABASE_URL": database_url},
-            ports=[50051],
-        ) as data_platform_server:
-            time.sleep(1)  # Give some time for the server to start
-
-            port = data_platform_server.get_exposed_port(50051)
-            host = data_platform_server.get_container_host_ip()
-            channel = Channel(host=host, port=port)
-            client = dp.DataPlatformDataServiceStub(channel)
-
-            yield client
-            channel.close()
+    yield client_stub
+    channel.close()
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataServiceStub):
+async def test_save_to_generation_to_data_platform(
+    client: dp.DataPlatformDataServiceStub,
+    setup_dp_locations,  # noqa: ARG001 - ensures observer + locations exist before this test
+):
     """
     Test saving data to the Data Platform.
     This test uses the `data_platform` fixture to ensure that the Data Platform service
@@ -83,9 +56,9 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     # 1. setup: add location - gsp 0
     metadata = Struct(fields={"gsp_id": Value(number_value=0)})
     create_location_request = dp.CreateLocationRequest(
-        location_name="gsp0",
+        location_name="test_save_gsp0",
         energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POINT(0 0)",
+        geometry_wkt="POINT(10 10)",
         location_type=dp.LocationType.NATION,
         effective_capacity_watts=1_000_000,
         metadata=metadata,
@@ -97,9 +70,9 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     # setup: add location - gsp 1
     metadata = Struct(fields={"gsp_id": Value(number_value=1)})
     create_location_request = dp.CreateLocationRequest(
-        location_name="gsp1",
+        location_name="test_save_gsp1",
         energy_source=dp.EnergySource.SOLAR,
-        geometry_wkt="POINT(0 0)",
+        geometry_wkt="POINT(11 11)",
         location_type=dp.LocationType.GSP,
         effective_capacity_watts=1_000_000,
         metadata=metadata,
@@ -107,10 +80,6 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     )
     create_location_response = await client.create_location(create_location_request)
     location_uuid_1 = create_location_response.location_uuid
-
-    # setup observer
-    create_observer_request = dp.CreateObserverRequest(name="pvlive_day_after")
-    _ = await client.create_observer(create_observer_request)
 
     # 2. add fake generation data
     create_observation_request = dp.CreateObservationsRequest(
@@ -196,7 +165,10 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     )
 
     # 6. check: read from the data platform to check it was saved
-    list_forecasters_response = await client.list_forecasters(dp.ListForecastersRequest())
+    # Filter to only the forecasters created by this test (shared dp_client may have others)
+    list_forecasters_response = await client.list_forecasters(
+        dp.ListForecastersRequest(forecaster_names_filter=["test_model", "test_model_adjust"]),
+    )
     assert len(list_forecasters_response.forecasters) == 2
 
     # check: There is a forecast object for gsp_id 1

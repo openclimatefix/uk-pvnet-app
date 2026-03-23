@@ -52,6 +52,8 @@ def check_number_of_forecasts(model_configs, db_session):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app(
+    dp_client,  # noqa: ARG001
+    setup_dp_locations,  # noqa: ARG001
     test_t0,
     db_session,
     nwp_ukv_data,
@@ -97,7 +99,15 @@ async def test_app(
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_app_no_sat(test_t0, db_session, nwp_ukv_data, nwp_ecmwf_data, db_url):
+async def test_app_no_sat(
+    dp_client,  # noqa: ARG001
+    setup_dp_locations,  # noqa: ARG001
+    test_t0,
+    db_session,
+    nwp_ukv_data,
+    nwp_ecmwf_data,
+    db_url,
+):
     """Test the app for the case when no satellite data is available"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
