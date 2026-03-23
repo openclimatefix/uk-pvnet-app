@@ -54,7 +54,7 @@ def check_number_of_forecasts(model_configs, db_session):
     # Check correct number of forecasts have been made
     # (Number of GSPs + 1 National + maybe GSP-sum) forecasts
     # Forecast made with multiple models
-    
+
     # Based on get_gsp_boundaries(version="20250109").iloc[1:].index
     num_active_gsps = 331
     expected_num_forecasts = 0
@@ -79,7 +79,9 @@ def check_number_of_forecasts(model_configs, db_session):
 
     expected_num_forecast_values = 0
     for model_config in model_configs:
-        num_forecasts = 1 + num_active_gsps * model_config.save_gsp_to_recent + model_config.save_gsp_sum
+        num_forecasts = (
+            1 + num_active_gsps * model_config.save_gsp_to_recent + model_config.save_gsp_sum
+        )
         expected_num_forecast_values += num_forecasts * (72 if model_config.is_day_ahead else 16)
 
     assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_num_forecast_values
