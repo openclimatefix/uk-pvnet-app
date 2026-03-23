@@ -1,3 +1,4 @@
+import datetime
 import os
 import time
 from datetime import UTC, timedelta
@@ -6,7 +7,11 @@ from importlib.metadata import version
 import numpy as np
 import pandas as pd
 import pytest
+import pytest_asyncio
 import xarray as xr
+from betterproto.lib.google.protobuf import Struct, Value
+from dp_sdk.ocf import dp
+from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_me_latest
 from nowcasting_datamodel.models import GSPYield, LocationSQL
@@ -66,6 +71,35 @@ def dp_client():
             os.environ["DATA_PLATFORM_PORT"] = str(port)
 
             yield host, port
+
+
+@pytest_asyncio.fixture(scope="session")
+async def setup_dp_locations(dp_client):
+    """Set up GSP locations and observer in the shared Data Platform for integration tests."""
+    host, port = dp_client
+    channel = Channel(host=host, port=port)
+    client = dp.DataPlatformDataServiceStub(channel)
+
+    total_gsps = 342
+    for i in range(total_gsps + 1):
+        metadata = Struct(fields={"gsp_id": Value(number_value=i)})
+        location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
+
+        req = dp.CreateLocationRequest(
+            location_name=f"gsp{i}",
+            energy_source=dp.EnergySource.SOLAR,
+            geometry_wkt="POINT(0 0)",
+            location_type=location_type,
+            effective_capacity_watts=1_000_000,
+            metadata=metadata,
+            valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
+        )
+        await client.create_location(req)
+
+    # Setup observer
+    await client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
+
+    channel.close()
 
 
 @pytest.fixture()

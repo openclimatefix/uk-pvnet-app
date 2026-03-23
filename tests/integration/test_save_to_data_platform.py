@@ -8,7 +8,6 @@ import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
-from grpclib.exceptions import GRPCError
 
 from src.pvnet_app.save import (
     create_forecaster_if_not_exists,
@@ -32,7 +31,10 @@ async def client(dp_client):
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataServiceStub):
+async def test_save_to_generation_to_data_platform(
+    client: dp.DataPlatformDataServiceStub,
+    setup_dp_locations,  # noqa: ARG001 - ensures observer + locations exist before this test
+):
     """
     Test saving data to the Data Platform.
     This test uses the `data_platform` fixture to ensure that the Data Platform service
@@ -78,14 +80,6 @@ async def test_save_to_generation_to_data_platform(client: dp.DataPlatformDataSe
     )
     create_location_response = await client.create_location(create_location_request)
     location_uuid_1 = create_location_response.location_uuid
-
-    # setup observer - may already exist if test_app.py ran first on the shared dp_client
-    try:
-        create_observer_request = dp.CreateObserverRequest(name="pvlive_day_after")
-        _ = await client.create_observer(create_observer_request)
-    except GRPCError as e:
-        if "unique" not in str(e).lower():
-            raise
 
     # 2. add fake generation data
     create_observation_request = dp.CreateObservationsRequest(

@@ -1,13 +1,8 @@
-import datetime
 import os
 import tempfile
 
 import pytest
-import pytest_asyncio
 import zarr
-from betterproto.lib.google.protobuf import Struct, Value
-from dp_sdk.ocf import dp
-from grpclib.client import Channel
 from nowcasting_datamodel.models.forecast import (
     ForecastSQL,
     ForecastValueLatestSQL,
@@ -19,33 +14,6 @@ from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
 NUM_GSPS = 331
-
-
-@pytest_asyncio.fixture(scope="module")
-async def setup_dp_locations(dp_client):
-    host, port = dp_client
-    channel = Channel(host=host, port=port)
-    client = dp.DataPlatformDataServiceStub(channel)
-    total_gsps = 342
-    for i in range(total_gsps + 1):
-        metadata = Struct(fields={"gsp_id": Value(number_value=i)})
-        location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
-
-        req = dp.CreateLocationRequest(
-            location_name=f"gsp{i}",
-            energy_source=dp.EnergySource.SOLAR,
-            geometry_wkt="POINT(0 0)",
-            location_type=location_type,
-            effective_capacity_watts=1_000_000,
-            metadata=metadata,
-            valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
-        )
-        await client.create_location(req)
-
-    # Setup observer
-    await client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
-
-    channel.close()
 
 
 def check_number_of_forecasts(model_configs, db_session):
