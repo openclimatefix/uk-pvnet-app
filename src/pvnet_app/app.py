@@ -327,7 +327,7 @@ async def run(
     logger.info("Writing to data platform")
     channel = Channel(data_platform_host, data_platform_port)
     client = dp.DataPlatformDataServiceStub(channel)
-   
+
     gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
 
     tasks = [
