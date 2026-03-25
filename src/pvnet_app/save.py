@@ -495,7 +495,10 @@ async def get_metadata_for_forecast(
             = Value(string_value=gsp_last_updated.observations[-1].timestamp_utc.isoformat())
 
     # add nwp and satellite last updated time, load file from s3 if exists
-    env_vars = ["NWP_ECMWF_ZARR_PATH", "NWP_UKV_ZARR_PATH", "SATELLITE_ZARR_PATH"]
+    env_vars = ["NWP_ECMWF_ZARR_PATH", 
+                "NWP_UKV_ZARR_PATH", 
+                "SATELLITE_ZARR_PATH", 
+                "SATELLITE_15_ZARR_PATH"]
     for env_var in env_vars:
         file = os.getenv(env_var)
         if file is not None:
