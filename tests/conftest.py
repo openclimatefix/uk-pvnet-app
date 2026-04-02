@@ -1,10 +1,17 @@
+import datetime
 import os
+import time
 from datetime import UTC, timedelta
+from importlib.metadata import version
 
 import numpy as np
 import pandas as pd
 import pytest
+import pytest_asyncio
 import xarray as xr
+from betterproto.lib.google.protobuf import Struct, Value
+from dp_sdk.ocf import dp
+from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_me_latest
 from nowcasting_datamodel.models import GSPYield, LocationSQL
@@ -16,6 +23,7 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 from nowcasting_datamodel.read.read import get_location
+from testcontainers.core.container import DockerContainer
 from testcontainers.postgres import PostgresContainer
 
 test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/test_data"
@@ -26,6 +34,72 @@ xr.set_options(keep_attrs=True)
 @pytest.fixture(scope="session")
 def test_t0():
     return pd.Timestamp.now(tz=None).floor(timedelta(minutes=30))
+
+
+@pytest.fixture(scope="session")
+def dp_client():
+    """Spin up a single shared Data Platform gRPC server for the entire test session.
+
+    Yields (host, port) only. Callers must create their own Channel+stub within
+    their own async event loop to avoid 'Future attached to a different loop' errors.
+    Sets DATA_PLATFORM_HOST and DATA_PLATFORM_PORT env vars so app.py connects to it.
+    """
+    with PostgresContainer(
+        f"ghcr.io/openclimatefix/data-platform-pgdb:{version('dp_sdk')}",
+        username="postgres",
+        password="postgres",  # noqa: S106
+        dbname="postgres",
+        env={"POSTGRES_HOST": "db"},
+    ) as postgres:
+        database_url = postgres.get_connection_url()
+        database_url = database_url.replace("postgresql+psycopg2", "postgres")
+        database_url = database_url.replace("localhost", "host.docker.internal")
+
+        with DockerContainer(
+            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
+            env={"DATABASE_URL": database_url},
+            ports=[50051],
+            platform="linux/amd64",
+        ) as data_platform_server:
+            time.sleep(2)  # Give some time for the server to start
+
+            port = data_platform_server.get_exposed_port(50051)
+            host = data_platform_server.get_container_host_ip()
+
+            # Set env vars so app.py connects to the test container
+            os.environ["DATA_PLATFORM_HOST"] = host
+            os.environ["DATA_PLATFORM_PORT"] = str(port)
+
+            yield host, port
+
+
+@pytest_asyncio.fixture(scope="session")
+async def setup_dp_locations(dp_client):
+    """Set up GSP locations and observer in the shared Data Platform for integration tests."""
+    host, port = dp_client
+    channel = Channel(host=host, port=port)
+    client = dp.DataPlatformDataServiceStub(channel)
+
+    total_gsps = 342
+    for i in range(total_gsps + 1):
+        metadata = Struct(fields={"gsp_id": Value(number_value=i)})
+        location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
+
+        req = dp.CreateLocationRequest(
+            location_name=f"gsp{i}",
+            energy_source=dp.EnergySource.SOLAR,
+            geometry_wkt="POINT(0 0)",
+            location_type=location_type,
+            effective_capacity_watts=1_000_000,
+            metadata=metadata,
+            valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
+        )
+        await client.create_location(req)
+
+    # Setup observer
+    await client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
+
+    channel.close()
 
 
 @pytest.fixture()

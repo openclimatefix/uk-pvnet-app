@@ -38,6 +38,9 @@ def get_gsp_capacities(
     if np.isnan(all_capacities).any():
         raise ValueError("Capacities contain NaNs")
 
+    if len(all_capacities)!=(len(gsp_ids)+1):
+        raise ValueError("Not enough capacities returned")
+
     return all_capacities
 
 
