@@ -61,7 +61,7 @@ def dp_client():
             ports=[50051],
             platform="linux/amd64",
         ) as data_platform_server:
-            time.sleep(2)  # Give some time for the server to start
+            time.sleep(30)  # Give some time for the server to start
 
             port = data_platform_server.get_exposed_port(50051)
             host = data_platform_server.get_container_host_ip()
