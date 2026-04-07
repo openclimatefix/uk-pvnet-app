@@ -5,14 +5,11 @@ import pytest
 from betterproto.lib.google.protobuf import Struct, Value
 from ocf import dp
 
-from pvnet_app.data.gsp import (
-    BACKUP_CAPACITIES,
-    get_gsp_and_national_capacities_from_dp,
-)
+from pvnet_app.data.gsp import get_capacities_from_dp
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_read_gsp_and_national_capacities_from_dp(
+async def test_get_capacities_from_dp_from_dp(
     client: dp.DataPlatformDataServiceStub,
     setup_dp_locations,  # noqa: ARG001 - ensures locations exist before this test
 ):
@@ -28,24 +25,24 @@ async def test_read_gsp_and_national_capacities_from_dp(
     2. check that the national capacity is read from the gsp_id=0 NATION location
     3. check that the GSP capacities are returned in the requested order with the right values
     """
-    gsp_ids = [1, 2, 3, 10, 50, 342]
+    gsp_ids = [0, 1, 2, 3, 10, 50, 342]
 
-    gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
+    capacities = await get_capacities_from_dp(
         client=client,
         gsp_ids=gsp_ids,
     )
 
     # 2. national capacity comes from the NATION location for gsp_id=0 (15 GW)
-    assert national_capacity == 15_000.0
+    assert capacities[0] == 15_000.0
 
     # 3. GSP capacities are a Series indexed by gsp_id, in the order requested
-    assert isinstance(gsp_capacities, pd.Series)
-    assert list(gsp_capacities.index) == gsp_ids
-    assert (gsp_capacities == 1.0).all()
+    assert isinstance(capacities, pd.Series)
+    assert list(capacities.index) == gsp_ids
+    assert (capacities[1:] == 1.0).all()
 
 
 @pytest.mark.asyncio(loop_scope="session")
-async def test_read_gsp_and_national_capacities_from_dp_with_custom_capacity(
+async def test_get_capacities_from_dp_with_custom_capacity(
     client: dp.DataPlatformDataServiceStub,
     setup_dp_locations,  # noqa: ARG001 - ensures observer + locations exist before this test
 ):
@@ -71,36 +68,9 @@ async def test_read_gsp_and_national_capacities_from_dp_with_custom_capacity(
     )
     await client.create_location(create_location_request)
 
-    gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
+    capacities = await get_capacities_from_dp(
         client=client,
         gsp_ids=[custom_gsp_id],
     )
 
-    assert national_capacity == 15_000.0
-    assert gsp_capacities.loc[custom_gsp_id] == custom_capacity_watts / 1_000_000.0
-
-
-@pytest.mark.asyncio(loop_scope="session")
-async def test_read_gsp_and_national_capacities_fallback(
-    client: dp.DataPlatformDataServiceStub,
-    setup_dp_locations,  # noqa: ARG001 - ensures locations exist before this test
-):
-    """
-    Test that the fallback to BACKUP_CAPACITIES is used when a missing GSP ID is requested.
-
-    If we request a GSP ID that is not found on the data platform, the function
-    should internally catch the ValueError and return the capacities from the backup CSV.
-    """
-    # GSP ID 348 is in the backup CSV but not created by setup_dp_locations (which creates 1..342)
-    missing_gsp_id = 348
-
-    gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
-        client=client,
-        gsp_ids=[missing_gsp_id],
-    )
-
-    # When fallback occurs, national capacity comes from the backup CSV
-    assert national_capacity == BACKUP_CAPACITIES.loc[0].item()
-
-    # And GSP capacities come from the backup CSV
-    assert gsp_capacities.loc[missing_gsp_id] == BACKUP_CAPACITIES.loc[missing_gsp_id]
+    assert capacities[custom_gsp_id] == custom_capacity_watts / 1_000_000.0

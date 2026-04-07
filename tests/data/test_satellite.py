@@ -3,10 +3,8 @@ import tempfile
 
 import numpy as np
 import pandas as pd
-import pytest
 import xarray as xr
 import zarr
-from ocf_data_sampler.load.gsp import get_gsp_boundaries
 
 from pvnet_app.consts import sat_path
 from pvnet_app.data.satellite import (
@@ -20,11 +18,6 @@ from pvnet_app.data.satellite import (
 
 # ------------------------------------------------------------
 # Utility functions for the tests
-
-
-@pytest.fixture()
-def gsp_ids():
-    return get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
 
 
 def save_to_zarr_zip(ds: xr.Dataset, filename: str) -> None:
@@ -62,7 +55,7 @@ def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[
 # Tests begin here
 
 
-def test_download_sat_5_data(sat_5_data, test_t0, gsp_ids):
+def test_download_sat_5_data(sat_5_data, test_t0):
     """Download only the 5 minute satellite data"""
 
     # make temporary directory
@@ -75,7 +68,6 @@ def test_download_sat_5_data(sat_5_data, test_t0, gsp_ids):
 
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
             source_path_5="latest.zarr.zip",
             source_path_15="latest_15.zarr.zip",
         )
@@ -92,7 +84,7 @@ def test_download_sat_5_data(sat_5_data, test_t0, gsp_ids):
         )
 
 
-def test_download_sat_15_data(sat_15_data, test_t0, gsp_ids):
+def test_download_sat_15_data(sat_15_data, test_t0):
     """Download only the 15 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -103,7 +95,6 @@ def test_download_sat_15_data(sat_15_data, test_t0, gsp_ids):
 
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
             source_path_5="latest.zarr.zip",
             source_path_15="latest_15.zarr.zip",
         )
@@ -120,7 +111,7 @@ def test_download_sat_15_data(sat_15_data, test_t0, gsp_ids):
         )
 
 
-def test_download_sat_5_and_15_data(sat_5_data, sat_15_data, test_t0, gsp_ids):
+def test_download_sat_5_and_15_data(sat_5_data, sat_15_data, test_t0):
     """Download 5 minute sat and 15 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -132,7 +123,6 @@ def test_download_sat_5_and_15_data(sat_5_data, sat_15_data, test_t0, gsp_ids):
 
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
             source_path_5="latest.zarr.zip",
             source_path_15="latest_15.zarr.zip",
         )
@@ -154,7 +144,7 @@ def test_download_sat_5_and_15_data(sat_5_data, sat_15_data, test_t0, gsp_ids):
         )
 
 
-def test_run_sat_5_data(sat_5_data, test_t0, gsp_ids):
+def test_run_sat_5_data(sat_5_data, test_t0):
     """Download and process only the 5 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -165,7 +155,6 @@ def test_run_sat_5_data(sat_5_data, test_t0, gsp_ids):
 
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
             source_path_5="latest.zarr.zip",
             source_path_15="latest_15.zarr.zip",
         )
@@ -175,7 +164,7 @@ def test_run_sat_5_data(sat_5_data, test_t0, gsp_ids):
         assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
 
 
-def test_run_sat_15_data(sat_15_data, test_t0, gsp_ids):
+def test_run_sat_15_data(sat_15_data, test_t0):
     """Download and process only the 15 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -186,7 +175,6 @@ def test_run_sat_15_data(sat_15_data, test_t0, gsp_ids):
 
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
             source_path_5="latest.zarr.zip",
             source_path_15="latest_15.zarr.zip",
         )
@@ -200,7 +188,7 @@ def test_run_sat_15_data(sat_15_data, test_t0, gsp_ids):
         assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
 
 
-def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0, gsp_ids):
+def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0):
     """Download and process 5 and 15 minute satellite data. Use the 15 minute data since the
     5 minute data is too delayed
     """
@@ -213,7 +201,6 @@ def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0,
 
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
             source_path_5="latest.zarr.zip",
             source_path_15="latest_15.zarr.zip",
         )
@@ -223,7 +210,7 @@ def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0,
         assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
 
 
-def test_run_zeros_in_sat_data(sat_15_data, test_t0, gsp_ids):
+def test_run_zeros_in_sat_data(sat_15_data, test_t0):
     """Check that the satellite data is considered invalid if it contains too many zeros"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -238,7 +225,6 @@ def test_run_zeros_in_sat_data(sat_15_data, test_t0, gsp_ids):
 
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
             source_path_5="latest.zarr.zip",
             source_path_15="latest_15.zarr.zip",
         )
@@ -248,7 +234,7 @@ def test_run_zeros_in_sat_data(sat_15_data, test_t0, gsp_ids):
         assert sat_downloader.valid_times is None
 
 
-def test_run_nan_in_sat_data(sat_15_data, test_t0, gsp_ids):
+def test_run_nan_in_sat_data(sat_15_data, test_t0):
     """Check that the satellite data is considered invalid if it contains too many NaNs"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -263,7 +249,6 @@ def test_run_nan_in_sat_data(sat_15_data, test_t0, gsp_ids):
 
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
             source_path_5="latest.zarr.zip",
             source_path_15="latest_15.zarr.zip",
         )
