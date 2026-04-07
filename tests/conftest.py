@@ -62,7 +62,7 @@ async def wait_for_data_platform_ready(host: str, port: int) -> None:
 
     raise TimeoutError(
         f"Data Platform gRPC endpoint was not ready at {host}:{port} within "
-        f"{DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS} seconds"
+        f"{DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS} seconds",
     ) from last_error
 
 
@@ -102,8 +102,8 @@ def dp_client():
             .with_kwargs(network=postgres_network)
             .waiting_for(
                 PortWaitStrategy(DATA_PLATFORM_GRPC_PORT).with_startup_timeout(
-                    DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS
-                )
+                    DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS,
+                ),
             )
         ) as data_platform_server:
 
