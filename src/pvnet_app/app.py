@@ -317,13 +317,7 @@ async def run(
         return next(iter(forecasters.values())).da_abs_all
 
     # ---------------------------------------------------------------------------
-    # Write predictions to database
-    logger.info("Writing to database")
-
-    with db_connection.get_session() as session, session.no_autoflush:
-        for forecaster in forecasters.values():
-            forecaster.log_forecast_to_database(session=session)
-
+    # Write predictions to data-platform
     logger.info("Writing to data platform")
     channel = Channel(data_platform_host, data_platform_port)
     client = dp.DataPlatformDataServiceStub(channel)
@@ -339,6 +333,13 @@ async def run(
     ]
     await asyncio.gather(*tasks)
     channel.close()
+
+    # Write predictions to database
+    logger.info("Writing to database")
+
+    with db_connection.get_session() as session, session.no_autoflush:
+        for forecaster in forecasters.values():
+            forecaster.log_forecast_to_database(session=session)
 
     logger.info("Finished forecast")
 
