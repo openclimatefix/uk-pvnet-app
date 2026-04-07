@@ -24,9 +24,13 @@ from nowcasting_datamodel.models.forecast import (
 )
 from nowcasting_datamodel.read.read import get_location
 from testcontainers.core.container import DockerContainer
+from testcontainers.core.wait_strategies import PortWaitStrategy
 from testcontainers.postgres import PostgresContainer
 
 test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/test_data"
+
+DATA_PLATFORM_GRPC_PORT = 50051
+DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS = 60
 
 xr.set_options(keep_attrs=True)
 
@@ -51,19 +55,34 @@ def dp_client():
         dbname="postgres",
         env={"POSTGRES_HOST": "db"},
     ) as postgres:
-        database_url = postgres.get_connection_url()
-        database_url = database_url.replace("postgresql+psycopg2", "postgres")
-        database_url = database_url.replace("localhost", "host.docker.internal")
+        postgres_container = postgres.get_wrapped_container()
+        assert postgres_container is not None
 
-        with DockerContainer(
-            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
-            env={"DATABASE_URL": database_url},
-            ports=[50051],
-            platform="linux/amd64",
+        docker_client = postgres.get_docker_client()
+        postgres_network = docker_client.network_name(postgres_container.id)
+        postgres_ip = docker_client.bridge_ip(postgres_container.id)
+        database_url = (
+            f"postgres://{postgres.username}:{postgres.password}@"
+            f"{postgres_ip}:{postgres.port}/{postgres.dbname}"
+        )
+
+        with (
+            DockerContainer(
+                image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
+                env={"DATABASE_URL": database_url},
+                ports=[DATA_PLATFORM_GRPC_PORT],
+                platform="linux/amd64",
+            )
+            .with_kwargs(network=postgres_network)
+            .waiting_for(
+                PortWaitStrategy(DATA_PLATFORM_GRPC_PORT).with_startup_timeout(
+                    DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS,
+                ),
+            )
         ) as data_platform_server:
-            time.sleep(2)  # Give some time for the server to start
+            time.sleep(2)  # Give extra time for the server to start
 
-            port = data_platform_server.get_exposed_port(50051)
+            port = data_platform_server.get_exposed_port(DATA_PLATFORM_GRPC_PORT)
             host = data_platform_server.get_container_host_ip()
 
             # Set env vars so app.py connects to the test container
