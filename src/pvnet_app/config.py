@@ -1,7 +1,13 @@
 """Functions to load and save configuration files."""
 import yaml
 
-from pvnet_app.consts import nwp_cloudcasting_path, nwp_ecmwf_path, nwp_ukv_path, sat_path
+from pvnet_app.consts import (
+    generation_path,
+    nwp_cloudcasting_path,
+    nwp_ecmwf_path,
+    nwp_ukv_path,
+    sat_path,
+)
 
 
 def load_yaml_config(path: str) -> dict:
@@ -42,7 +48,7 @@ def populate_config_with_data_data_filepaths(config: dict) -> dict:
     }
 
     # Set the GSP input path to null. We don't need it in production
-    config["input_data"]["gsp"]["zarr_path"] = ""
+    config["input_data"]["generation"]["zarr_path"] = generation_path
 
     # Replace satellite data path
     if "satellite" in config["input_data"] and \

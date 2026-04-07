@@ -1,7 +1,6 @@
 import datetime
 import os
 import time
-from datetime import timedelta
 from importlib.metadata import version
 
 import numpy as np
@@ -26,7 +25,7 @@ xr.set_options(keep_attrs=True)
 
 @pytest.fixture(scope="session")
 def test_t0():
-    return pd.Timestamp.now(tz=None).floor(timedelta(minutes=30))
+    return pd.Timestamp.now(tz=None).floor("30min")
 
 
 @pytest.fixture(scope="session")
@@ -153,7 +152,7 @@ def make_nwp_data(shell_path, varname, init_time):
 @pytest.fixture(scope="session")
 def nwp_ukv_data(test_t0):
     # The init time was at least 8 hours ago and floor to 3-hour interval
-    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
+    init_time = (test_t0 - pd.Timedelta("8h")).floor("3h")
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_ukv_shell.zarr",
         varname="um-ukv",
@@ -164,7 +163,7 @@ def nwp_ukv_data(test_t0):
 @pytest.fixture(scope="session")
 def nwp_ecmwf_data(test_t0):
     # The init time was at least 8 hours ago and floor to 3-hour interval
-    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
+    init_time = (test_t0 - pd.Timedelta("8h")).floor("3h")
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_ecmwf_shell.zarr",
         varname="hres-ifs_uk",
@@ -195,11 +194,11 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
     n_hours = 3
 
     # Add times so they lead up to present
-    t0_datetime_utc = test_t0 - timedelta(minutes=delay_mins)
+    t0_datetime_utc = test_t0 - pd.Timedelta(minutes=delay_mins)
     times = pd.date_range(
-        t0_datetime_utc - timedelta(hours=n_hours),
+        t0_datetime_utc - pd.Timedelta(hours=n_hours),
         t0_datetime_utc,
-        freq=timedelta(minutes=freq_mins),
+        freq=pd.Timedelta(minutes=freq_mins),
     )
     ds = ds.expand_dims(time=times)
 

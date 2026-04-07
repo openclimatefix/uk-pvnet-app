@@ -10,12 +10,12 @@ import sentry_sdk
 import torch
 from grpclib.client import Channel
 from ocf import dp
-from ocf_data_sampler.load.gsp import get_gsp_boundaries
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.config import load_yaml_config
+from pvnet_app.consts import generation_path
 from pvnet_app.data.batch_validation import check_batch
-from pvnet_app.data.gsp import get_gsp_and_national_capacities_from_dp
+from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader, get_satellite_source_paths
 from pvnet_app.forecaster import Forecaster
@@ -60,15 +60,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 async def run(
     t0: str | None = None,
-    gsp_ids: list[int] | None = None,
     write_predictions: bool = True,
 ) -> None:
     """Inference function to run PVNet.
 
     Args:
         t0 (str): Datetime at which forecast is made
-        gsp_ids (array_like): List of gsp_ids to make predictions for. This list of GSPs are summed
-            to national.
         write_predictions (bool): Whether to write prediction to the database. Else returns as
             DataArray for local testing.
 
@@ -111,9 +108,6 @@ async def run(
     else:
         t0 = pd.Timestamp(t0).floor("30min")
 
-    if gsp_ids is not None and len(gsp_ids) == 0:
-        raise ValueError("No GSP IDs provided")
-
     # --- Unpack the environment variables
     run_critical_models_only = get_boolean_env_var("RUN_CRITICAL_MODELS_ONLY", default=False)
     allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
@@ -139,7 +133,6 @@ async def run(
     logger.info(f"Using `pvnet` library version: {pvnet_version}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Making forecast for init time: {t0}")
-    logger.info(f"Making forecast for GSP IDs: {gsp_ids}")
     logger.info(f"Running critical models only: {run_critical_models_only}")
     logger.info(f"Allow adjuster: {allow_adjuster}")
     logger.info(f"Allow saving GSP sum: {allow_save_gsp_sum}")
@@ -170,18 +163,19 @@ async def run(
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
-    if gsp_ids is None:
-        gsp_ids = get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
 
-    # --- Get capacities
-    logger.info("Loading capacities from the data platform")
-    dp_channel = Channel(data_platform_host, data_platform_port)
-    dp_client = dp.DataPlatformDataServiceStub(dp_channel)
-    gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
-        client=dp_client,
-        gsp_ids=gsp_ids,
+    # --- Get capacities from the database or data platform
+    logger.info("Loading capacities")
+    ds_gen = await create_null_generation_data(
+        dp_address=(data_platform_host, data_platform_port),
+        t0=t0,
     )
-    dp_channel.close()
+
+    ds_gen.to_zarr(generation_path)
+
+    national_capacity = ds_gen.sel(time_utc=t0, location_id=0).capacity_mwp.item()
+    gsp_capacities = ds_gen.sel(time_utc=t0, location_id=slice(1, None)).capacity_mwp.values
+    gsp_ids = ds_gen.location_id.values
 
     data_downloaders = []
 
@@ -193,7 +187,6 @@ async def run(
             t0=t0,
             source_path_5=sat_source_path_5,
             source_path_15=sat_source_path_15,
-            gsp_ids=gsp_ids,
         )
         sat_downloader.run()
 
