@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 import os
 import time
@@ -13,7 +12,6 @@ import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
 from dp_sdk.ocf import dp
 from grpclib.client import Channel
-from grpclib.exceptions import GRPCError, StreamTerminatedError
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_me_latest
 from nowcasting_datamodel.models import GSPYield, LocationSQL
@@ -40,30 +38,6 @@ xr.set_options(keep_attrs=True)
 @pytest.fixture(scope="session")
 def test_t0():
     return pd.Timestamp.now(tz=None).floor(timedelta(minutes=30))
-
-
-async def wait_for_data_platform_ready(host: str, port: int) -> None:
-    """Wait until the Data Platform gRPC endpoint answers a lightweight RPC."""
-    deadline = time.time() + DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS
-    last_error: Exception | None = None
-
-    while time.time() < deadline:
-        channel = Channel(host=host, port=port)
-        client = dp.DataPlatformDataServiceStub(channel)
-
-        try:
-            await client.list_forecasters(dp.ListForecastersRequest(), timeout=2.0)
-            return
-        except (GRPCError, StreamTerminatedError, OSError, TimeoutError) as exc:
-            last_error = exc
-            await asyncio.sleep(1)
-        finally:
-            channel.close()
-
-    raise TimeoutError(
-        f"Data Platform gRPC endpoint was not ready at {host}:{port} within "
-        f"{DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS} seconds",
-    ) from last_error
 
 
 @pytest.fixture(scope="session")
@@ -94,10 +68,10 @@ def dp_client():
 
         with (
             DockerContainer(
-            image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
-            env={"DATABASE_URL": database_url},
-            ports=[DATA_PLATFORM_GRPC_PORT],
-            platform="linux/amd64",
+                image=f"ghcr.io/openclimatefix/data-platform:{version('dp_sdk')}",
+                env={"DATABASE_URL": database_url},
+                ports=[DATA_PLATFORM_GRPC_PORT],
+                platform="linux/amd64",
             )
             .with_kwargs(network=postgres_network)
             .waiting_for(
@@ -106,11 +80,10 @@ def dp_client():
                 ),
             )
         ) as data_platform_server:
+            time.sleep(2)  # Give extra time for the server to start
 
             port = data_platform_server.get_exposed_port(DATA_PLATFORM_GRPC_PORT)
             host = data_platform_server.get_container_host_ip()
-
-            asyncio.run(wait_for_data_platform_ready(host=host, port=port))
 
             # Set env vars so app.py connects to the test container
             os.environ["DATA_PLATFORM_HOST"] = host
