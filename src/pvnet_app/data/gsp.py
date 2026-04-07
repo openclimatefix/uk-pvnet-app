@@ -30,7 +30,7 @@ def get_gsp_capacities(
         # Get GSP capacities
         all_capacities = get_latest_gsp_capacities(
             session=session,
-            gsp_ids=[0, *gsp_ids],
+            gsp_ids=gsp_ids,
             datetime_utc=t0 - pd.Timedelta(days=2),
         )
 
@@ -38,8 +38,11 @@ def get_gsp_capacities(
     if np.isnan(all_capacities).any():
         raise ValueError("Capacities contain NaNs")
 
-    if len(all_capacities)!=(len(gsp_ids)+1):
-        raise ValueError("Not enough capacities returned")
+    if len(all_capacities)!=len(gsp_ids):
+        raise ValueError(
+            f"Capacities length ({len(all_capacities)}) "
+            f"does not match GSP IDs length ({len(gsp_ids)})"
+        )
 
     return all_capacities
 
