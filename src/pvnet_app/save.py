@@ -226,6 +226,7 @@ async def save_forecast_to_data_platform(
         forecast_values = map_values_da_to_dp_requests(
             forecast_normed_da.sel(gsp_id=gsp_id),
             init_time_utc=init_time_utc,
+            model_tag=model_tag,
         )
 
         # 5. Save to data platform
@@ -264,17 +265,21 @@ async def save_forecast_to_data_platform(
 def map_values_da_to_dp_requests(
     gsp_normed_da: xr.DataArray,
     init_time_utc: datetime,
+    model_tag: str = "",
 ) -> list[dp.CreateForecastRequestForecastValue]:
     """Convert a DataArray for a single GSP to a list of ForecastValue objects.
 
     Args:
         gsp_normed_da: Normalized DataArray for a single GSP
         init_time_utc: Forecast initialization time
+        model_tag: Name of the model (used for logging)
     """
     # create horizon mins
     target_datetime_utc = pd.to_datetime(gsp_normed_da.target_datetime_utc.values)
     horizons_mins = (target_datetime_utc - init_time_utc).total_seconds() / 60
     horizons_mins = horizons_mins.astype(int)
+
+    gsp_id = int(gsp_normed_da.gsp_id.values)
 
     # Reduce singular dimensions
     gsp_normed_da = gsp_normed_da.squeeze(drop=True)
@@ -284,6 +289,12 @@ def map_values_da_to_dp_requests(
 
     forecast_values = []
     for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
+        if p90 >= 1.1:
+            logger.warning(
+                f"p90 value {p90} exceeds 1.1 for model={model_tag}, gsp_id={gsp_id}, "
+                f"horizon_mins={h}; clamping to 1.1",
+            )
+            p90 = 1.1
         forecast_values.append(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=h,
