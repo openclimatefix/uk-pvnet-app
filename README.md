@@ -129,7 +129,7 @@ After the ML models have run, we check the following
 
 ### Running tests locally
 
-To be able to run the tests locally it is recommended to use conda & pip and follow the steps from the Install requirements section onwards in the [Dockerfile](Dockerfile) or the install steps in the [conda-pytest.yaml](.github/workflows/conda-pytest.yaml) file and run tests the usual way via `python -m pytest`. Note if using certain macs you may need to install python >= 3.11 to get this to work.
+To be able to run the tests locally it is recommended to use `conda` and `uv`. The easiest way to to create the required environment and run the pytest is to run `make test`. This will create a new environment in your working directory under `.venv`.
 
 ### Running the app locally
 
