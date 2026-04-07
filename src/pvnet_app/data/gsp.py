@@ -41,7 +41,7 @@ def get_gsp_capacities(
     if len(all_capacities)!=len(gsp_ids):
         raise ValueError(
             f"Capacities length ({len(all_capacities)}) "
-            f"does not match GSP IDs length ({len(gsp_ids)})"
+            f"does not match GSP IDs length ({len(gsp_ids)})",
         )
 
     return all_capacities
