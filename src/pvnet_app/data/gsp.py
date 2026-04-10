@@ -10,7 +10,7 @@ from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 
 def get_gsp_locations() -> pd.DataFrame:
     """Load the GSP locations metadata."""
-    gsp_coordinates_path = files("pvnet_app.data").joinpath("uk_gsp_locations_20250109.csv")
+    gsp_coordinates_path = files("pvnet_app.data").joinpath("uk_gsp_locations_20251204.csv")
     return pd.read_csv(gsp_coordinates_path, index_col="gsp_id")
 
 

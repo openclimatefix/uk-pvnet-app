@@ -1,6 +1,7 @@
 import datetime
 import os
 import time
+from collections.abc import Generator
 from importlib.metadata import version
 
 import numpy as np
@@ -22,6 +23,7 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 from nowcasting_datamodel.read.read import get_location
+from sqlalchemy.orm import Session
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import PortWaitStrategy
 from testcontainers.postgres import PostgresContainer
@@ -35,12 +37,12 @@ xr.set_options(keep_attrs=True)
 
 
 @pytest.fixture(scope="session")
-def test_t0():
+def test_t0() -> pd.Timestamp:
     return pd.Timestamp.now(tz=None).floor("30min")
 
 
 @pytest.fixture(scope="session")
-def dp_client():
+def dp_client() -> Generator[tuple[str, str], None, None]:
     """Spin up a single shared Data Platform gRPC server for the entire test session.
 
     Yields (host, port) only. Callers must create their own Channel+stub within
@@ -92,13 +94,13 @@ def dp_client():
 
 
 @pytest_asyncio.fixture(scope="session")
-async def setup_dp_locations(dp_client):
+async def setup_dp_locations(dp_client: tuple[str, str]) -> None:
     """Set up GSP locations and observer in the shared Data Platform for integration tests."""
     host, port = dp_client
     channel = Channel(host=host, port=port)
     client = dp.DataPlatformDataServiceStub(channel)
 
-    total_gsps = 342
+    total_gsps = 348
     for i in range(total_gsps + 1):
         metadata = Struct(fields={"gsp_id": Value(number_value=i)})
         location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
@@ -121,13 +123,13 @@ async def setup_dp_locations(dp_client):
 
 
 @pytest.fixture()
-def db_url():
+def db_url() -> Generator[str, None, None]:
     with PostgresContainer("postgres:16.1") as postgres:
         yield postgres.get_connection_url()
 
 
 @pytest.fixture()
-def db_connection(test_t0, db_url):
+def db_connection(test_t0: pd.Timestamp, db_url: str) -> Generator[DatabaseConnection, None, None]:
     """Database engine, this includes the table creation."""
 
     database_connection = DatabaseConnection(db_url, echo=False)
@@ -147,7 +149,7 @@ def db_connection(test_t0, db_url):
 
 
 @pytest.fixture()
-def db_session(db_connection):
+def db_session(db_connection: DatabaseConnection) -> Generator[Session, None, None]:
     """Return a sqlalchemy session, which tears down everything properly post-test."""
 
     with db_connection.get_session() as s:
@@ -161,10 +163,10 @@ def db_session(db_connection):
         s.commit()
 
 
-def populate_db_session_with_input_data(session, test_t0):
+def populate_db_session_with_input_data(session: Session, test_t0: pd.Timestamp) -> None:
     """Populate a session with input data for testing"""
 
-    num_gsps = 342
+    num_gsps = 348
     total_capacity_mw = 17_000
 
     gsp_yields = []
@@ -203,7 +205,7 @@ def populate_db_session_with_input_data(session, test_t0):
     session.commit()
 
 
-def make_nwp_data(shell_path, varname, init_time):
+def make_nwp_data(shell_path: str, varname: str, init_time: pd.Timestamp) -> xr.Dataset:
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(shell_path).compute()
 
@@ -232,7 +234,7 @@ def make_nwp_data(shell_path, varname, init_time):
 
 
 @pytest.fixture(scope="session")
-def nwp_ukv_data(test_t0):
+def nwp_ukv_data(test_t0: pd.Timestamp) -> xr.Dataset:
     # The init time was at least 8 hours ago and floor to 3-hour interval
     init_time = (test_t0 - pd.Timedelta("8h")).floor("3h")
     return make_nwp_data(
@@ -243,7 +245,7 @@ def nwp_ukv_data(test_t0):
 
 
 @pytest.fixture(scope="session")
-def nwp_ecmwf_data(test_t0):
+def nwp_ecmwf_data(test_t0: pd.Timestamp) -> xr.Dataset:
     # The init time was at least 8 hours ago and floor to 3-hour interval
     init_time = (test_t0 - pd.Timedelta("8h")).floor("3h")
     return make_nwp_data(
@@ -254,7 +256,7 @@ def nwp_ecmwf_data(test_t0):
 
 
 @pytest.fixture(scope="session")
-def cloudcasting_data(test_t0):
+def cloudcasting_data(test_t0: pd.Timestamp) -> xr.Dataset:
     # The init time is the same as test_t0
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_cloudcasting_shell.zarr",
@@ -264,11 +266,11 @@ def cloudcasting_data(test_t0):
 
 
 @pytest.fixture(scope="session")
-def config_filename():
+def config_filename() -> str:
     return f"{test_data_dir}/test.yaml"
 
 
-def make_sat_data(test_t0, delay_mins, freq_mins):
+def make_sat_data(test_t0: pd.Timestamp, delay_mins: int, freq_mins: int) -> xr.Dataset:
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(f"{test_data_dir}/non_hrv_shell.zarr").compute()
 
@@ -280,7 +282,7 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
     times = pd.date_range(
         t0_datetime_utc - pd.Timedelta(hours=n_hours),
         t0_datetime_utc,
-        freq=pd.Timedelta(minutes=freq_mins),
+        freq=f"{freq_mins}min",
     )
     ds = ds.expand_dims(time=times)
 
@@ -290,28 +292,24 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
         coords=[ds[c] for c in ds.xindexes],
     )
 
-    # Add stored attributes to DataArray
-    ds.data.attrs = ds.attrs["_data_attrs"]
-    del ds.attrs["_data_attrs"]
-
     return ds
 
 
 @pytest.fixture(scope="session")
-def sat_5_data(test_t0):
+def sat_5_data(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_sat_data(test_t0, delay_mins=10, freq_mins=5)
 
 
 @pytest.fixture(scope="session")
-def sat_5_data_zero_delay(test_t0):
+def sat_5_data_zero_delay(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_sat_data(test_t0, delay_mins=0, freq_mins=5)
 
 
 @pytest.fixture(scope="session")
-def sat_5_data_delayed(test_t0):
+def sat_5_data_delayed(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_sat_data(test_t0, delay_mins=120, freq_mins=5)
 
 
 @pytest.fixture(scope="session")
-def sat_15_data(test_t0):
+def sat_15_data(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_sat_data(test_t0, delay_mins=0, freq_mins=15)
