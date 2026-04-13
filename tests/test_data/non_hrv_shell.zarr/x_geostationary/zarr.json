@@ -1,13 +1,13 @@
 {
   "shape": [
-    680
+    614
   ],
   "data_type": "float64",
   "chunk_grid": {
     "name": "regular",
     "configuration": {
       "chunk_shape": [
-        680
+        614
       ]
     }
   },
@@ -17,7 +17,7 @@
       "separator": "/"
     }
   },
-  "fill_value": 0.0,
+  "fill_value": "NaN",
   "codecs": [
     {
       "name": "bytes",
@@ -34,8 +34,8 @@
     }
   ],
   "attributes": {
-    "coordinate_reference_system": "geostationary",
     "units": "meter",
+    "coordinate_reference_system": "geostationary",
     "_FillValue": "AAAAAAAA+H8="
   },
   "dimension_names": [
