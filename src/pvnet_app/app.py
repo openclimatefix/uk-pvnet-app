@@ -91,7 +91,7 @@ async def run(
           defaults to 250 MW.
         - FORECAST_VALIDATE_ZIG_ZAG_ERROR, threshold for forecast zig-zag error on,
           defaults to 500 MW.
-        - FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT, when the solar elevation is above this,
+        - FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT, when the solar elevation is above this,
           we expect positive forecast values. Defaults to 10 degrees.
         - FILTER_BAD_FORECASTS, option to filter out bad forecasts. If set to true and the forecast
           fails the validation checks, it will not be saved. Defaults to false, where all forecasts

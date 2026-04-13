@@ -12,7 +12,7 @@ from ocf_data_sampler.config.load import load_yaml_configuration
 from ocf_data_sampler.load.utils import make_spatial_coords_increasing
 from ocf_data_sampler.select.geospatial import convert_coordinates
 from ocf_data_sampler.select.location import Location
-from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels
+from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels_multiple
 
 from pvnet_app.consts import sat_path
 from pvnet_app.data.gsp import get_gsp_locations
@@ -247,7 +247,7 @@ def get_pvnet_satellite_spatial_bounds(
     ds: xr.Dataset,
     width_pixels: int = 24,
     height_pixels: int = 24,
-) -> dict[str, slice]:
+) -> xr.Dataset:
     """Get the spatial extent of the satellite data used in PVNet.
 
     Args:
@@ -256,11 +256,11 @@ def get_pvnet_satellite_spatial_bounds(
         height_pixels: The height of the spatial slice in pixels
 
     Returns:
-        dict[str, slice]: The spatial slice of the dataset used byb PVNet
+        xr.Dataset: The spatial slice of the dataset used by PVNet
     """
     # Cut down the slice for efficiency and reorder the coordinates if needed
-    da = make_spatial_coords_increasing(
-        ds.data.isel(time=0, variable=0).copy(deep=True),
+    ds = make_spatial_coords_increasing(
+        ds,
         x_coord="x_geostationary",
         y_coord="y_geostationary",
     )
@@ -274,7 +274,7 @@ def get_pvnet_satellite_spatial_bounds(
         y=df_locs.latitude.values,
         from_coords="lon_lat",
         target_coords="geostationary",
-        area_string=ds.data.attrs["area"],
+        area_string=str(ds.attrs["area"]),
     )
 
     # Add the projection to the locations objects
@@ -282,36 +282,10 @@ def get_pvnet_satellite_spatial_bounds(
     for x, y, gsp_id in zip(geo_xs, geo_ys, df_locs.index.values, strict=True):
         locations.append(Location(x=x, y=y, coord_system="geostationary", id=gsp_id))
 
-    xmin = np.inf
-    xmax = -np.inf
-    ymin = np.inf
-    ymax = -np.inf
+    ds = select_spatial_slice_pixels_multiple(ds, locations, width_pixels, height_pixels)
 
-    for location in locations:
-        da_slice = select_spatial_slice_pixels(
-            da,
-            location,
-            width_pixels=width_pixels,
-            height_pixels=height_pixels,
-        )
+    return ds
 
-        xmin = min(xmin, da_slice.x_geostationary.min().item())
-        xmax = max(xmax, da_slice.x_geostationary.max().item())
-        ymin = min(ymin, da_slice.y_geostationary.min().item())
-        ymax = max(ymax, da_slice.y_geostationary.max().item())
-
-    # Allow for coords to be reversed
-    if ds.x_geostationary[-1] > ds.x_geostationary[0]:
-        xslice = slice(xmin, xmax)
-    else:
-        xslice = slice(xmax, xmin)
-
-    if ds.y_geostationary[-1] > ds.y_geostationary[0]:
-        yslice = slice(ymin, ymax)
-    else:
-        yslice = slice(ymax, ymin)
-
-    return {"x_geostationary": xslice, "y_geostationary": yslice}
 
 
 def contains_too_many_of_value(
@@ -442,7 +416,7 @@ class SatelliteDownloader:
             selected_path = self.destination_path_15
 
         with zarr.storage.ZipStore(selected_path) as store:
-            ds = xr.open_zarr(store).compute()
+            ds = xr.open_zarr(store)[["data"]].compute()
 
         return ds
 
@@ -457,13 +431,11 @@ class SatelliteDownloader:
             bool: Whether the data passes the quality checks
         """
         # Slice the data to the spatial extent used in PVNet
-        spatial_slice = get_pvnet_satellite_spatial_bounds(ds)
-        ds = ds.sel(spatial_slice)
+        ds = get_pvnet_satellite_spatial_bounds(ds)
 
         too_many_nans = contains_too_many_of_value(ds, value=np.nan, threshold=0.05)
-        # Note that in the UK, even at night, the values are not zero
-        too_many_zeros = contains_too_many_of_value(ds, value=0, threshold=0.1)
-        return (not too_many_nans) and (not too_many_zeros)
+
+        return (not too_many_nans)
 
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         """Apply all processing steps to the satellite data in order to match the training data.
@@ -484,6 +456,10 @@ class SatelliteDownloader:
         # recent non-nan timestamp
         ds = extend_satellite_data_with_nans(ds, t0=self.t0)
 
+        # Add the top level area attribute to the data var(s). This is needed by ocf_data_sampler
+        for v in list(ds.data_vars.keys()):
+            ds[v].attrs["area"] = str(ds.attrs["area"])
+
         return ds
 
     def resave(self, ds: xr.Dataset) -> None:
@@ -491,13 +467,11 @@ class SatelliteDownloader:
         # Overwrite the old data
         shutil.rmtree(self.destination_path, ignore_errors=True)
 
-        ds["variable"] = ds["variable"].astype(str)
-
         save_chunk_dict = {
             "x_geostationary": 100,
             "y_geostationary": 100,
             "time": 6,
-            "variable": -1,
+            "channel": -1,
         }
 
         # Clear old encoding
@@ -519,7 +493,7 @@ class SatelliteDownloader:
         ds = self.choose_and_load_satellite_data()
 
         if self.data_is_okay(ds):
-            ds = self.process(ds).compute()
+            ds = self.process(ds)
             self.resave(ds)
 
         else:
@@ -548,7 +522,7 @@ class SatelliteDownloader:
             shutil.rmtree(path, ignore_errors=True)
 
 
-def get_satellite_source_paths() -> (str | None, str | None):
+def get_satellite_source_paths() -> tuple[str | None, str | None]:
     """Get the paths to the satellite data from environment variables."""
     sat_source_path_5 = os.getenv("SATELLITE_ZARR_PATH", None)
     sat_source_path_15 = os.getenv("SATELLITE_15_ZARR_PATH", None)

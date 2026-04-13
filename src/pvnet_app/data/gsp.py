@@ -7,15 +7,15 @@ import betterproto
 import numpy as np
 import pandas as pd
 import xarray as xr
+from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 from ocf import dp
-from grpclib.client import Channel
 
 
 def get_gsp_locations() -> pd.DataFrame:
     """Load the GSP locations metadata."""
-    gsp_coordinates_path = files("pvnet_app.data").joinpath("uk_gsp_locations_20250109.csv")
+    gsp_coordinates_path = files("pvnet_app.data").joinpath("uk_gsp_locations_20251204.csv")
     return pd.read_csv(gsp_coordinates_path, index_col="gsp_id")
 
 
@@ -138,7 +138,7 @@ async def create_null_generation_data(
         )
 
         dp_channel.close()
-        
+
     else:
         capacities = get_gsp_capacities(
             db_connection=db_connection,
