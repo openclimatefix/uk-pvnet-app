@@ -10,7 +10,7 @@ from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.save import fetch_dp_gsp_uuid_map
 
-NUM_GSPS = 331
+NUM_GSPS = 334
 
 
 async def check_number_of_forecasts(client, model_configs, test_t0):

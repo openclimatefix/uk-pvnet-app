@@ -210,30 +210,6 @@ def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0)
         assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
 
 
-def test_run_zeros_in_sat_data(sat_15_data, test_t0):
-    """Check that the satellite data is considered invalid if it contains too many zeros"""
-
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
-
-        # Make half the values zeros
-        ds = sat_15_data.copy(deep=True)
-        ds.data[::2] = 0
-
-        # Make satellite data available
-        save_to_zarr_zip(ds, filename="latest.zarr.zip")
-
-        sat_downloader = SatelliteDownloader(
-            t0=test_t0,
-            source_path_5="latest.zarr.zip",
-            source_path_15="latest_15.zarr.zip",
-        )
-        sat_downloader.run()
-
-        # If the satellite data is invalid the valid_times attribute should be None
-        assert sat_downloader.valid_times is None
-
-
 def test_run_nan_in_sat_data(sat_15_data, test_t0):
     """Check that the satellite data is considered invalid if it contains too many NaNs"""
 

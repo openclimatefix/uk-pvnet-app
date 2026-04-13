@@ -40,7 +40,7 @@
   ],
   "attributes": {},
   "dimension_names": [
-    "variable"
+    "channel"
   ],
   "zarr_format": 3,
   "node_type": "array",
