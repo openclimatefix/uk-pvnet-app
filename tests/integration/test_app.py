@@ -13,7 +13,7 @@ from nowcasting_datamodel.models.forecast import (
 from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
 
-NUM_GSPS = 331
+NUM_GSPS = 334
 
 
 def check_number_of_forecasts(model_configs, db_session):
@@ -89,7 +89,7 @@ async def test_app(
         os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
         os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
-        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
+        os.environ["FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         await run(t0=test_t0)
@@ -127,7 +127,7 @@ async def test_app_no_sat(
         os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
         os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
-        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
+        os.environ["FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         await run(t0=test_t0)
 
