@@ -102,6 +102,7 @@ async def run(
         - RAISE_MODEL_FAILURE: Option to raise an exception if a model fails to run. If set to
           "any" it will raise an exception if any model fails. If set to "critical" it will raise
           an exception if any critical model fails. If not set, it will not raise an exception.
+        - SAVE_TO_DATABASE: Option to save forecasts to the nowcasting database. Defaults to true.
     """
     # ---------------------------------------------------------------------------
     # 0. Basic set up
@@ -120,6 +121,7 @@ async def run(
     allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
     allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
+    save_to_database = get_boolean_env_var("SAVE_TO_DATABASE", default=True)
     raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
 
     zig_zag_warning_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_WARNING", 250))
@@ -335,11 +337,14 @@ async def run(
     channel.close()
 
     # Write predictions to database
-    logger.info("Writing to database")
+    if save_to_database:
+        logger.info("Writing to database")
 
-    with db_connection.get_session() as session, session.no_autoflush:
-        for forecaster in forecasters.values():
-            forecaster.log_forecast_to_database(session=session)
+        with db_connection.get_session() as session, session.no_autoflush:
+            for forecaster in forecasters.values():
+                forecaster.log_forecast_to_database(session=session)
+    else:
+        logger.info("Skipping writing to database (SAVE_TO_DATABASE is false)")
 
     logger.info("Finished forecast")
 

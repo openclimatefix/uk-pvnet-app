@@ -38,6 +38,7 @@ this is not set then the `SATELLITE_ZARR_PATH` is used by `.zarr` is repalced wi
   option in the model configs so it is not used. Defaults to true.
 - `ALLOW_SAVE_GSP_SUM`: Option to allow model to save the GSP sum. If false this overwrites the
   model configs so saving of the GSP sum is not used. Defaults to false.
+- `SAVE_TO_DATABASE`: Option to save forecasts to the nowcasting database. Defaults to true.
 
 #### These extra variables control validation and logging
 
