@@ -16,7 +16,10 @@ from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.config import load_yaml_config
 from pvnet_app.data.batch_validation import check_batch
-from pvnet_app.data.gsp import get_gsp_and_national_capacities
+from pvnet_app.data.gsp import (
+    get_gsp_and_national_capacities,
+    get_gsp_and_national_capacities_from_dp,
+)
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader, get_satellite_source_paths
 from pvnet_app.forecaster import Forecaster
@@ -103,6 +106,8 @@ async def run(
           "any" it will raise an exception if any model fails. If set to "critical" it will raise
           an exception if any critical model fails. If not set, it will not raise an exception.
         - SAVE_TO_DATABASE: Option to save forecasts to the nowcasting database. Defaults to true.
+        - READ_FROM_DATA_PLATFORM: Option to read GSP capacities from the data platform instead
+          of the nowcasting database. Defaults to false.
     """
     # ---------------------------------------------------------------------------
     # 0. Basic set up
@@ -122,6 +127,7 @@ async def run(
     allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
     save_to_database = get_boolean_env_var("SAVE_TO_DATABASE", default=True)
+    read_from_data_platform = get_boolean_env_var("READ_FROM_DATA_PLATFORM", default=False)
     raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
 
     zig_zag_warning_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_WARNING", 250))
@@ -178,13 +184,27 @@ async def run(
     if gsp_ids is None:
         gsp_ids = get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
 
-    # --- Get capacities from the database
-    logger.info("Loading capacities from the database")
-    gsp_capacities, national_capacity = get_gsp_and_national_capacities(
-        db_connection=db_connection,
-        gsp_ids=gsp_ids,
-        t0=t0,
-    )
+    # --- Open the data platform channel if we need it for capacities or for writing forecasts
+    dp_channel: Channel | None = None
+    dp_client: dp.DataPlatformDataServiceStub | None = None
+    if read_from_data_platform or write_predictions:
+        dp_channel = Channel(data_platform_host, data_platform_port)
+        dp_client = dp.DataPlatformDataServiceStub(dp_channel)
+
+    # --- Get capacities
+    if read_from_data_platform:
+        logger.info("Loading capacities from the data platform")
+        gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
+            client=dp_client,
+            gsp_ids=gsp_ids,
+        )
+    else:
+        logger.info("Loading capacities from the database")
+        gsp_capacities, national_capacity = get_gsp_and_national_capacities(
+            db_connection=db_connection,
+            gsp_ids=gsp_ids,
+            t0=t0,
+        )
 
     data_downloaders = []
 
@@ -316,25 +336,25 @@ async def run(
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
+        if dp_channel is not None:
+            dp_channel.close()
         return next(iter(forecasters.values())).da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to data-platform
     logger.info("Writing to data platform")
-    channel = Channel(data_platform_host, data_platform_port)
-    client = dp.DataPlatformDataServiceStub(channel)
 
-    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=dp_client)
 
     tasks = [
         forecaster.save_forecast_to_dataplatform(
             locations_gsp_uuid_map=gsp_uuid_map,
-            client=client,
+            client=dp_client,
         )
         for forecaster in forecasters.values()
     ]
     await asyncio.gather(*tasks)
-    channel.close()
+    dp_channel.close()
 
     # Write predictions to database
     if save_to_database:
