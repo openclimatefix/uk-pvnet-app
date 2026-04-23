@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
-from ocf import dp
 from grpclib.client import Channel
+from ocf import dp
 
 from pvnet_app.data.gsp import (
     BACKUP_CAPACITIES,
@@ -101,13 +101,13 @@ async def test_read_gsp_and_national_capacities_fallback(
 ):
     """
     Test that the fallback to BACKUP_CAPACITIES is used when a missing GSP ID is requested.
-    
-    If we request a GSP ID that is not found on the data platform, the function 
+
+    If we request a GSP ID that is not found on the data platform, the function
     should internally catch the ValueError and return the capacities from the backup CSV.
     """
     # GSP ID 348 is in the backup CSV but not created by setup_dp_locations (which creates 1..342)
     missing_gsp_id = 348
-    
+
     gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
         client=client,
         gsp_ids=[missing_gsp_id],
@@ -115,6 +115,6 @@ async def test_read_gsp_and_national_capacities_fallback(
 
     # When fallback occurs, national capacity comes from the backup CSV
     assert national_capacity == BACKUP_CAPACITIES.loc[0].item()
-    
+
     # And GSP capacities come from the backup CSV
     assert gsp_capacities.loc[missing_gsp_id] == BACKUP_CAPACITIES.loc[missing_gsp_id]

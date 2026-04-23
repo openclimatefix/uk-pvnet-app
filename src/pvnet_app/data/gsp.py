@@ -7,9 +7,9 @@ from importlib.resources import files
 import betterproto
 import numpy as np
 import pandas as pd
-from ocf import dp
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
+from ocf import dp
 
 logger = logging.getLogger()
 

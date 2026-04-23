@@ -13,11 +13,11 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
-from ocf import dp
 from nowcasting_datamodel.models import ForecastSQL, ForecastValue
 from nowcasting_datamodel.read.read import get_latest_input_data_last_updated, get_location
 from nowcasting_datamodel.read.read_models import get_model
 from nowcasting_datamodel.save.save import save as save_sql_forecasts
+from ocf import dp
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)

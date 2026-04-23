@@ -6,8 +6,8 @@ import pandas as pd
 import pytest
 import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
-from ocf import dp
 from grpclib.client import Channel
+from ocf import dp
 
 from src.pvnet_app.save import (
     create_forecaster_if_not_exists,

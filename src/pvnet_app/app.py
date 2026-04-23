@@ -7,10 +7,10 @@ from importlib.metadata import version
 import pandas as pd
 import sentry_sdk
 import torch
-from ocf import dp
 from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
+from ocf import dp
 from ocf_data_sampler.load.gsp import get_gsp_boundaries
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
