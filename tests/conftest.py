@@ -10,7 +10,7 @@ import pytest
 import pytest_asyncio
 import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
-from dp_sdk.ocf import dp
+from ocf import dp
 from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_me_latest

@@ -7,7 +7,7 @@ from importlib.resources import files
 import betterproto
 import numpy as np
 import pandas as pd
-from dp_sdk.ocf import dp
+from ocf import dp
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.read.read_gsp import get_latest_gsp_capacities
 
@@ -111,9 +111,8 @@ async def get_gsp_and_national_capacities_from_dp(
                 gsp_id=lambda df: df["metadata"].apply(
                     lambda x: int(x["gsp_id"]["number_value"]),
                 ),
-                capacity_mwp=lambda df: df["effective_capacity_watts"] / 1_000_000.0,
-            )
-            .set_index("gsp_id")
+                capacity_mwp=lambda df: df["effective_capacity_watts"].astype(float) / 1_000_000.0,
+            ).set_index("gsp_id")
         )
 
         missing = [gid for gid in [0, *gsp_ids] if gid not in locations_df.index]

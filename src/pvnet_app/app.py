@@ -7,7 +7,7 @@ from importlib.metadata import version
 import pandas as pd
 import sentry_sdk
 import torch
-from dp_sdk.ocf import dp
+from ocf import dp
 from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast

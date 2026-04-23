@@ -27,6 +27,8 @@ The following environment variables are used in the app:
 
 - `SATELLITE_15_ZARR_PATH`: The path to the 15 minute satellite data in Zarr format. If 
 this is not set then the `SATELLITE_ZARR_PATH` is used by `.zarr` is repalced with `_15.zarr`
+- `READ_FROM_DATA_PLATFORM`: Option to read GSP capacities from the data platform instead 
+of the nowcasting database. Defaults to false.
 
 #### These control the model(s) run
 
