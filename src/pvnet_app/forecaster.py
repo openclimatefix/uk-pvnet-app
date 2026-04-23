@@ -1,5 +1,4 @@
 """Functions to run the forecaster."""
-import token
 import logging
 import tempfile
 import numpy as np
