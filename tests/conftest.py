@@ -93,6 +93,17 @@ def dp_client():
 
 
 @pytest_asyncio.fixture(scope="session")
+async def client(dp_client):
+    """Create a gRPC client connected to the shared Data Platform server."""
+    host, port = dp_client
+    channel = Channel(host=host, port=port)
+    client_stub = dp.DataPlatformDataServiceStub(channel)
+
+    yield client_stub
+    channel.close()
+
+
+@pytest_asyncio.fixture(scope="session")
 async def setup_dp_locations(dp_client):
     """Set up GSP locations and observer in the shared Data Platform for integration tests."""
     host, port = dp_client

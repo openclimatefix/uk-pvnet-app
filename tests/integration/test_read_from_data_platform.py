@@ -2,28 +2,13 @@ import datetime
 
 import pandas as pd
 import pytest
-import pytest_asyncio
 from betterproto.lib.google.protobuf import Struct, Value
-from grpclib.client import Channel
 from ocf import dp
 
 from pvnet_app.data.gsp import (
     BACKUP_CAPACITIES,
     get_gsp_and_national_capacities_from_dp,
 )
-
-
-@pytest_asyncio.fixture(scope="session")
-async def client(dp_client):
-    """
-    Fixture to create a gRPC client connected to the shared Data Platform server.
-    """
-    host, port = dp_client
-    channel = Channel(host=host, port=port)
-    client_stub = dp.DataPlatformDataServiceStub(channel)
-
-    yield client_stub
-    channel.close()
 
 
 @pytest.mark.asyncio(loop_scope="session")
