@@ -1,8 +1,9 @@
 """Functions to run the forecaster."""
 import logging
-import tempfile
-import numpy as np
 import os
+import tempfile
+
+import numpy as np
 import pandas as pd
 import torch
 import xarray as xr
@@ -97,6 +98,7 @@ class Forecaster:
             model_config.summation.repo,
             model_config.summation.commit,
             device,
+            self.hf_token,
         )
 
         # Get the UK centroid coordinates
@@ -130,7 +132,7 @@ class Forecaster:
             summation_repo: The huggingface repo of the summation model
             summation_commit: The commit hash of the summation model to load
             device: The device the models will be run on
-            token:
+            hf_token:
                 HF authentication token. If True, the token is read from the HF config folder.
                 If string, it is used as the authentication token.
         """
