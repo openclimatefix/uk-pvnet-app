@@ -71,15 +71,15 @@ def test_validate_forecast_above_110percent():
     assert not forecast_passes
 
 
-def test_validate_forecast_over_17gw():
-    """Test that validate_forecast fails if the forecast is above 17 GW"""
+def test_validate_forecast_over_20gw():
+    """Test that validate_forecast fails if the forecast is above 20 GW"""
 
     national_forecast = pd.Series(
-        np.array([18_000]),
+        np.array([21_000]),
         index=pd.to_datetime(["2025-01-01 00:00"]),
     )
 
-    # 18,000 MW is above 17 GW => Should fail
+    # 21,000 MW is above 20 GW => Should fail
     forecast_passes = validate_forecast(
         national_forecast=national_forecast,
         national_capacity=100_000,
