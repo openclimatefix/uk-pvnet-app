@@ -10,7 +10,6 @@ import pytest
 import pytest_asyncio
 import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
-from dp_sdk.ocf import dp
 from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.fake import make_fake_me_latest
@@ -23,6 +22,7 @@ from nowcasting_datamodel.models.forecast import (
     ForecastValueSQL,
 )
 from nowcasting_datamodel.read.read import get_location
+from ocf import dp
 from sqlalchemy.orm import Session
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import PortWaitStrategy
@@ -91,6 +91,17 @@ def dp_client() -> Generator[tuple[str, str], None, None]:
             os.environ["DATA_PLATFORM_PORT"] = str(port)
 
             yield host, port
+
+
+@pytest_asyncio.fixture(scope="session")
+async def client(dp_client):
+    """Create a gRPC client connected to the shared Data Platform server."""
+    host, port = dp_client
+    channel = Channel(host=host, port=port)
+    client_stub = dp.DataPlatformDataServiceStub(channel)
+
+    yield client_stub
+    channel.close()
 
 
 @pytest_asyncio.fixture(scope="session")

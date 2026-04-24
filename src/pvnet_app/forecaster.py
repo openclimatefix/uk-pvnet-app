@@ -9,7 +9,7 @@ import torch
 import xarray as xr
 import yaml
 from dateutil.tz import UTC
-from dp_sdk.ocf import dp
+from ocf import dp
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.pvnet_dataset import PVNetConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (

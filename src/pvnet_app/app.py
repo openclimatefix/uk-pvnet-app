@@ -7,10 +7,10 @@ from importlib.metadata import version
 import pandas as pd
 import sentry_sdk
 import torch
-from dp_sdk.ocf import dp
 from grpclib.client import Channel
 from nowcasting_datamodel.connection import DatabaseConnection
 from nowcasting_datamodel.models.base import Base_Forecast
+from ocf import dp
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.config import load_yaml_config
@@ -100,6 +100,8 @@ async def run(
           "any" it will raise an exception if any model fails. If set to "critical" it will raise
           an exception if any critical model fails. If not set, it will not raise an exception.
         - SAVE_TO_DATABASE: Option to save forecasts to the nowcasting database. Defaults to true.
+        - READ_FROM_DATA_PLATFORM: Option to read GSP capacities from the data platform instead
+          of the nowcasting database. Defaults to false.
     """
     # ---------------------------------------------------------------------------
     # 0. Basic set up
@@ -116,6 +118,7 @@ async def run(
     allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
     save_to_database = get_boolean_env_var("SAVE_TO_DATABASE", default=True)
+    read_from_data_platform = get_boolean_env_var("READ_FROM_DATA_PLATFORM", default=False)
     raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
 
     zig_zag_warning_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_WARNING", 250))
@@ -168,11 +171,14 @@ async def run(
     # ---------------------------------------------------------------------------
     # 1. Prepare data sources
 
-    # --- Get capacities from the database
-    logger.info("Loading capacities from the database")
-    ds_gen = create_null_generation_data(
+
+    # --- Get capacities from the database or data platform
+    logger.info("Loading capacities")
+    ds_gen = await create_null_generation_data(
         db_connection=db_connection,
+        dp_address=(data_platform_host, data_platform_port),
         t0=t0,
+        read_from_data_platform=read_from_data_platform,
     )
 
     ds_gen.to_zarr(generation_path)
@@ -315,20 +321,20 @@ async def run(
     # ---------------------------------------------------------------------------
     # Write predictions to data-platform
     logger.info("Writing to data platform")
-    channel = Channel(data_platform_host, data_platform_port)
-    client = dp.DataPlatformDataServiceStub(channel)
 
-    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+    dp_channel = Channel(data_platform_host, data_platform_port)
+    dp_client = dp.DataPlatformDataServiceStub(dp_channel)
+    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=dp_client)
 
     tasks = [
         forecaster.save_forecast_to_dataplatform(
             locations_gsp_uuid_map=gsp_uuid_map,
-            client=client,
+            client=dp_client,
         )
         for forecaster in forecasters.values()
     ]
     await asyncio.gather(*tasks)
-    channel.close()
+    dp_channel.close()
 
     # Write predictions to database
     if save_to_database:
