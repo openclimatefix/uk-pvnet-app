@@ -184,20 +184,16 @@ async def run(
     if gsp_ids is None:
         gsp_ids = get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
 
-    # --- Open the data platform channel if we need it for capacities or for writing forecasts
-    dp_channel: Channel | None = None
-    dp_client: dp.DataPlatformDataServiceStub | None = None
-    if read_from_data_platform or write_predictions:
-        dp_channel = Channel(data_platform_host, data_platform_port)
-        dp_client = dp.DataPlatformDataServiceStub(dp_channel)
-
     # --- Get capacities
     if read_from_data_platform:
         logger.info("Loading capacities from the data platform")
+        dp_channel = Channel(data_platform_host, data_platform_port)
+        dp_client = dp.DataPlatformDataServiceStub(dp_channel)
         gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
             client=dp_client,
             gsp_ids=gsp_ids,
         )
+        dp_channel.close()
     else:
         logger.info("Loading capacities from the database")
         gsp_capacities, national_capacity = get_gsp_and_national_capacities(
@@ -336,14 +332,14 @@ async def run(
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
-        if dp_channel is not None:
-            dp_channel.close()
         return next(iter(forecasters.values())).da_abs_all
 
     # ---------------------------------------------------------------------------
     # Write predictions to data-platform
     logger.info("Writing to data platform")
 
+    dp_channel = Channel(data_platform_host, data_platform_port)
+    dp_client = dp.DataPlatformDataServiceStub(dp_channel)
     gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=dp_client)
 
     tasks = [
