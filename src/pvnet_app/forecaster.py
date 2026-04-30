@@ -136,14 +136,12 @@ class Forecaster:
             sum_model = SummationBaseModel.from_pretrained(
                 model_id=summation_repo,
                 revision=summation_commit,
-                token=hf_token
             ).to(device)
 
             # Compare the current GSP model with the one the summation model was trained on
             datamodule_path = SummationBaseModel.get_datamodule_config(
                 model_id=summation_repo,
                 revision=summation_commit,
-                token=hf_token
             )
             with open(datamodule_path) as cfg:
                 sum_pvnet_cfg = yaml.safe_load(cfg)["pvnet_model"]
