@@ -1,5 +1,6 @@
 """Functions to run the forecaster."""
 import logging
+import os
 import tempfile
 
 import numpy as np
@@ -77,6 +78,8 @@ class Forecaster:
         self.save_gsp_sum = model_config.save_gsp_sum
         self.save_gsp_to_recent = model_config.save_gsp_to_recent
 
+        self.hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
+
         # Load the GSP and summation models
         self.model, self.summation_model = self.load_model(
             model_config.pvnet.repo,
@@ -84,6 +87,7 @@ class Forecaster:
             model_config.summation.repo,
             model_config.summation.commit,
             device,
+            self.hf_token,
         )
 
         # Values
@@ -104,6 +108,7 @@ class Forecaster:
         summation_repo: str | None,
         summation_commit: str | None,
         device: torch.device,
+        hf_token: bool | str | None = None,
     ) -> tuple[PVNetBaseModel, SummationBaseModel | None]:
         """Load the GSP and summation models.
 
@@ -113,11 +118,15 @@ class Forecaster:
             summation_repo: The huggingface repo of the summation model
             summation_commit: The commit hash of the summation model to load
             device: The device the models will be run on
+            hf_token:
+                HF authentication token. If True, the token is read from the HF config folder.
+                If string, it is used as the authentication token.
         """
         # Load the GSP level model
         model = PVNetBaseModel.from_pretrained(
             model_id=pvnet_repo,
             revision=pvnet_commit,
+            token=hf_token
         ).to(device)
 
         # Load the summation model
@@ -127,12 +136,14 @@ class Forecaster:
             sum_model = SummationBaseModel.from_pretrained(
                 model_id=summation_repo,
                 revision=summation_commit,
+                token=hf_token
             ).to(device)
 
             # Compare the current GSP model with the one the summation model was trained on
             datamodule_path = SummationBaseModel.get_datamodule_config(
                 model_id=summation_repo,
                 revision=summation_commit,
+                token=hf_token
             )
             with open(datamodule_path) as cfg:
                 sum_pvnet_cfg = yaml.safe_load(cfg)["pvnet_model"]
