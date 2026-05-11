@@ -126,7 +126,7 @@ class Forecaster:
         model = PVNetBaseModel.from_pretrained(
             model_id=pvnet_repo,
             revision=pvnet_commit,
-            token=hf_token
+            token=hf_token,
         ).to(device)
 
         # Load the summation model
