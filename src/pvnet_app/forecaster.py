@@ -1,6 +1,5 @@
 """Functions to run the forecaster."""
 import logging
-import os
 import tempfile
 
 import numpy as np
@@ -50,6 +49,7 @@ class Forecaster:
         device: torch.device,
         gsp_capacities: xr.DataArray,
         national_capacity: float,
+        hf_token: bool | str | None = None,
     ) -> None:
         """Class for making and compiling solar forecasts from for all GB GSPs and national total.
 
@@ -61,6 +61,9 @@ class Forecaster:
             device: Device to run the model on
             gsp_capacities: DataArray of the solar capacities for all regional GSPs at t0
             national_capacity: The national solar capacity at t0
+            hf_token:
+                HF authentication token. If True, the token is read from the HF config folder.
+                If string, it is used as the authentication token.
         """
         self.logger = logging.getLogger(model_config.name)
         self.logger.setLevel(getattr(logging, model_config.log_level))
@@ -78,8 +81,6 @@ class Forecaster:
         self.save_gsp_sum = model_config.save_gsp_sum
         self.save_gsp_to_recent = model_config.save_gsp_to_recent
 
-        self.hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
-
         # Load the GSP and summation models
         self.model, self.summation_model = self.load_model(
             model_config.pvnet.repo,
@@ -87,7 +88,7 @@ class Forecaster:
             model_config.summation.repo,
             model_config.summation.commit,
             device,
-            self.hf_token,
+            hf_token,
         )
 
         # Values
@@ -118,9 +119,7 @@ class Forecaster:
             summation_repo: The huggingface repo of the summation model
             summation_commit: The commit hash of the summation model to load
             device: The device the models will be run on
-            hf_token:
-                HF authentication token. If True, the token is read from the HF config folder.
-                If string, it is used as the authentication token.
+            hf_token: HF authentication token.
         """
         # Load the GSP level model
         model = PVNetBaseModel.from_pretrained(
