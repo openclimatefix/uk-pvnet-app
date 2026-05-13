@@ -1,9 +1,9 @@
+import datetime
 import os
 import tempfile
 
 import pytest
 import zarr
-import datetime
 from ocf import dp
 
 from pvnet_app.app import run
@@ -39,7 +39,7 @@ async def check_forecasts_in_data_platform(client, model_configs, test_t0):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app(
-    dp_client,  # noqa: ARG001
+    dp_client,
     setup_dp_locations,  # noqa: ARG001
     test_t0,
     nwp_ukv_data,
@@ -83,7 +83,7 @@ async def test_app(
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app_no_sat(
-    dp_client,  # noqa: ARG001
+    dp_client,
     setup_dp_locations,  # noqa: ARG001
     test_t0,
     nwp_ukv_data,

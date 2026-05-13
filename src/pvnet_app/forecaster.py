@@ -19,6 +19,7 @@ from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import validate_batch_against_config
 from pvnet_summation.data.datamodule import construct_sample as construct_sum_sample
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
+
 from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.model_configs.pydantic_models import ModelConfig
 from pvnet_app.save import save_forecast_to_data_platform
