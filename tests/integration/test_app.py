@@ -3,51 +3,38 @@ import tempfile
 
 import pytest
 import zarr
-from nowcasting_datamodel.models.forecast import (
-    ForecastSQL,
-    ForecastValueLatestSQL,
-    ForecastValueSevenDaysSQL,
-    ForecastValueSQL,
-)
+import datetime
+from ocf import dp
 
 from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
+from pvnet_app.save import fetch_dp_gsp_uuid_map
 
 NUM_GSPS = 331
 
 
-def check_number_of_forecasts(model_configs, db_session):
-    """Check the app has added the expected number of forecast values to the database"""
+async def check_forecasts_in_data_platform(client, model_configs, test_t0):
+    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+    national_uuid = gsp_uuid_map[0]
 
-    # Check correct number of forecasts have been made
-    # (Number of GSPs + 1 National + maybe GSP-sum) forecasts
-    # Forecast made with multiple models
-    expected_num_forecasts = 0
-    expected_num_forecast_values = 0
+    list_response = await client.list_forecasters(dp.ListForecastersRequest())
+    forecaster_names = {f.forecaster_name for f in list_response.forecasters}
+
     for model_config in model_configs:
-        # The number of forecasts
-        num_forecasts = NUM_GSPS + 1 + model_config.save_gsp_sum
-        expected_num_forecasts += num_forecasts
-        # The number of forecast values - 16 for intraday, 36 for day-ahead)
-        expected_num_forecast_values += num_forecasts * (72 if model_config.is_day_ahead else 16)
+        model_name = model_config.name.replace("-", "_")
 
-    forecasts = db_session.query(ForecastSQL).all()
-    # Doubled for historic and forecast
-    assert len(forecasts) == expected_num_forecasts * 2
+        assert model_name in forecaster_names, f"Missing forecaster '{model_name}' in data platform"
+        assert f"{model_name}_adjust" in forecaster_names
 
-    # Check probabilistic added
-    assert "90" in forecasts[0].forecast_values[0].properties
-    assert "10" in forecasts[0].forecast_values[0].properties
-
-    assert len(db_session.query(ForecastValueSQL).all()) == expected_num_forecast_values
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_num_forecast_values
-
-    expected_num_forecast_values = 0
-    for model_config in model_configs:
-        num_forecasts = 1 + NUM_GSPS * model_config.save_gsp_to_recent + model_config.save_gsp_sum
-        expected_num_forecast_values += num_forecasts * (72 if model_config.is_day_ahead else 16)
-
-    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_num_forecast_values
+        forecasts_response = await client.get_latest_forecasts(
+            dp.GetLatestForecastsRequest(
+                energy_source=dp.EnergySource.SOLAR,
+                pivot_timestamp_utc=test_t0.to_pydatetime().replace(tzinfo=datetime.UTC),
+                location_uuid=national_uuid,
+            ),
+        )
+        forecast_model_names = {f.forecaster.forecaster_name for f in forecasts_response.forecasts}
+        assert model_name in forecast_model_names
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -55,19 +42,15 @@ async def test_app(
     dp_client,  # noqa: ARG001
     setup_dp_locations,  # noqa: ARG001
     test_t0,
-    db_session,
     nwp_ukv_data,
     nwp_ecmwf_data,
     sat_5_data_zero_delay,
     cloudcasting_data,
-    db_url,
 ):
     """Test the app running the intraday models"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.chdir(tmpdirname)
-
-        os.environ["DB_URL"] = db_url
 
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables
@@ -95,7 +78,7 @@ async def test_app(
         await run(t0=test_t0)
 
     model_configs = get_all_models(get_critical_only=False)
-    check_number_of_forecasts(model_configs, db_session)
+    await check_forecasts_in_data_platform(dp_client, model_configs, test_t0)
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -103,17 +86,13 @@ async def test_app_no_sat(
     dp_client,  # noqa: ARG001
     setup_dp_locations,  # noqa: ARG001
     test_t0,
-    db_session,
     nwp_ukv_data,
     nwp_ecmwf_data,
-    db_url,
 ):
     """Test the app for the case when no satellite data is available"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.chdir(tmpdirname)
-
-        os.environ["DB_URL"] = db_url
 
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
@@ -132,8 +111,7 @@ async def test_app_no_sat(
         await run(t0=test_t0)
 
     # Only the models which don't use satellite will be run in this case
-    # The models below are the only ones which should have been run
     model_configs = get_all_models()
     model_configs = [model for model in model_configs if not model.uses_satellite_data]
 
-    check_number_of_forecasts(model_configs, db_session)
+    await check_forecasts_in_data_platform(dp_client, model_configs, test_t0)

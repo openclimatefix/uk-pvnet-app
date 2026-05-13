@@ -8,18 +8,13 @@ import pandas as pd
 import sentry_sdk
 import torch
 from grpclib.client import Channel
-from nowcasting_datamodel.connection import DatabaseConnection
-from nowcasting_datamodel.models.base import Base_Forecast
 from ocf import dp
 from ocf_data_sampler.load.gsp import get_gsp_boundaries
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.config import load_yaml_config
 from pvnet_app.data.batch_validation import check_batch
-from pvnet_app.data.gsp import (
-    get_gsp_and_national_capacities,
-    get_gsp_and_national_capacities_from_dp,
-)
+from pvnet_app.data.gsp import get_gsp_and_national_capacities_from_dp
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader, get_satellite_source_paths
 from pvnet_app.forecaster import Forecaster
@@ -78,8 +73,6 @@ async def run(
         write_predictions (bool): Whether to write prediction to the database. Else returns as
             DataArray for local testing.
 
-    This app requires these environmental variables to be available:
-        - DB_URL
     These variables are optional depending on the models being run:
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
@@ -105,9 +98,8 @@ async def run(
         - RAISE_MODEL_FAILURE: Option to raise an exception if a model fails to run. If set to
           "any" it will raise an exception if any model fails. If set to "critical" it will raise
           an exception if any critical model fails. If not set, it will not raise an exception.
-        - SAVE_TO_DATABASE: Option to save forecasts to the nowcasting database. Defaults to true.
-        - READ_FROM_DATA_PLATFORM: Option to read GSP capacities from the data platform instead
-          of the nowcasting database. Defaults to false.
+        - DATA_PLATFORM_HOST: Hostname of the data platform gRPC server. Defaults to localhost.
+        - DATA_PLATFORM_PORT: Port of the data platform gRPC server. Defaults to 50051.
     """
     # ---------------------------------------------------------------------------
     # 0. Basic set up
@@ -126,15 +118,12 @@ async def run(
     allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
     allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
-    save_to_database = get_boolean_env_var("SAVE_TO_DATABASE", default=True)
-    read_from_data_platform = get_boolean_env_var("READ_FROM_DATA_PLATFORM", default=False)
     raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
 
     zig_zag_warning_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_WARNING", 250))
     zig_zag_error_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_ERROR", 500))
     sun_elevation_lower_limit = float(os.getenv("FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT", 10))
 
-    db_url = os.environ["DB_URL"]  # Will raise KeyError if not set
     data_platform_host = os.getenv("DATA_PLATFORM_HOST", "localhost")
     data_platform_port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
     s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
@@ -163,9 +152,6 @@ async def run(
     if len(model_configs) == 0:
         raise Exception("No models found after filtering")
 
-    # Open connection to the database - used for pulling GSP capacitites and writing forecasts
-    db_connection = DatabaseConnection(url=db_url, base=Base_Forecast, echo=False)
-
     # 0. Get Model configs
     data_config_paths: dict[str, str] = {}
     data_configs: list[dict] = []
@@ -185,22 +171,15 @@ async def run(
         gsp_ids = get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
 
     # --- Get capacities
-    if read_from_data_platform:
-        logger.info("Loading capacities from the data platform")
-        dp_channel = Channel(data_platform_host, data_platform_port)
-        dp_client = dp.DataPlatformDataServiceStub(dp_channel)
-        gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
-            client=dp_client,
-            gsp_ids=gsp_ids,
-        )
-        dp_channel.close()
-    else:
-        logger.info("Loading capacities from the database")
-        gsp_capacities, national_capacity = get_gsp_and_national_capacities(
-            db_connection=db_connection,
-            gsp_ids=gsp_ids,
-            t0=t0,
-        )
+    # do it with async with
+    logger.info("Loading capacities from the data platform")
+    dp_channel = Channel(data_platform_host, data_platform_port)
+    dp_client = dp.DataPlatformDataServiceStub(dp_channel)
+    gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
+        client=dp_client,
+        gsp_ids=gsp_ids,
+    )
+    dp_channel.close()
 
     data_downloaders = []
 
@@ -351,16 +330,6 @@ async def run(
     ]
     await asyncio.gather(*tasks)
     dp_channel.close()
-
-    # Write predictions to database
-    if save_to_database:
-        logger.info("Writing to database")
-
-        with db_connection.get_session() as session, session.no_autoflush:
-            for forecaster in forecasters.values():
-                forecaster.log_forecast_to_database(session=session)
-    else:
-        logger.info("Skipping writing to database (SAVE_TO_DATABASE is false)")
 
     logger.info("Finished forecast")
 

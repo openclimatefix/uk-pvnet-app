@@ -1,7 +1,7 @@
 import datetime
 import os
 import time
-from datetime import UTC, timedelta
+from datetime import timedelta
 from importlib.metadata import version
 
 import numpy as np
@@ -11,17 +11,6 @@ import pytest_asyncio
 import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
 from grpclib.client import Channel
-from nowcasting_datamodel.connection import DatabaseConnection
-from nowcasting_datamodel.fake import make_fake_me_latest
-from nowcasting_datamodel.models import GSPYield, LocationSQL
-from nowcasting_datamodel.models.base import Base_Forecast
-from nowcasting_datamodel.models.forecast import (
-    ForecastSQL,
-    ForecastValueLatestSQL,
-    ForecastValueSevenDaysSQL,
-    ForecastValueSQL,
-)
-from nowcasting_datamodel.read.read import get_location
 from ocf import dp
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import PortWaitStrategy
@@ -130,88 +119,6 @@ async def setup_dp_locations(dp_client):
     await client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
 
     channel.close()
-
-
-@pytest.fixture()
-def db_url():
-    with PostgresContainer("postgres:16.1") as postgres:
-        yield postgres.get_connection_url()
-
-
-@pytest.fixture()
-def db_connection(test_t0, db_url):
-    """Database engine, this includes the table creation."""
-
-    database_connection = DatabaseConnection(db_url, echo=False)
-    engine = database_connection.engine
-
-    database_connection.create_all()
-
-    with database_connection.get_session() as s:
-        populate_db_session_with_input_data(s, test_t0)
-
-    yield database_connection
-
-    # Tear down
-    Base_Forecast.metadata.drop_all(engine)
-
-    engine.dispose()
-
-
-@pytest.fixture()
-def db_session(db_connection):
-    """Return a sqlalchemy session, which tears down everything properly post-test."""
-
-    with db_connection.get_session() as s:
-        yield s
-
-        # Remove forecasts made in the test
-        s.query(ForecastValueSevenDaysSQL).delete()
-        s.query(ForecastValueLatestSQL).delete()
-        s.query(ForecastValueSQL).delete()
-        s.query(ForecastSQL).delete()
-        s.commit()
-
-
-def populate_db_session_with_input_data(session, test_t0):
-    """Populate a session with input data for testing"""
-
-    num_gsps = 342
-    total_capacity_mw = 17_000
-
-    gsp_yields = []
-    for i in range(0, num_gsps + 1):
-        # Capacity is total capacity for GSP 0. The rest of the GSPs share the capacity evenly
-        installed_capacity_mw = total_capacity_mw if i == 0 else total_capacity_mw / num_gsps
-
-        location_sql: LocationSQL = get_location(
-            session=session,
-            gsp_id=i,
-            installed_capacity_mw=installed_capacity_mw,
-        )
-
-        # GSP data is mostly up to date, but a bit delayed
-        for date in pd.date_range(
-            test_t0 - pd.Timedelta("18h"),
-            test_t0 - pd.Timedelta("6.5h"),
-            freq="30min",
-        ):
-            gsp_yield_sql = GSPYield(
-                datetime_utc=date.to_pydatetime().replace(tzinfo=UTC),
-                solar_generation_kw=np.random.randint(low=0, high=installed_capacity_mw * 1000),
-                capacity_mwp=installed_capacity_mw,
-            ).to_orm()
-            gsp_yield_sql.location = location_sql
-            gsp_yields.append(gsp_yield_sql)
-
-    # Add recent GSP data to the database
-    session.add_all(gsp_yields)
-
-    # Add recent fake forecast error data to the database for the pvnet_v2 model
-    metric_values = make_fake_me_latest(session=session, model_name="pvnet_v2")
-    session.add_all(metric_values)
-
-    session.commit()
 
 
 def make_nwp_data(shell_path, varname, init_time):

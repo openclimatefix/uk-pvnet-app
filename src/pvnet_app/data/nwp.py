@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import pyproj
 import xarray as xr
-import xesmf as xe
+# import xesmf as xe
 from ocf_data_sampler.config.load import load_yaml_configuration
 
 from pvnet_app.consts import nwp_cloudcasting_path, nwp_ecmwf_path, nwp_ukv_path
@@ -62,16 +62,17 @@ def regrid_nwp_data(
 
     logger.info(f"Regridding {nwp_source} to expected grid to {target_coords_path}")
 
-    regridder = xe.Regridder(ds, ds_target_coords, method=method)
+    # regridder = xe.Regridder(ds, ds_target_coords, method=method)
 
-    # Regrid in a loop to keep RAM usage lower
-    ds_list = []
-    for step in ds.step:
-        # Copy to make sure the data is C-contiguous for efficient regridding
-        ds_step = ds.sel(step=step).copy(deep=True)
-        ds_list.append(regridder(ds_step))
+    # # Regrid in a loop to keep RAM usage lower
+    # ds_list = []
+    # for step in ds.step:
+    #     # Copy to make sure the data is C-contiguous for efficient regridding
+    #     ds_step = ds.sel(step=step).copy(deep=True)
+    #     ds_list.append(regridder(ds_step))
 
-    return xr.concat(ds_list, dim="step")
+    # return xr.concat(ds_list, dim="step")
+    return ds
 
 
 def check_model_nwp_inputs_available(

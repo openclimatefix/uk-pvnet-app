@@ -19,11 +19,9 @@ from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import validate_batch_against_config
 from pvnet_summation.data.datamodule import construct_sample as construct_sum_sample
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
-from sqlalchemy.orm import Session
-
 from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.model_configs.pydantic_models import ModelConfig
-from pvnet_app.save import save_forecast, save_forecast_to_data_platform
+from pvnet_app.save import save_forecast_to_data_platform
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -288,20 +286,6 @@ class Forecaster:
             },
         )
         return da
-
-    def log_forecast_to_database(self, session: Session) -> None:
-        """Log the compiled forecast to the database."""
-        self.logger.debug("Saving ForecastSQL to database")
-
-        # save using nowcasting_datamodel
-        save_forecast(
-            session=session,
-            forecast_da=self.da_abs_all,
-            model_tag=self.model_tag,
-            save_gsp_to_recent=self.save_gsp_to_recent,
-            apply_adjuster=self.apply_adjuster,
-            save_gsp_sum=self.save_gsp_sum,
-        )
 
     async def save_forecast_to_dataplatform(
         self,
