@@ -108,6 +108,8 @@ async def run(
         - SAVE_TO_DATABASE: Option to save forecasts to the nowcasting database. Defaults to true.
         - READ_FROM_DATA_PLATFORM: Option to read GSP capacities from the data platform instead
           of the nowcasting database. Defaults to false.
+        - HUGGINGFACE_TOKEN: Huggingface token, required if any of the models being run are in
+          private repositories.
     """
     # ---------------------------------------------------------------------------
     # 0. Basic set up
@@ -129,6 +131,7 @@ async def run(
     save_to_database = get_boolean_env_var("SAVE_TO_DATABASE", default=True)
     read_from_data_platform = get_boolean_env_var("READ_FROM_DATA_PLATFORM", default=False)
     raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
+    hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
 
     zig_zag_warning_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_WARNING", 250))
     zig_zag_error_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_ERROR", 500))
@@ -174,6 +177,7 @@ async def run(
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
             revision=model_config.pvnet.commit,
+            token=hf_token,
         )
         data_config_paths[model_config.name] = data_config_path
         data_configs.append(load_yaml_config(data_config_path))
@@ -274,6 +278,7 @@ async def run(
                 device=device,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
+                hf_token=hf_token,
             )
 
         else:

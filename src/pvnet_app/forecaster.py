@@ -49,6 +49,7 @@ class Forecaster:
         device: torch.device,
         gsp_capacities: xr.DataArray,
         national_capacity: float,
+        hf_token: bool | str | None = None,
     ) -> None:
         """Class for making and compiling solar forecasts from for all GB GSPs and national total.
 
@@ -60,6 +61,9 @@ class Forecaster:
             device: Device to run the model on
             gsp_capacities: DataArray of the solar capacities for all regional GSPs at t0
             national_capacity: The national solar capacity at t0
+            hf_token:
+                HF authentication token. If True, the token is read from the HF config folder.
+                If string, it is used as the authentication token.
         """
         self.logger = logging.getLogger(model_config.name)
         self.logger.setLevel(getattr(logging, model_config.log_level))
@@ -84,6 +88,7 @@ class Forecaster:
             model_config.summation.repo,
             model_config.summation.commit,
             device,
+            hf_token,
         )
 
         # Values
@@ -104,6 +109,7 @@ class Forecaster:
         summation_repo: str | None,
         summation_commit: str | None,
         device: torch.device,
+        hf_token: bool | str | None = None,
     ) -> tuple[PVNetBaseModel, SummationBaseModel | None]:
         """Load the GSP and summation models.
 
@@ -113,11 +119,13 @@ class Forecaster:
             summation_repo: The huggingface repo of the summation model
             summation_commit: The commit hash of the summation model to load
             device: The device the models will be run on
+            hf_token: HF authentication token.
         """
         # Load the GSP level model
         model = PVNetBaseModel.from_pretrained(
             model_id=pvnet_repo,
             revision=pvnet_commit,
+            token=hf_token,
         ).to(device)
 
         # Load the summation model
