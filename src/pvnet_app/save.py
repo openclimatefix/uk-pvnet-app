@@ -122,25 +122,22 @@ def map_values_da_to_dp_requests(
     p10s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_10").values.astype(float)
     p90s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_90").values.astype(float)
 
-    def _clamp(value: float, name: str, h: int) -> float:
-        if value < 0 or value > 1.1:
-            logger.warning(
-                f"{name} value {value} outside [0, 1.1] for model={model_tag}, "
-                f"gsp_id={gsp_id}, horizon_mins={h}; clamping",
-            )
-            return max(0.0, min(1.1, value))
-        return value
-
     forecast_values = []
     for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
+        if p90 >= 1.1:
+            logger.warning(
+                f"p90 value {p90} exceeds 1.1 for model={model_tag}, gsp_id={gsp_id}, "
+                f"horizon_mins={h}; clamping to 1.1",
+            )
+            p90 = 1.1
         forecast_values.append(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=h,
-                p50_fraction=_clamp(p50, "p50", h),
+                p50_fraction=p50,
                 metadata=Struct().from_pydict({}),
                 other_statistics_fractions={
-                    "p10": _clamp(p10, "p10", h),
-                    "p90": _clamp(p90, "p90", h),
+                    "p10": p10,
+                    "p90": p90,
                 },
             ),
         )
