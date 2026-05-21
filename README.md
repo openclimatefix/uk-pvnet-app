@@ -15,7 +15,6 @@ The following environment variables are used in the app:
 
 ### Required Environment Variables
 
-- `DB_URL`: The URL for the database connection.
 - `NWP_UKV_ZARR_PATH`: The path to the UKV NWP data in Zarr format.
 - `NWP_ECMWF_ZARR_PATH`: The path to the ECMWF NWP data in Zarr format.
 - `CLOUDCASTING_ZARR_PATH`: The path to the cloudcasting forecast data in Zarr format.
@@ -27,8 +26,13 @@ The following environment variables are used in the app:
 
 - `SATELLITE_15_ZARR_PATH`: The path to the 15 minute satellite data in Zarr format. If 
 this is not set then the `SATELLITE_ZARR_PATH` is used by `.zarr` is repalced with `_15.zarr`
-- `READ_FROM_DATA_PLATFORM`: Option to read GSP capacities from the data platform instead 
-of the nowcasting database. Defaults to false.
+
+#### These control the data platform connection
+
+Forecasts and GSP capacities are read from and written to the data platform.
+
+- `DATA_PLATFORM_HOST`: The host address for the data platform, default is localhost.
+- `DATA_PLATFORM_PORT`: The port for the data platform, default is 50051.
 
 #### These control the model(s) run
 
@@ -40,7 +44,6 @@ of the nowcasting database. Defaults to false.
   option in the model configs so it is not used. Defaults to true.
 - `ALLOW_SAVE_GSP_SUM`: Option to allow model to save the GSP sum. If false this overwrites the
   model configs so saving of the GSP sum is not used. Defaults to false.
-- `SAVE_TO_DATABASE`: Option to save forecasts to the nowcasting database. Defaults to true.
 
 #### These extra variables control validation and logging
 
@@ -55,15 +58,12 @@ of the nowcasting database. Defaults to false.
 - `RAISE_MODEL_FAILURE`: Option to raise an exception if a model fails to run. If set to "any" it 
   will raise an exception if any model fails. If set to "critical" it will raise an exception if any
   critical model fails. If not set, it will not raise an exception.
-- `DATA_PLATFORM_HOST`: The host address for the data platform, default is localhost.
-- `DATA_PLATFORM_PORT`: The port for the data platform, default is 50051. 
 
 ### Examples
 
 Here are some examples of how to set these environment variables:
 
 ```sh
-export DB_URL="postgresql://user:password@localhost:5432/dbname"
 export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
 export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
 export CLOUDCASTING_ZARR_PATH="s3://bucket/path/to/cloudcasting.zarr"
@@ -93,7 +93,7 @@ export ENVIRONMENT="production"
 ## Validation Checks
 
 We run a number of different validation checks on the data and the forecasts that are made. 
-These are in place to ensure quality forecasts are made and saved to the database.
+These are in place to ensure quality forecasts are made and saved to the data-platform.
 
 Before feeding data into the model(s) we check whether the data avilable is compatible with the 
 data that the model expects.
@@ -136,7 +136,7 @@ To be able to run the tests locally it is recommended to use `conda` and `uv`. T
 
 ### Running the app locally
 
-It is possbile to run the app locally by setting the required environment variables listed at the top of the [app](pvnet_app/app.py), these should point to the relevant data sources and DBs for the environment you want to run the app in. You will need to make sure you have opened a connection to the DB, as well as authenticating against any cloud providers where data may be stored (e.g if using AWS S3 then can do this via the AWS CLI command `aws configure`), a simple [notebook](scripts/run_app_local_example.ipynb) has been created as an example.  
+It is possbile to run the app locally by setting the required environment variables listed at the top of the [app](pvnet_app/app.py), these should point to the relevant data sources and the data platform instance for the environment you want to run the app in. You will need to make sure the data platform at `DATA_PLATFORM_HOST:DATA_PLATFORM_PORT` is reachable, as well as authenticating against any cloud providers where data may be stored (e.g if using AWS S3 then can do this via the AWS CLI command `aws configure`), a simple [notebook](scripts/run_app_local_example.ipynb) has been created as an example.  
 
 
 ## Contributors ✨
