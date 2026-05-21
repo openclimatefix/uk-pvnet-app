@@ -258,6 +258,7 @@ async def run(
                     device=device,
                     gsp_capacities=gsp_capacities,
                     national_capacity=national_capacity,
+                    hf_token=hf_token,
                 )
 
             else:
