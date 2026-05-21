@@ -103,13 +103,14 @@ async def setup_dp_locations(dp_client):
     for i in range(total_gsps + 1):
         metadata = Struct(fields={"gsp_id": Value(number_value=i)})
         location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
+        effective_capacity_watts = 15_000_000_000 if i == 0 else 1_000_000
 
         req = dp.CreateLocationRequest(
             location_name=f"gsp{i}",
             energy_source=dp.EnergySource.SOLAR,
             geometry_wkt="POINT(0 0)",
             location_type=location_type,
-            effective_capacity_watts=1_000_000,
+            effective_capacity_watts=effective_capacity_watts,
             metadata=metadata,
             valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
         )
