@@ -4,6 +4,8 @@ Downloading these model files in the build means we do not need to download them
 is run.
 """
 
+import os
+
 import typer
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
@@ -14,9 +16,12 @@ from pvnet_app.app import models_dict
 def main() -> None:
     """Download model from Huggingface and save it to cache."""
     # Model will be downloaded and saved to cache on disk
+    hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
+
     PVNetBaseModel.from_pretrained(
         models_dict["pvnet_v2"]["pvnet"]["name"],
         revision=models_dict["pvnet_v2"]["pvnet"]["version"],
+        token=hf_token,
     )
 
     # Model will be downloaded and saved to cache on disk

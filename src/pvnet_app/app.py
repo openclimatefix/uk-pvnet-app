@@ -101,6 +101,8 @@ async def run(
           an exception if any critical model fails. If not set, it will not raise an exception.
         - DATA_PLATFORM_HOST: Hostname of the data platform gRPC server. Defaults to localhost.
         - DATA_PLATFORM_PORT: Port of the data platform gRPC server. Defaults to 50051.
+        - HUGGINGFACE_TOKEN: Huggingface token, required if any of the models being run are in
+          private repositories.
     """
     # ---------------------------------------------------------------------------
     # 0. Basic set up
@@ -120,6 +122,7 @@ async def run(
     allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
     raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
+    hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
 
     zig_zag_warning_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_WARNING", 250))
     zig_zag_error_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_ERROR", 500))
@@ -161,6 +164,7 @@ async def run(
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
             revision=model_config.pvnet.commit,
+            token=hf_token,
         )
         data_config_paths[model_config.name] = data_config_path
         data_configs.append(load_yaml_config(data_config_path))

@@ -3,6 +3,7 @@
 It adds all models in src/pvnet_app/model_configs/all_models.py
 """
 
+import os
 from pathlib import Path
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
@@ -36,6 +37,9 @@ def generate_table() -> str:
     separator = "|".join(["----" for _ in columns])
     rows = [header, separator]
 
+    hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
+
+
     for model_config in model_configs:
         pvnet_link = make_huffingface_link(model_config.pvnet)
         summation_link = make_huffingface_link(model_config.summation)
@@ -43,6 +47,7 @@ def generate_table() -> str:
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
             revision=model_config.pvnet.commit,
+            token=hf_token,
         )
         data_config = load_yaml_config(data_config_path)
 
