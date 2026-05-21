@@ -39,7 +39,7 @@ async def check_forecasts_in_data_platform(client, model_configs, test_t0):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app(
-    dp_client,
+    client,
     setup_dp_locations,  # noqa: ARG001
     test_t0,
     nwp_ukv_data,
@@ -78,12 +78,12 @@ async def test_app(
         await run(t0=test_t0)
 
     model_configs = get_all_models(get_critical_only=False)
-    await check_forecasts_in_data_platform(dp_client, model_configs, test_t0)
+    await check_forecasts_in_data_platform(client, model_configs, test_t0)
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app_no_sat(
-    dp_client,
+    client,
     setup_dp_locations,  # noqa: ARG001
     test_t0,
     nwp_ukv_data,
@@ -114,4 +114,4 @@ async def test_app_no_sat(
     model_configs = get_all_models()
     model_configs = [model for model in model_configs if not model.uses_satellite_data]
 
-    await check_forecasts_in_data_platform(dp_client, model_configs, test_t0)
+    await check_forecasts_in_data_platform(client, model_configs, test_t0)
