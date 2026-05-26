@@ -36,8 +36,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-# Get rid of the verbose sqlalchemy logs
-logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
 # Turn off logs from aiobotocore
 logging.getLogger("aiobotocore").setLevel(logging.ERROR)
 
@@ -175,168 +173,168 @@ async def run(
     if gsp_ids is None:
         gsp_ids = get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
 
-    async with Channel(host=data_platform_host, port=data_platform_port) as dp_channel:
-        dp_client = dp.DataPlatformDataServiceStub(dp_channel)
-        # --- Get capacities
-        logger.info("Loading capacities from the data platform")
-        gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
-            client=dp_client,
+    # --- Get capacities
+    logger.info("Loading capacities from the data platform")
+    dp_channel = Channel(data_platform_host, data_platform_port)
+    dp_client = dp.DataPlatformDataServiceStub(dp_channel)
+    gsp_capacities, national_capacity = await get_gsp_and_national_capacities_from_dp(
+        client=dp_client,
+        gsp_ids=gsp_ids,
+    )
+    dp_channel.close()
+
+    data_downloaders = []
+
+    # --- Try to download satellite data if any models require it
+    if any("satellite" in conf["input_data"] for conf in data_configs):
+        logger.info("Downloading satellite data")
+
+        sat_downloader = SatelliteDownloader(
+            t0=t0,
+            source_path_5=sat_source_path_5,
+            source_path_15=sat_source_path_15,
             gsp_ids=gsp_ids,
         )
+        sat_downloader.run()
 
-        data_downloaders = []
+        data_downloaders.append(sat_downloader)
 
-        # --- Try to download satellite data if any models require it
-        if any("satellite" in conf["input_data"] for conf in data_configs):
-            logger.info("Downloading satellite data")
+    # --- Try to download NWP data if any models require it
+    if any("nwp" in conf["input_data"] for conf in data_configs):
+        logger.info("Downloading NWP data")
 
-            sat_downloader = SatelliteDownloader(
+        # Find the NWP sources required by the models
+        required_providers = set()
+        for conf in data_configs:
+            if "nwp" in conf["input_data"]:
+                for source in conf["input_data"]["nwp"].values():
+                    required_providers.add(source["provider"])
+
+        if "ukv" in required_providers:
+            ukv_downloader = UKVDownloader(source_path=ukv_source_path)
+            ukv_downloader.run()
+
+            data_downloaders.append(ukv_downloader)
+
+        if "ecmwf" in required_providers:
+            ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path)
+            ecmwf_downloader.run()
+
+            data_downloaders.append(ecmwf_downloader)
+
+        if "cloudcasting" in required_providers:
+            cloudcasting_downloader = CloudcastingDownloader(source_path=cloudcasting_source_path)
+            cloudcasting_downloader.run()
+
+            data_downloaders.append(cloudcasting_downloader)
+
+    # ---------------------------------------------------------------------------
+    # 2. Set up models
+
+    # Prepare all the models which can be run
+    forecasters = {}
+    for model_config in model_configs:
+        # First load the data config
+        data_config_path = data_config_paths[model_config.name]
+
+        # Check if the data available will allow the model to run
+        logger.info(f"Checking that the input data for model '{model_config.name}' exists")
+        model_can_run = all(
+            downloader.check_model_inputs_available(data_config_path, t0)
+            for downloader in data_downloaders
+        )
+
+        if model_can_run:
+            logger.info(f"The input data for model '{model_config.name}' is available")
+            # Set up a forecast compiler for the model
+            forecasters[model_config.name] = Forecaster(
+                model_config=model_config,
+                data_config_path=data_config_path,
                 t0=t0,
-                source_path_5=sat_source_path_5,
-                source_path_15=sat_source_path_15,
                 gsp_ids=gsp_ids,
-            )
-            sat_downloader.run()
-
-            data_downloaders.append(sat_downloader)
-
-        # --- Try to download NWP data if any models require it
-        if any("nwp" in conf["input_data"] for conf in data_configs):
-            logger.info("Downloading NWP data")
-
-            # Find the NWP sources required by the models
-            required_providers = set()
-            for conf in data_configs:
-                if "nwp" in conf["input_data"]:
-                    for source in conf["input_data"]["nwp"].values():
-                        required_providers.add(source["provider"])
-
-            if "ukv" in required_providers:
-                ukv_downloader = UKVDownloader(source_path=ukv_source_path)
-                ukv_downloader.run()
-
-                data_downloaders.append(ukv_downloader)
-
-            if "ecmwf" in required_providers:
-                ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path)
-                ecmwf_downloader.run()
-
-                data_downloaders.append(ecmwf_downloader)
-
-            if "cloudcasting" in required_providers:
-                cloudcasting_downloader = CloudcastingDownloader(
-                    source_path=cloudcasting_source_path,
-                )
-                cloudcasting_downloader.run()
-
-                data_downloaders.append(cloudcasting_downloader)
-
-        # ---------------------------------------------------------------------------
-        # 2. Set up models
-
-        # Prepare all the models which can be run
-        forecasters = {}
-        for model_config in model_configs:
-            # First load the data config
-            data_config_path = data_config_paths[model_config.name]
-
-            # Check if the data available will allow the model to run
-            logger.info(f"Checking that the input data for model '{model_config.name}' exists")
-            model_can_run = all(
-                downloader.check_model_inputs_available(data_config_path, t0)
-                for downloader in data_downloaders
-            )
-
-            if model_can_run:
-                logger.info(f"The input data for model '{model_config.name}' is available")
-                # Set up a forecast compiler for the model
-                forecasters[model_config.name] = Forecaster(
-                    model_config=model_config,
-                    data_config_path=data_config_path,
-                    t0=t0,
-                    gsp_ids=gsp_ids,
-                    device=device,
-                    gsp_capacities=gsp_capacities,
-                    national_capacity=national_capacity,
-                    hf_token=hf_token,
-                )
-
-            else:
-                logger.warning(
-                    f"The model {model_config.name} cannot be run with input data available",
-                )
-
-        if len(forecasters) == 0:
-            raise Exception("No models were compatible with the available input data.")
-
-        # ---------------------------------------------------------------------------
-        # Make predictions
-        logger.info("Making predictions")
-
-        first_model_name = next(iter(forecasters.keys()))
-        for model_name, forecaster in forecasters.items():
-            batch = forecaster.make_batch()
-
-            # Do basic validation of the batch: Will raise error if the batch fails the checks
-            check_batch(batch)
-
-            if (s3_batch_save_dir is not None) and model_name == first_model_name:
-                # Save the batch under the name of the first model
-                save_batch_to_s3(batch, model_name, s3_batch_save_dir)
-
-            forecaster.predict(batch)
-
-        # Delete the downloaded data
-        for downloader in data_downloaders:
-            downloader.clean_up()
-
-        # ---------------------------------------------------------------------------
-        # Run validation checks on the forecast values
-        logger.info("Validating forecasts")
-        for model_name in list(forecasters.keys()):
-            national_forecast = (
-                forecasters[model_name].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
-            ).to_series()
-
-            forecast_okay = validate_forecast(
-                national_forecast=national_forecast,
+                device=device,
+                gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
-                zip_zag_warning_threshold=zig_zag_warning_threshold,
-                zig_zag_error_threshold=zig_zag_error_threshold,
-                sun_elevation_lower_limit=sun_elevation_lower_limit,
-                model_name=model_name,
+                hf_token=hf_token,
             )
 
-            if not forecast_okay:
-                logger.warning(f"Forecast for model {model_name} failed validation")
-                if filter_bad_forecasts:
-                    # This forecast will not be saved
-                    del forecasters[model_name]
+        else:
+            logger.warning(f"The model {model_config.name} cannot be run with input data available")
 
-        if len(forecasters) == 0:
-            raise Exception("No models passed the forecast validation checks")
+    if len(forecasters) == 0:
+        raise Exception("No models were compatible with the available input data.")
 
-        # ---------------------------------------------------------------------------
-        # Escape clause for making predictions locally
-        if not write_predictions:
-            return next(iter(forecasters.values())).da_abs_all
+    # ---------------------------------------------------------------------------
+    # Make predictions
+    logger.info("Making predictions")
 
-        # ---------------------------------------------------------------------------
-        # Write predictions to data-platform
-        logger.info("Writing to data platform")
+    first_model_name = next(iter(forecasters.keys()))
+    for model_name, forecaster in forecasters.items():
+        batch = forecaster.make_batch()
 
-        gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=dp_client)
+        # Do basic validation of the batch: Will raise error if the batch fails the checks
+        check_batch(batch)
 
-        tasks = [
-            forecaster.save_forecast_to_dataplatform(
-                locations_gsp_uuid_map=gsp_uuid_map,
-                client=dp_client,
-            )
-            for forecaster in forecasters.values()
-        ]
-        await asyncio.gather(*tasks)
+        if (s3_batch_save_dir is not None) and model_name == first_model_name:
+            # Save the batch under the name of the first model
+            save_batch_to_s3(batch, model_name, s3_batch_save_dir)
 
-        logger.info("Finished forecast")
+        forecaster.predict(batch)
+
+    # Delete the downloaded data
+    for downloader in data_downloaders:
+        downloader.clean_up()
+
+    # ---------------------------------------------------------------------------
+    # Run validation checks on the forecast values
+    logger.info("Validating forecasts")
+    for model_name in list(forecasters.keys()):
+        national_forecast = (
+            forecasters[model_name].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
+        ).to_series()
+
+        forecast_okay = validate_forecast(
+            national_forecast=national_forecast,
+            national_capacity=national_capacity,
+            zip_zag_warning_threshold=zig_zag_warning_threshold,
+            zig_zag_error_threshold=zig_zag_error_threshold,
+            sun_elevation_lower_limit=sun_elevation_lower_limit,
+            model_name=model_name,
+        )
+
+        if not forecast_okay:
+            logger.warning(f"Forecast for model {model_name} failed validation")
+            if filter_bad_forecasts:
+                # This forecast will not be saved
+                del forecasters[model_name]
+
+    if len(forecasters) == 0:
+        raise Exception("No models passed the forecast validation checks")
+
+    # ---------------------------------------------------------------------------
+    # Escape clause for making predictions locally
+    if not write_predictions:
+        return next(iter(forecasters.values())).da_abs_all
+
+    # ---------------------------------------------------------------------------
+    # Write predictions to data-platform
+    logger.info("Writing to data platform")
+
+    dp_channel = Channel(data_platform_host, data_platform_port)
+    dp_client = dp.DataPlatformDataServiceStub(dp_channel)
+    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=dp_client)
+
+    tasks = [
+        forecaster.save_forecast_to_dataplatform(
+            locations_gsp_uuid_map=gsp_uuid_map,
+            client=dp_client,
+        )
+        for forecaster in forecasters.values()
+    ]
+    await asyncio.gather(*tasks)
+    dp_channel.close()
+
+    logger.info("Finished forecast")
 
     if raise_model_failure in ["any", "critical"]:
         check_model_runs_finished(
@@ -345,11 +343,9 @@ async def run(
             raise_if_missing=raise_model_failure,
         )
 
-
 def main() -> None:
     """Main entrypoint to the inference app."""
     asyncio.run(run())
-
 
 if __name__ == "__main__":
     main()
