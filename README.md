@@ -80,12 +80,12 @@ export ENVIRONMENT="production"
 <!-- START model-config-table -->
 | Model Name | Uses satellite | Uses UKV | Uses ECMWF | Uses cloudcasting | PVNet Hugging Face Link | PVNet Summation Hugging Face Link |
 | ----|----|----|----|----|----|---- |
-| pvnet_intra_allbells30 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/1ff82a88e890441e4497a59b7d5e6d6836769ff7) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/71acc4c990cf0d0cd9f01dbd1375ec4fa7e1e750) |
-| pvnet_intra_allbells0 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/cc486ad6af6628a5d7c604c5730be748b243bc15) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/474a138e4d8b188e07ef0d34520c896281132bf0) |
+| pvnet_intra_allbells30 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/29071edc6f6ffdba4ce006f95c5291ef73f0258e) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/d756a68fcbafdea4b56226bd3c009d6e327856b9) |
+| pvnet_intra_allbells0 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/87957a7b582c6530ea8f7a81dabfde0206231d54) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/c78e796211f33e6f2561dced07d1de4845fb0bac) |
 | pvnet_da_ecmwf | - | - | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/8cd379ad7769aecd532017976e9658d3fea76e02) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/62d13dbe1458003995f671656e4db5c7b36dc912) |
 | pvnet_intra_sat30 | yes | - | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/5fdc7ec353668d4758455430eea8e10d4c638f1e) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/eb779e7aaa9e0fb5813889a8f9a02d6c518b432a) |
-| pvnet_da_ukv | - | yes | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/4831fc755042b7b311a72b206d62032bfd606c9f) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/aff32fb46f8ecbaf6d5b2664c444a27f6bb160f4) |
-| pvnet_da_2nwp | - | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/03924afeef8c83fb8daf45d555f51f7647c91e6d) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/0b597e230753c7f0e24fb8906cce23b500f96627) |
+| pvnet_da_ukv | - | yes | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/e76e0ee7b823ec544985b91fb0902fdb54469125) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/48ec9568d1f5e1e83618c84a8f53384bbc2c5b74) |
+| pvnet_da_2nwp | - | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/4b519e4bcfc6e784f390131ee310874be90c17c4) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/ad347ddcbce7e8b21d67dea0f93160ab49d4fa50) |
 
 <!-- END model-config-table -->
 
