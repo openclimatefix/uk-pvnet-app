@@ -48,6 +48,14 @@ async def check_number_of_forecasts(client, model_configs, test_t0):
     list_response = await client.list_forecasters(dp.ListForecastersRequest())
     forecasters_by_name = {f.forecaster_name: f for f in list_response.forecasters}
 
+    forecasts_response = await client.get_latest_forecasts(
+        dp.GetLatestForecastsRequest(
+            energy_source=dp.EnergySource.SOLAR,
+            location_uuid=national_uuid,
+        ),
+    )
+    forecast_model_names = {f.forecaster.forecaster_name for f in forecasts_response.forecasts}
+
     for model_config in model_configs:
         model_name = model_config.name.replace("-", "_")
         model_adjust = f"{model_name}_adjust"
@@ -55,15 +63,6 @@ async def check_number_of_forecasts(client, model_configs, test_t0):
 
         assert model_name in forecasters_by_name
         assert model_adjust in forecasters_by_name
-
-        forecasts_response = await client.get_latest_forecasts(
-            dp.GetLatestForecastsRequest(
-                energy_source=dp.EnergySource.SOLAR,
-                pivot_timestamp_utc=test_t0.to_pydatetime().replace(tzinfo=datetime.UTC),
-                location_uuid=national_uuid,
-            ),
-        )
-        forecast_model_names = {f.forecaster.forecaster_name for f in forecasts_response.forecasts}
         assert model_name in forecast_model_names
 
         forecast_at_first_timestamp = await client.get_forecast_at_timestamp(
