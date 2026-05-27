@@ -158,7 +158,6 @@ async def test_save_to_generation_to_data_platform(
     # check: There is a forecast object for gsp_id 1
     get_latest_forecasts_request = dp.GetLatestForecastsRequest(
         energy_source=dp.EnergySource.SOLAR,
-        pivot_timestamp_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
         location_uuid=location_uuid_1,
     )
     get_latest_forecasts_response = await client.get_latest_forecasts(
@@ -171,7 +170,6 @@ async def test_save_to_generation_to_data_platform(
     # check: There is a forecast object for gsp_id 0
     get_latest_forecasts_request = dp.GetLatestForecastsRequest(
         energy_source=dp.EnergySource.SOLAR,
-        pivot_timestamp_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
         location_uuid=location_uuid_0,
     )
     get_latest_forecasts_response = await client.get_latest_forecasts(
@@ -184,37 +182,32 @@ async def test_save_to_generation_to_data_platform(
     forecast_adjuster = get_latest_forecasts_response.forecasts[1]
     assert forecast_adjuster.forecaster.forecaster_name == "test_model_adjust"
 
+    time_window = dp.TimeWindow(
+        start_timestamp_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
+        end_timestamp_utc=datetime.datetime(2025, 1, 2, tzinfo=datetime.UTC),
+    )
+
     # check: the number of forecast values for non-adjusted forecast
-    stream_forecast_data_request = dp.StreamForecastDataRequest(
-        energy_source=dp.EnergySource.SOLAR,
-        location_uuid=location_uuid_0,
-        forecasters=forecast.forecaster,
-        time_window=dp.TimeWindow(
-            start_timestamp_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
-            end_timestamp_utc=datetime.datetime(2025, 1, 2, tzinfo=datetime.UTC),
+    forecast_response = await client.get_forecast_as_timeseries(
+        dp.GetForecastAsTimeseriesRequest(
+            energy_source=dp.EnergySource.SOLAR,
+            location_uuid=location_uuid_0,
+            forecaster=forecast.forecaster,
+            time_window=time_window,
         ),
     )
-    stream_forecast_data_response = client.stream_forecast_data(
-        stream_forecast_data_request,
-    )
-    count = 0
-    async for d in stream_forecast_data_response:
-        assert d.p50_fraction == 0.5
-        count += 1
-    assert count == 24
+    for value in forecast_response.values:
+        assert value.p50_value_fraction == 0.5
+    assert len(forecast_response.values) == 24
 
     # 7. check: the number of forecast values, for adjuster forecast
-    stream_forecast_data_request = dp.StreamForecastDataRequest(
-        energy_source=dp.EnergySource.SOLAR,
-        location_uuid=location_uuid_0,
-        forecasters=forecast_adjuster.forecaster,
-        time_window=dp.TimeWindow(
-            start_timestamp_utc=datetime.datetime(2025, 1, 1, tzinfo=datetime.UTC),
-            end_timestamp_utc=datetime.datetime(2025, 1, 2, tzinfo=datetime.UTC),
+    forecast_response = await client.get_forecast_as_timeseries(
+        dp.GetForecastAsTimeseriesRequest(
+            energy_source=dp.EnergySource.SOLAR,
+            location_uuid=location_uuid_0,
+            forecaster=forecast_adjuster.forecaster,
+            time_window=time_window,
         ),
-    )
-    stream_forecast_data_response = client.stream_forecast_data(
-        stream_forecast_data_request,
     )
     # 8. check the adjusted forecast p50 values
     # The previous days forecast was 0.5 and
@@ -222,29 +215,27 @@ async def test_save_to_generation_to_data_platform(
     # the deltas are 0, -0.01, -0.02, ...
     # limited to 10% of 0.5 = 0.05, so we should be limited to 0.5 +/- 0.05
     # Also there are checks for p10 and p90
-    count = 0
-    async for d in stream_forecast_data_response:
+    for count, value in enumerate(forecast_response.values):
         # p50
         new_value = 0.5 + 0.01 * count
         if new_value > 0.55:
             new_value = 0.55
 
-        assert np.isclose(d.p50_fraction, new_value, atol=1e-4)
+        assert np.isclose(value.p50_value_fraction, new_value, atol=1e-4)
 
         # p10
         new_value_p10 = 0.3 + 0.01 * count
         if new_value_p10 > 0.35:
             new_value_p10 = 0.35
-        assert np.isclose(d.other_statistics_fractions["p10"], new_value_p10)
+        assert np.isclose(value.other_statistics_fractions["p10"], new_value_p10)
 
         # p90
         new_value_p90 = 0.7 + 0.01 * count
         if new_value_p90 > 0.75:
             new_value_p90 = 0.75
-        assert np.isclose(d.other_statistics_fractions["p90"], new_value_p90)
+        assert np.isclose(value.other_statistics_fractions["p90"], new_value_p90)
 
-        count += 1
-    assert count == 24
+    assert len(forecast_response.values) == 24
 
 
 @pytest.mark.parametrize(
