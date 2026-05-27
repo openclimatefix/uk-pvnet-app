@@ -18,13 +18,13 @@ models:
   # ------------------------------------------------------
   
   # Currently this model uses a 30 minute satellite delay
-  - name: pvnet_intra_allbells30 # This name is important as it used for blending
+  - name: pvnet_intra_allbells30
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
-        commit: 1ff82a88e890441e4497a59b7d5e6d6836769ff7
+        commit: 29071edc6f6ffdba4ce006f95c5291ef73f0258e
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
-        commit: 71acc4c990cf0d0cd9f01dbd1375ec4fa7e1e750
+        commit: d756a68fcbafdea4b56226bd3c009d6e327856b9
     is_critical: True
     is_day_ahead: False
     use_adjuster: True
@@ -37,10 +37,10 @@ models:
   - name: pvnet_intra_allbells0
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
-        commit: cc486ad6af6628a5d7c604c5730be748b243bc15
+        commit: 87957a7b582c6530ea8f7a81dabfde0206231d54
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
-        commit: 474a138e4d8b188e07ef0d34520c896281132bf0
+        commit: c78e796211f33e6f2561dced07d1de4845fb0bac
     is_critical: False
     is_day_ahead: False
     use_adjuster: False
@@ -85,10 +85,10 @@ models:
   - name: pvnet_da_ukv
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
-        commit: 4831fc755042b7b311a72b206d62032bfd606c9f
+        commit: e76e0ee7b823ec544985b91fb0902fdb54469125
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
-        commit: aff32fb46f8ecbaf6d5b2664c444a27f6bb160f4
+        commit: 48ec9568d1f5e1e83618c84a8f53384bbc2c5b74
     is_critical: True
     is_day_ahead: True
     use_adjuster: False
@@ -101,10 +101,10 @@ models:
   - name: pvnet_da_2nwp
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
-        commit: 03924afeef8c83fb8daf45d555f51f7647c91e6d
+        commit: 4b519e4bcfc6e784f390131ee310874be90c17c4
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
-        commit: 0b597e230753c7f0e24fb8906cce23b500f96627
+        commit: ad347ddcbce7e8b21d67dea0f93160ab49d4fa50
     is_critical: True
     is_day_ahead: True
     use_adjuster: True
