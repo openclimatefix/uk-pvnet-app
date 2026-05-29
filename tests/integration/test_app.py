@@ -1,73 +1,91 @@
+import datetime
 import os
 import tempfile
 
 import pytest
 import zarr
-from nowcasting_datamodel.models.forecast import (
-    ForecastSQL,
-    ForecastValueLatestSQL,
-    ForecastValueSevenDaysSQL,
-    ForecastValueSQL,
-)
+from ocf import dp
 
 from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
+from pvnet_app.save import fetch_dp_gsp_uuid_map
 
 NUM_GSPS = 331
 
 
-def check_number_of_forecasts(model_configs, db_session):
-    """Check the app has added the expected number of forecast values to the database"""
+async def check_number_of_forecasts(client, model_configs, test_t0):
+    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
+    national_uuid = gsp_uuid_map[0]
+    location_uuids = list(gsp_uuid_map.values())
+    init_time_utc = test_t0.to_pydatetime().replace(tzinfo=datetime.UTC)
+    first_target_time_utc = init_time_utc + datetime.timedelta(minutes=30)
 
-    # Check correct number of forecasts have been made
-    # (Number of GSPs + 1 National + maybe GSP-sum) forecasts
-    # Forecast made with multiple models
-    expected_num_forecasts = 0
-    expected_num_forecast_values = 0
+    list_response = await client.list_forecasters(dp.ListForecastersRequest())
+    forecasters_by_name = {f.forecaster_name: f for f in list_response.forecasters}
+
     for model_config in model_configs:
-        # The number of forecasts
-        num_forecasts = NUM_GSPS + 1 + model_config.save_gsp_sum
-        expected_num_forecasts += num_forecasts
-        # The number of forecast values - 16 for intraday, 36 for day-ahead)
-        expected_num_forecast_values += num_forecasts * (72 if model_config.is_day_ahead else 16)
+        model_name = model_config.name.replace("-", "_")
+        model_adjust = f"{model_name}_adjust"
+        expected_num_horizons = 72 if model_config.is_day_ahead else 16
+        end_timestamp_utc = init_time_utc + datetime.timedelta(
+            minutes=30 * (expected_num_horizons + 1),
+        )
 
-    forecasts = db_session.query(ForecastSQL).all()
-    # Doubled for historic and forecast
-    assert len(forecasts) == expected_num_forecasts * 2
+        assert model_name in forecasters_by_name
+        assert model_adjust in forecasters_by_name
 
-    # Check probabilistic added
-    assert "90" in forecasts[0].forecast_values[0].properties
-    assert "10" in forecasts[0].forecast_values[0].properties
+        forecast_at_first_timestamp = await client.get_forecast_at_timestamp(
+            dp.GetForecastAtTimestampRequest(
+                energy_source=dp.EnergySource.SOLAR,
+                timestamp_utc=first_target_time_utc,
+                location_uuids=location_uuids,
+                forecaster=forecasters_by_name[model_name],
+            ),
+        )
+        assert len(forecast_at_first_timestamp.values) == NUM_GSPS + 1
 
-    assert len(db_session.query(ForecastValueSQL).all()) == expected_num_forecast_values
-    assert len(db_session.query(ForecastValueLatestSQL).all()) == expected_num_forecast_values
+        for forecaster_name in [model_name, model_adjust]:
+            forecast_response = await client.get_forecast_as_timeseries(
+                dp.GetForecastAsTimeseriesRequest(
+                    energy_source=dp.EnergySource.SOLAR,
+                    location_uuid=national_uuid,
+                    forecaster=forecasters_by_name[forecaster_name],
+                    time_window=dp.TimeWindow(
+                        start_timestamp_utc=init_time_utc,
+                        end_timestamp_utc=end_timestamp_utc,
+                    ),
+                    initialization_timestamp_utc=init_time_utc,
+                ),
+            )
 
-    expected_num_forecast_values = 0
-    for model_config in model_configs:
-        num_forecasts = 1 + NUM_GSPS * model_config.save_gsp_to_recent + model_config.save_gsp_sum
-        expected_num_forecast_values += num_forecasts * (72 if model_config.is_day_ahead else 16)
+            forecast_values = {
+                int((value.target_timestamp_utc - init_time_utc).total_seconds() // 60): value
+                for value in forecast_response.values
+            }
 
-    assert len(db_session.query(ForecastValueSevenDaysSQL).all()) == expected_num_forecast_values
+            assert sorted(forecast_values) == [
+                30 * horizon for horizon in range(1, expected_num_horizons + 1)
+            ]
+
+            for value in forecast_values.values():
+                assert "p10" in value.other_statistics_fractions
+                assert "p90" in value.other_statistics_fractions
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app(
-    dp_client,  # noqa: ARG001
+    client,
     setup_dp_locations,  # noqa: ARG001
     test_t0,
-    db_session,
     nwp_ukv_data,
     nwp_ecmwf_data,
     sat_5_data_zero_delay,
     cloudcasting_data,
-    db_url,
 ):
     """Test the app running the intraday models"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.chdir(tmpdirname)
-
-        os.environ["DB_URL"] = db_url
 
         # The app loads sat and NWP data from environment variable
         # Save out data, and set paths as environmental variables
@@ -89,31 +107,27 @@ async def test_app(
         os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
         os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
-        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
+        os.environ["FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         # Run prediction
         await run(t0=test_t0)
 
     model_configs = get_all_models(get_critical_only=False)
-    check_number_of_forecasts(model_configs, db_session)
+    await check_number_of_forecasts(client, model_configs, test_t0)
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app_no_sat(
-    dp_client,  # noqa: ARG001
+    client,
     setup_dp_locations,  # noqa: ARG001
     test_t0,
-    db_session,
     nwp_ukv_data,
     nwp_ecmwf_data,
-    db_url,
 ):
     """Test the app for the case when no satellite data is available"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.chdir(tmpdirname)
-
-        os.environ["DB_URL"] = db_url
 
         os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
         nwp_ukv_data.to_zarr(temp_nwp_path)
@@ -127,13 +141,12 @@ async def test_app_no_sat(
         os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
         os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
-        os.environ["FORECAST_VALIDATION_SUN_ELEVATION_LOWER_LIMIT"] = "90"
+        os.environ["FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
         await run(t0=test_t0)
 
     # Only the models which don't use satellite will be run in this case
-    # The models below are the only ones which should have been run
     model_configs = get_all_models()
     model_configs = [model for model in model_configs if not model.uses_satellite_data]
 
-    check_number_of_forecasts(model_configs, db_session)
+    await check_number_of_forecasts(client, model_configs, test_t0)

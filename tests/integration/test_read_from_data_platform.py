@@ -19,8 +19,9 @@ async def test_read_gsp_and_national_capacities_from_dp(
     """
     Test reading GSP and national capacities from the Data Platform.
 
-    The setup_dp_locations fixture creates 1 NATION location (gsp_id=0) and
-    342 GSP locations (gsp_id=1..342), each with effective_capacity_watts=1_000_000 (1 MW).
+    The setup_dp_locations fixture creates 1 NATION location (gsp_id=0) with
+    effective_capacity_watts=15_000_000_000 (15 GW) and 342 GSP locations
+    (gsp_id=1..342), each with effective_capacity_watts=1_000_000 (1 MW).
 
     In this test we
     1. request capacities for a subset of GSP ids that were created in setup
@@ -34,8 +35,8 @@ async def test_read_gsp_and_national_capacities_from_dp(
         gsp_ids=gsp_ids,
     )
 
-    # 2. national capacity comes from the NATION location for gsp_id=0 (1 MW)
-    assert national_capacity == 1.0
+    # 2. national capacity comes from the NATION location for gsp_id=0 (15 GW)
+    assert national_capacity == 15_000.0
 
     # 3. GSP capacities are a Series indexed by gsp_id, in the order requested
     assert isinstance(gsp_capacities, pd.Series)
@@ -75,7 +76,7 @@ async def test_read_gsp_and_national_capacities_from_dp_with_custom_capacity(
         gsp_ids=[custom_gsp_id],
     )
 
-    assert national_capacity == 1.0
+    assert national_capacity == 15_000.0
     assert gsp_capacities.loc[custom_gsp_id] == custom_capacity_watts / 1_000_000.0
 
 
