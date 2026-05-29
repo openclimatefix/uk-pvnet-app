@@ -38,6 +38,7 @@ def regrid_nwp_data(
     target_coords_path: str,
     method: str,
     nwp_source: str,
+    split_by_step: bool,
 ) -> xr.Dataset:
     """This function regrids the input NWP data to the grid of the target path.
 
@@ -46,6 +47,7 @@ def regrid_nwp_data(
         target_coords_path: The path to the target grid
         method: The regridding method to use
         nwp_source: The source of the NWP data (only used for logging messages)
+        split_by_step: Whether to split by step before regridding
     """
     # These are the coords we are aiming for
     ds_target_coords = xr.load_dataset(target_coords_path)
@@ -65,13 +67,18 @@ def regrid_nwp_data(
     regridder = xe.Regridder(ds, ds_target_coords, method=method)
 
     # Regrid in a loop to keep RAM usage lower
-    ds_list = []
-    for step in ds.step:
-        # Copy to make sure the data is C-contiguous for efficient regridding
-        ds_step = ds.sel(step=step).copy(deep=True)
-        ds_list.append(regridder(ds_step))
+    if split_by_step:
+        ds_list = []
+        for step in ds.step:
+            # Copy to make sure the data is C-contiguous for efficient regridding
+            ds_step = ds.sel(step=step).copy(deep=True)
+            ds_list.append(regridder(ds_step))
 
-    return xr.concat(ds_list, dim="step")
+        return xr.concat(ds_list, dim="step")
+
+    else:
+        return regridder(ds)
+
 
 
 def check_model_nwp_inputs_available(
@@ -306,7 +313,7 @@ class UKVDownloader(NWPDownloader):
     }
 
     @staticmethod
-    def regrid(ds: xr.Dataset) -> xr.Dataset:
+    def regrid(ds: xr.Dataset, split_by_step: bool = True) -> xr.Dataset:
         """Regrid the UKV data to the target grid.
 
         In production the UKV data is on a different grid structure to the training data. The
@@ -318,6 +325,7 @@ class UKVDownloader(NWPDownloader):
             target_coords_path=files("pvnet_app.data").joinpath("nwp_ukv_target_coords.nc"),
             method="bilinear",
             nwp_source="UKV",
+            split_by_step=split_by_step,
         )
 
     @staticmethod
