@@ -432,7 +432,7 @@ class SatelliteDownloader:
 
         # If both 5- and 15-minute data exists, use the most recent
         if exists_5_minute and exists_15_minute:
-            use_5_minute = datetimes_5min.max() > datetimes_15min.max()
+            use_5_minute = datetimes_5min.max() >= datetimes_15min.max()
         else:
             # If only one exists, use that
             use_5_minute = exists_5_minute
