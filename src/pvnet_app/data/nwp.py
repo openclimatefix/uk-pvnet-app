@@ -259,8 +259,8 @@ class UKVDownloader(NWPDownloader):
     nwp_source = "ukv"
     save_chunk_dict = { # noqa: RUF012
         "step": 10,
-        "x": 100,
-        "y": 100,
+        "x_osgb": 100,
+        "y_osgb": 100,
     }
 
     @staticmethod
@@ -289,8 +289,6 @@ class UKVDownloader(NWPDownloader):
         # This is for nwp-consumer>=1.0.0
         logger.info("Adding lon-lat coords to the UKV data")
 
-        ds = ds.rename({"x_laea": "x", "y_laea": "y"})
-
         # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
         laea = pyproj.Proj(
             proj="laea",
@@ -310,16 +308,14 @@ class UKVDownloader(NWPDownloader):
         # Calculate longitude and latitude from x_laea and y_laea
         # - x is an array of shape (455,)
         # - y is an array of shape (639,)
-        # We need to change x and y to a 2D arrays of shape (455, 639)
-        x, y = ds.x.values, ds.y.values
-        x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
-        y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
+        # We need to change x and y to a 2D arrays
+        x_laea, y_laea = np.meshgrid(ds.x_laea, ds.y_laea)
 
-        lons, lats = laea_to_lon_lat(xx=x, yy=y)
+        lons, lats = laea_to_lon_lat(xx=x_laea, yy=y_laea)
 
         ds = ds.assign_coords(
-            longitude=(["y", "x"], lons),
-            latitude=(["y", "x"], lats),
+            longitude=(["y_laea", "x_laea"], lons),
+            latitude=(["y_laea", "x_laea"], lats),
         )
 
         return ds
