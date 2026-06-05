@@ -4,9 +4,7 @@ import tempfile
 from unittest.mock import patch
 
 import pytest
-import zarr
 from ocf import dp
-
 
 from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
@@ -112,7 +110,7 @@ async def test_app(
         with patch(
             "pvnet_app.data.satellite.open_satellite_data",
             side_effect=[sat_5_data_zero_delay],
-        ):  
+        ):
             # Run prediction
             await run(t0=test_t0)
 

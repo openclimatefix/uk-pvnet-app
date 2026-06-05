@@ -124,7 +124,7 @@ def test_run_nan_in_sat_data(sat_15_data, test_t0):
             )
             sat_downloader.run()
 
-        # If the satellite data is invalid the valid_times attribute should be None and the 
+        # If the satellite data is invalid the valid_times attribute should be None and the
         # satellite data should not be saved
         assert sat_downloader.valid_times is None
         assert not os.path.exists(sat_path)

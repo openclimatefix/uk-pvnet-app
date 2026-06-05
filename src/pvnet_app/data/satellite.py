@@ -2,10 +2,10 @@
 import logging
 import shutil
 
+import icechunk
 import numpy as np
 import pandas as pd
 import xarray as xr
-import icechunk
 from ocf_data_sampler.config.load import load_yaml_configuration
 from ocf_data_sampler.load.utils import make_spatial_coords_increasing
 from ocf_data_sampler.select.geospatial import convert_coordinates
@@ -19,7 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 def open_satellite_data(s3_icechunk_path: str, region: str) -> xr.Dataset:
+    """Open the satellite data from the given s3 icechunk path.
 
+    Args:
+        s3_icechunk_path: The s3 path to the icechunk containing the satellite
+        region: The s3 region where the icechunk is stored
+    """
     bucket, _, path = s3_icechunk_path.removeprefix("s3://").partition("/")
 
     store = icechunk.s3_storage(
@@ -368,7 +373,6 @@ class SatelliteDownloader:
         Returns:
             xr.Dataset: The processed satellite data
         """
-
         # Filter out unused variables
         ds = ds[["data"]]
 
@@ -418,14 +422,14 @@ class SatelliteDownloader:
         # Open 5 minute satellite data
         if self.source_path_5 is not None:
             ds_dict["5-min"] = open_satellite_data(
-                s3_icechunk_path=self.source_path_5, 
+                s3_icechunk_path=self.source_path_5,
                 region=self.s3_region,
             )
 
         if self.source_path_15 is not None:
             # Also open 15-minute satellite
             ds_dict["15-min"] = open_satellite_data(
-                s3_icechunk_path=self.source_path_15, 
+                s3_icechunk_path=self.source_path_15,
                 region=self.s3_region,
             )
 
@@ -434,7 +438,7 @@ class SatelliteDownloader:
         logger.info(f"Using {best_source} satellite data")
         ds = ds_dict[best_source]
         self.sat_choice = best_source
-        
+
         # Load only the last hour
         ds = (
             ds.sortby("time")

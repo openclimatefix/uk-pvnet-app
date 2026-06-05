@@ -311,7 +311,7 @@ async def run(
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
-        return next(iter(forecasters.values())).da_abs_all
+        return forecasters
 
     # ---------------------------------------------------------------------------
     # Write predictions to data-platform
