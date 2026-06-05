@@ -18,14 +18,9 @@ The following environment variables are used in the app:
 - `NWP_UKV_ZARR_PATH`: The path to the UKV NWP data in Zarr format.
 - `NWP_ECMWF_ZARR_PATH`: The path to the ECMWF NWP data in Zarr format.
 - `CLOUDCASTING_ZARR_PATH`: The path to the cloudcasting forecast data in Zarr format.
-- `SATELLITE_ZARR_PATH`: The path to the satellite data in Zarr format.
-
-### Optional Environment Variables
-
-#### These control the data sources
-
-- `SATELLITE_15_ZARR_PATH`: The path to the 15 minute satellite data in Zarr format. If 
-this is not set then the `SATELLITE_ZARR_PATH` is used by `.zarr` is repalced with `_15.zarr`
+- `SATELLITE_ICECHUNK_PATH_5`: The path to the satellite data icechunk.
+- `SATELLITE_ICECHUNK_PATH_15`: The path to the satellite data icechunk.
+- `SATELLITE_S3_REGION`: The s3 region for the satellite icechunk.
 
 #### These control the data platform connection
 
@@ -59,21 +54,6 @@ Forecasts and GSP capacities are read from and written to the data platform.
   will raise an exception if any model fails. If set to "critical" it will raise an exception if any
   critical model fails. If not set, it will not raise an exception.
 
-### Examples
-
-Here are some examples of how to set these environment variables:
-
-```sh
-export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
-export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
-export CLOUDCASTING_ZARR_PATH="s3://bucket/path/to/cloudcasting.zarr"
-export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
-export ALLOW_ADJUSTER="true"
-export ALLOW_SAVE_GSP_SUM="false"
-export RUN_CRITICAL_MODELS_ONLY="true"
-export SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
-export ENVIRONMENT="production"
-```
 
 ## ML Models Used for PVNet
 
