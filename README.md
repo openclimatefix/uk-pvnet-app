@@ -18,14 +18,9 @@ The following environment variables are used in the app:
 - `NWP_UKV_ZARR_PATH`: The path to the UKV NWP data in Zarr format.
 - `NWP_ECMWF_ZARR_PATH`: The path to the ECMWF NWP data in Zarr format.
 - `CLOUDCASTING_ZARR_PATH`: The path to the cloudcasting forecast data in Zarr format.
-- `SATELLITE_ZARR_PATH`: The path to the satellite data in Zarr format.
-
-### Optional Environment Variables
-
-#### These control the data sources
-
-- `SATELLITE_15_ZARR_PATH`: The path to the 15 minute satellite data in Zarr format. If 
-this is not set then the `SATELLITE_ZARR_PATH` is used by `.zarr` is repalced with `_15.zarr`
+- `SATELLITE_ICECHUNK_PATH_5`: The path to the satellite data icechunk.
+- `SATELLITE_ICECHUNK_PATH_15`: The path to the satellite data icechunk.
+- `SATELLITE_S3_REGION`: The s3 region for the satellite icechunk.
 
 #### These control the data platform connection
 
@@ -59,34 +54,18 @@ Forecasts and GSP capacities are read from and written to the data platform.
   will raise an exception if any model fails. If set to "critical" it will raise an exception if any
   critical model fails. If not set, it will not raise an exception.
 
-### Examples
-
-Here are some examples of how to set these environment variables:
-
-```sh
-export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
-export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
-export CLOUDCASTING_ZARR_PATH="s3://bucket/path/to/cloudcasting.zarr"
-export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
-export ALLOW_ADJUSTER="true"
-export ALLOW_SAVE_GSP_SUM="false"
-export RUN_CRITICAL_MODELS_ONLY="true"
-export SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
-export ENVIRONMENT="production"
-```
 
 ## ML Models Used for PVNet
 
 <!-- START model-config-table -->
 | Model Name | Uses satellite | Uses UKV | Uses ECMWF | Uses cloudcasting | PVNet Hugging Face Link | PVNet Summation Hugging Face Link |
 | ----|----|----|----|----|----|---- |
-| pvnet_v2 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/cfcb233576c3c8110daed0179452e3d9913c744c) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/e43006c1359c5ea4df03fe4f6ce3d0da8a4c68f0) |
-| pvnet_cloud | - | yes | yes | yes | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/117bd0f1b9454f6995d3d2fa00ef125c9c9a7190) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/da7cd536bd3cdd9c9bae2d4974484dc68599143d) |
-| pvnet_v2_sat0 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/bcd70352e2d77a69e1aec7670749c2c675a5a14e) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/89082d95fd569e4d976f0eaba1d0d26142e2903c) |
-| pvnet_ecmwf | - | - | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/6b7cc5fec03b83837672a759d7e00f249685de6b) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/0c26b19ab90001ee51f9886227be8286e84a393c) |
-| pvnet-sat-only | yes | - | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/86140b77d015fce1d5fa1a518d340127e488fcfd) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/0f6336d5a4258b3b43b45ea554521bee69df4622) |
-| pvnet-ukv-only | - | yes | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/30c406ea8455d9d43aa1284cba23c3a59102f549) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/e6d6af7cae45c16e76e02e959772fba981182897) |
-| pvnet_day_ahead | - | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region_day_ahead/tree/ace3469f6fb6db7356afe401c1aaf1a78505f4f7) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_summation_uk_national_day_ahead/tree/fba62ff05d1465076d2cfb4a40f18d9896e7a457) |
+| pvnet_intra_allbells30 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/29071edc6f6ffdba4ce006f95c5291ef73f0258e) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/d756a68fcbafdea4b56226bd3c009d6e327856b9) |
+| pvnet_intra_allbells0 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/87957a7b582c6530ea8f7a81dabfde0206231d54) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/c78e796211f33e6f2561dced07d1de4845fb0bac) |
+| pvnet_da_ecmwf | - | - | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/8cd379ad7769aecd532017976e9658d3fea76e02) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/62d13dbe1458003995f671656e4db5c7b36dc912) |
+| pvnet_intra_sat30 | yes | - | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/5fdc7ec353668d4758455430eea8e10d4c638f1e) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/eb779e7aaa9e0fb5813889a8f9a02d6c518b432a) |
+| pvnet_da_ukv | - | yes | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/e76e0ee7b823ec544985b91fb0902fdb54469125) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/48ec9568d1f5e1e83618c84a8f53384bbc2c5b74) |
+| pvnet_da_2nwp | - | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/4b519e4bcfc6e784f390131ee310874be90c17c4) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/ad347ddcbce7e8b21d67dea0f93160ab49d4fa50) |
 
 <!-- END model-config-table -->
 

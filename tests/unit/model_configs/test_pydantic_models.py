@@ -4,8 +4,8 @@ from pvnet_app.model_configs.pydantic_models import get_all_models
 def test_get_all_models():
     """Test for getting all models"""
     models = get_all_models()
-    assert len(models) == 9
-    assert models[0].name == "pvnet_v2"
+    assert len(models) == 6
+    assert models[0].name == "pvnet_intra_allbells30"
 
 
 def test_get_all_models_get_critical_only():
