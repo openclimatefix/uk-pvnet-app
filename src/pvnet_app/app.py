@@ -17,7 +17,7 @@ from pvnet_app.consts import generation_path
 from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
-from pvnet_app.data.satellite import SatelliteDownloader, get_satellite_source_paths
+from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_configs.pydantic_models import get_all_models
 from pvnet_app.save import fetch_dp_gsp_uuid_map
@@ -73,7 +73,8 @@ async def run(
         - NWP_UKV_ZARR_PATH
         - NWP_ECMWF_ZARR_PATH
         - CLOUDCASTING_ZARR_PATH
-        - SATELLITE_ZARR_PATH
+        - SATELLITE_ICECHUNK_PATH_5
+        - SATELLITE_ICECHUNK_PATH_15
     The following are optional:
         - SENTRY_DSN, optional link to sentry
         - ENVIRONMENT, the environment this is running in, defaults to local
@@ -126,7 +127,9 @@ async def run(
     ecmwf_source_path = os.getenv("NWP_ECMWF_ZARR_PATH", None)
     ukv_source_path = os.getenv("NWP_UKV_ZARR_PATH", None)
     cloudcasting_source_path = os.getenv("CLOUDCASTING_ZARR_PATH", None)
-    sat_source_path_5, sat_source_path_15 = get_satellite_source_paths()
+    sat_source_path_5 = os.getenv("SATELLITE_ICECHUNK_PATH_5", None)
+    sat_source_path_15 = os.getenv("SATELLITE_ICECHUNK_PATH_15", None)
+    sat_s3_region = os.getenv("SATELLITE_S3_REGION", None)
 
     # --- Log version and variables
     pvnet_version = version("pvnet")
@@ -187,6 +190,7 @@ async def run(
             t0=t0,
             source_path_5=sat_source_path_5,
             source_path_15=sat_source_path_15,
+            s3_region=sat_s3_region,
         )
         sat_downloader.run()
 
@@ -307,7 +311,7 @@ async def run(
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
-        return next(iter(forecasters.values())).da_abs_all
+        return forecasters
 
     # ---------------------------------------------------------------------------
     # Write predictions to data-platform

@@ -1,9 +1,9 @@
 import datetime
 import os
 import tempfile
+from unittest.mock import patch
 
 import pytest
-import zarr
 from ocf import dp
 
 from pvnet_app.app import run
@@ -98,10 +98,8 @@ async def test_app(
         os.environ["CLOUDCASTING_ZARR_PATH"] = temp_nwp_path = "temp_cloudcasting.zarr"
         cloudcasting_data.to_zarr(temp_nwp_path)
 
-        # In production sat zarr is zipped
-        os.environ["SATELLITE_ZARR_PATH"] = temp_sat_path = "temp_sat.zarr.zip"
-        with zarr.storage.ZipStore(temp_sat_path, mode="x") as store:
-            sat_5_data_zero_delay.to_zarr(store)
+        # Satellite data will be mocked
+        os.environ["SATELLITE_ICECHUNK_PATH_5"] = "s3://fake/sat5"
 
         # Set environmental variables
         os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
@@ -109,8 +107,12 @@ async def test_app(
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
-        # Run prediction
-        await run(t0=test_t0)
+        with patch(
+            "pvnet_app.data.satellite.open_satellite_data",
+            side_effect=[sat_5_data_zero_delay, None],
+        ):
+            # Run prediction
+            await run(t0=test_t0)
 
     model_configs = get_all_models(get_critical_only=False)
     await check_number_of_forecasts(client, model_configs, test_t0)
@@ -135,15 +137,16 @@ async def test_app_no_sat(
         os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
         nwp_ecmwf_data.to_zarr(temp_nwp_path)
 
-        # There is no satellite data available at the environ path
-        os.environ["SATELLITE_ZARR_PATH"] = "nonexistent_sat.zarr.zip"
+        # Satellite data will be mocked as unavailable
+        os.environ["SATELLITE_ICECHUNK_PATH_5"] = "s3://fake/sat5"
 
         os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
         os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
-        await run(t0=test_t0)
+        with patch("pvnet_app.data.satellite.open_satellite_data", return_value=None):
+            await run(t0=test_t0)
 
     # Only the models which don't use satellite will be run in this case
     model_configs = get_all_models()

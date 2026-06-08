@@ -1,13 +1,11 @@
 """Functions to download and process satellite data."""
 import logging
-import os
 import shutil
 
-import fsspec
+import icechunk
 import numpy as np
 import pandas as pd
 import xarray as xr
-import zarr
 from ocf_data_sampler.config.load import load_yaml_configuration
 from ocf_data_sampler.load.utils import make_spatial_coords_increasing
 from ocf_data_sampler.select.geospatial import convert_coordinates
@@ -20,20 +18,31 @@ from pvnet_app.data.gsp import get_gsp_locations
 logger = logging.getLogger(__name__)
 
 
-def get_satellite_timestamps(zarr_path: str) -> pd.DatetimeIndex:
-    """Get the datetimes of the satellite data at the given path.
+def open_satellite_data(s3_icechunk_path: str, region: str) -> xr.Dataset | None:
+    """Open the satellite data from the given s3 icechunk path.
 
     Args:
-        zarr_path: The path to the satellite zarr
-
-    Returns:
-        pd.DatetimeIndex: All available timestamps
+        s3_icechunk_path: The s3 path to the icechunk containing the satellite
+        region: The s3 region where the icechunk is stored
     """
-    logger.info(f"Getting satellite timestamps from {zarr_path}")
-    with zarr.storage.ZipStore(zarr_path, mode="r") as store:
-        ds = xr.open_zarr(store)
+    bucket, _, path = s3_icechunk_path.removeprefix("s3://").partition("/")
 
-    return pd.to_datetime(ds.time.values)
+    store = icechunk.s3_storage(
+        bucket=bucket,
+        prefix=path,
+        from_env=True,
+        region=region,
+    )
+
+    try:
+        repo = icechunk.Repository.open(store)
+        session = repo.readonly_session("main")
+        ds = xr.open_zarr(session.store)
+    except icechunk.IcechunkError as e:
+        logger.error(f"Error opening icechunk repository: {e}")
+        ds = None
+
+    return ds
 
 
 def fill_1d_bool_gaps(x: np.array, max_gap: int) -> np.array:
@@ -287,7 +296,6 @@ def get_pvnet_satellite_spatial_bounds(
     return ds
 
 
-
 def contains_too_many_of_value(
     ds: xr.Dataset,
     value: float,
@@ -325,8 +333,6 @@ def contains_too_many_of_value(
 
 class SatelliteDownloader:
     """Class to download and process satellite data."""
-    destination_path_5: str = "sat_5_min.zarr.zip"
-    destination_path_15: str = "sat_15_min.zarr.zip"
     destination_path: str = sat_path
 
     def __init__(
@@ -334,91 +340,17 @@ class SatelliteDownloader:
         t0: pd.Timestamp,
         source_path_5: str | None,
         source_path_15: str | None,
+        s3_region: str,
     ) -> None:
         """Class to download and process satellite data."""
         self.t0 = t0
         self.source_path_5 = source_path_5
         self.source_path_15 = source_path_15
+        self.s3_region = s3_region
+        self.time_window = pd.Timedelta("1h")
         self.valid_times = None
+        self.sat_choice = None
 
-    def download_data(self) -> bool:
-        """Download the sat data if available and return whether it was successful.
-
-        Returns:
-            bool: Whether satellite data was available to download
-        """
-        # Set variable to track whether the satellite download is successful
-        data_available = False
-
-        # Download 5 minute satellite data if it exists
-        if self.source_path_5 is not None:
-            fs = fsspec.open(self.source_path_5).fs
-            if fs.exists(self.source_path_5):
-                logger.info("Downloading 5-minute satellite data")
-                fs.get(self.source_path_5, self.destination_path_5)
-                data_available = True
-            else:
-                logger.info("No 5-minute data available")
-
-        # Also download 15-minute satellite if it exists
-        if self.source_path_15 is not None:
-            fs = fsspec.open(self.source_path_15).fs
-            if fs.exists(self.source_path_15):
-                logger.info("Downloading 15-minute satellite data")
-                fs.get(self.source_path_15, self.destination_path_15)
-                data_available = True
-            else:
-                logger.info("No 15-minute data available")
-
-        return data_available
-
-    def choose_and_load_satellite_data(self) -> xr.Dataset:
-        """Select from the 5 and 15-minutely satellite data for the most recent data."""
-        # Check which satellite data exists
-        exists_5_minute = os.path.exists(self.destination_path_5)
-        exists_15_minute = os.path.exists(self.destination_path_15)
-
-        if not exists_5_minute and not exists_15_minute:
-            raise FileNotFoundError("Neither 5- nor 15-minutely data was found.")
-
-        # Find the delay in the 5- and 15-minutely data
-        if exists_5_minute:
-            datetimes_5min = get_satellite_timestamps(self.destination_path_5)
-            logger.info(
-                f"Latest 5-minute timestamp is {datetimes_5min.max()}. "
-                f"All the datetimes are: \n{datetimes_5min}",
-            )
-        else:
-            logger.info("No 5-minute data was found.")
-
-        if exists_15_minute:
-            datetimes_15min = get_satellite_timestamps(self.destination_path_15)
-            logger.info(
-                f"Latest 15-minute timestamp is {datetimes_15min.max()}. "
-                f"All the datetimes are: \n{datetimes_15min}",
-            )
-        else:
-            logger.info("No 15-minute data was found.")
-
-        # If both 5- and 15-minute data exists, use the most recent
-        if exists_5_minute and exists_15_minute:
-            use_5_minute = datetimes_5min.max() >= datetimes_15min.max()
-        else:
-            # If only one exists, use that
-            use_5_minute = exists_5_minute
-
-        # Move the selected data to the expected path
-        if use_5_minute:
-            logger.info(f"Using 5-minutely data {self.destination_path_5}.")
-            selected_path = self.destination_path_5
-        else:
-            logger.info(f"Using 15-minutely data {self.destination_path_15}.")
-            selected_path = self.destination_path_15
-
-        with zarr.storage.ZipStore(selected_path) as store:
-            ds = xr.open_zarr(store)[["data"]].compute()
-
-        return ds
 
     @staticmethod
     def data_is_okay(ds: xr.Dataset) -> bool:
@@ -446,6 +378,9 @@ class SatelliteDownloader:
         Returns:
             xr.Dataset: The processed satellite data
         """
+        # Filter out unused variables
+        ds = ds[["data"]]
+
         # Interpolate missing satellite timestamps
         ds = interpolate_missing_satellite_timestamps(ds, max_gap=pd.Timedelta("15min"))
 
@@ -483,14 +418,43 @@ class SatelliteDownloader:
     def run(self) -> None:
         """Download, process, and save the satellite data."""
         logger.info("Downloading and processing the satellite data")
-        data_available = self.download_data()
 
-        if not data_available:
-            logger.warning("No satellite data available for download")
+        ds_dict = {}
+        # Open 5 minute satellite data
+        if self.source_path_5 is not None:
+            ds = open_satellite_data(
+                s3_icechunk_path=self.source_path_5,
+                region=self.s3_region,
+            )
+            if ds is not None:
+                ds_dict["5-min"] = ds
+
+        if self.source_path_15 is not None:
+            # Also open 15-minute satellite
+            ds = open_satellite_data(
+                s3_icechunk_path=self.source_path_15,
+                region=self.s3_region,
+            )
+            if ds is not None:
+                ds_dict["15-min"] = ds
+
+        if not ds_dict:
+            logger.warning("No satellite data available from either source")
             return
 
-        # Select the most recent satellite data and load it into memory
-        ds = self.choose_and_load_satellite_data()
+        # Select the source with the most recent data, and use 5-minute data if equal recency
+        best_source = max(ds_dict, key=lambda k: (ds_dict[k].time.max(), k=="5-min"))
+        ds = ds_dict[best_source]
+        self.sat_choice = best_source
+        logger.info(f"Using {best_source} satellite data")
+
+        # Load only the last hour
+        ds = (
+            ds.sortby("time")
+            .sel(time=slice(self.t0 - self.time_window, self.t0))
+            .drop_duplicates("time", keep="last")
+            .load()
+        )
 
         if self.data_is_okay(ds):
             ds = self.process(ds)
@@ -518,17 +482,4 @@ class SatelliteDownloader:
 
     def clean_up(self) -> None:
         """Remove the downloaded data."""
-        for path in [self.destination_path, self.destination_path_5, self.destination_path_15]:
-            shutil.rmtree(path, ignore_errors=True)
-
-
-def get_satellite_source_paths() -> tuple[str | None, str | None]:
-    """Get the paths to the satellite data from environment variables."""
-    sat_source_path_5 = os.getenv("SATELLITE_ZARR_PATH", None)
-    sat_source_path_15 = os.getenv("SATELLITE_15_ZARR_PATH", None)
-    if sat_source_path_15 is None and sat_source_path_5 is not None:
-        sat_source_path_15 = sat_source_path_5.replace(".zarr", "_15.zarr")
-    logger.info(
-        f"Satellite source paths: 5-minute: {sat_source_path_5}, 15-minute: {sat_source_path_15}",
-    )
-    return sat_source_path_5, sat_source_path_15
+        shutil.rmtree(self.destination_path, ignore_errors=True)
