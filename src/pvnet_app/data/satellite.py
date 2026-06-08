@@ -433,8 +433,8 @@ class SatelliteDownloader:
                 region=self.s3_region,
             )
 
-        # Select the source with the most recent data
-        best_source = max(ds_dict, key=lambda k: ds_dict[k].time.max())
+        # Select the source with the most recent data, and use 5-minute data if equal recency
+        best_source = max(ds_dict, key=lambda k: (ds_dict[k].time.max(), k=="5-min"))
         logger.info(f"Using {best_source} satellite data")
         ds = ds_dict[best_source]
         self.sat_choice = best_source
