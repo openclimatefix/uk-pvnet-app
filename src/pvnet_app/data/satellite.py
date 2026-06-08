@@ -420,23 +420,21 @@ class SatelliteDownloader:
         logger.info("Downloading and processing the satellite data")
 
         ds_dict = {}
-        # Open 5 minute satellite data
-        if self.source_path_5 is not None:
-            ds = open_satellite_data(
-                s3_icechunk_path=self.source_path_5,
-                region=self.s3_region,
-            )
-            if ds is not None:
-                ds_dict["5-min"] = ds
 
-        if self.source_path_15 is not None:
-            # Also open 15-minute satellite
-            ds = open_satellite_data(
-                s3_icechunk_path=self.source_path_15,
-                region=self.s3_region,
-            )
-            if ds is not None:
-                ds_dict["15-min"] = ds
+        for path, label in [(self.source_path_5, "5-min"), (self.source_path_15, "15-min")]:
+
+            if path is not None:
+                ds = open_satellite_data(
+                    s3_icechunk_path=path,
+                    region=self.s3_region,
+                )
+
+                if ds is not None:
+                    ds_dict[label] = ds
+                    logger.info(
+                        f"{label} satellite data contains times:"
+                        f"\n...\n{ds_dict[label].time.values[-24:]}",
+                    )
 
         if not ds_dict:
             logger.warning("No satellite data available from either source")
@@ -444,15 +442,15 @@ class SatelliteDownloader:
 
         # Select the source with the most recent data, and use 5-minute data if equal recency
         best_source = max(ds_dict, key=lambda k: (ds_dict[k].time.max(), k=="5-min"))
-        ds = ds_dict[best_source]
         self.sat_choice = best_source
         logger.info(f"Using {best_source} satellite data")
 
-        # Load only the last hour
+        # Slice and load into memory for processing
         ds = (
-            ds.sortby("time")
-            .sel(time=slice(self.t0 - self.time_window, self.t0))
+            ds_dict[best_source]
+            .sortby("time")
             .drop_duplicates("time", keep="last")
+            .sel(time=slice(self.t0 - self.time_window, self.t0))
             .load()
         )
 
