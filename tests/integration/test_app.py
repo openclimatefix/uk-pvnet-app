@@ -109,10 +109,47 @@ async def test_app(
 
         with patch(
             "pvnet_app.data.satellite.open_satellite_data",
-            side_effect=[sat_5_data_zero_delay],
+            side_effect=[sat_5_data_zero_delay, None],
         ):
             # Run prediction
             await run(t0=test_t0)
 
     model_configs = get_all_models(get_critical_only=False)
+    await check_number_of_forecasts(client, model_configs, test_t0)
+
+
+@pytest.mark.asyncio(loop_scope="session")
+async def test_app_no_sat(
+    client,
+    setup_dp_locations,  # noqa: ARG001
+    test_t0,
+    nwp_ukv_data,
+    nwp_ecmwf_data,
+):
+    """Test the app for the case when no satellite data is available"""
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        os.chdir(tmpdirname)
+
+        os.environ["NWP_UKV_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ukv.zarr"
+        nwp_ukv_data.to_zarr(temp_nwp_path)
+
+        os.environ["NWP_ECMWF_ZARR_PATH"] = temp_nwp_path = "temp_nwp_ecmwf.zarr"
+        nwp_ecmwf_data.to_zarr(temp_nwp_path)
+
+        # Satellite data will be mocked as unavailable
+        os.environ["SATELLITE_ICECHUNK_PATH_5"] = "s3://fake/sat5"
+
+        os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
+        os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
+        os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
+        os.environ["FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT"] = "90"
+
+        with patch("pvnet_app.data.satellite.open_satellite_data", return_value=None):
+            await run(t0=test_t0)
+
+    # Only the models which don't use satellite will be run in this case
+    model_configs = get_all_models()
+    model_configs = [model for model in model_configs if not model.uses_satellite_data]
+
     await check_number_of_forecasts(client, model_configs, test_t0)

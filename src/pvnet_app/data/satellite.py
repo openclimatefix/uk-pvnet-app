@@ -18,7 +18,7 @@ from pvnet_app.data.gsp import get_gsp_locations
 logger = logging.getLogger(__name__)
 
 
-def open_satellite_data(s3_icechunk_path: str, region: str) -> xr.Dataset:
+def open_satellite_data(s3_icechunk_path: str, region: str) -> xr.Dataset | None:
     """Open the satellite data from the given s3 icechunk path.
 
     Args:
@@ -34,10 +34,15 @@ def open_satellite_data(s3_icechunk_path: str, region: str) -> xr.Dataset:
         region=region,
     )
 
-    repo = icechunk.Repository.open(store)
-    session = repo.readonly_session("main")
+    try:
+        repo = icechunk.Repository.open(store)
+        session = repo.readonly_session("main")
+        ds = xr.open_zarr(session.store)
+    except icechunk.IcechunkError as e:
+        logger.error(f"Error opening icechunk repository: {e}")
+        ds = None
 
-    return xr.open_zarr(session.store)
+    return ds
 
 
 def fill_1d_bool_gaps(x: np.array, max_gap: int) -> np.array:
@@ -414,30 +419,34 @@ class SatelliteDownloader:
         """Download, process, and save the satellite data."""
         logger.info("Downloading and processing the satellite data")
 
-        if self.source_path_5 is None and self.source_path_15 is None:
-            logger.warning("No satellite source paths provided, skipping satellite download")
-            return
-
         ds_dict = {}
         # Open 5 minute satellite data
         if self.source_path_5 is not None:
-            ds_dict["5-min"] = open_satellite_data(
+            ds = open_satellite_data(
                 s3_icechunk_path=self.source_path_5,
                 region=self.s3_region,
             )
+            if ds is not None:
+                ds_dict["5-min"] = ds
 
         if self.source_path_15 is not None:
             # Also open 15-minute satellite
-            ds_dict["15-min"] = open_satellite_data(
+            ds = open_satellite_data(
                 s3_icechunk_path=self.source_path_15,
                 region=self.s3_region,
             )
+            if ds is not None:
+                ds_dict["15-min"] = ds
+
+        if not ds_dict:
+            logger.warning("No satellite data available from either source")
+            return
 
         # Select the source with the most recent data, and use 5-minute data if equal recency
         best_source = max(ds_dict, key=lambda k: (ds_dict[k].time.max(), k=="5-min"))
-        logger.info(f"Using {best_source} satellite data")
         ds = ds_dict[best_source]
         self.sat_choice = best_source
+        logger.info(f"Using {best_source} satellite data")
 
         # Load only the last hour
         ds = (
