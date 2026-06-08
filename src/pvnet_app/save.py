@@ -329,7 +329,7 @@ async def get_metadata_for_forecast(
     """Get metadata for the forecast."""
     metadata = {"app_version": Value(string_value=version("pvnet_app"))}
 
-    # add gsp last updated time
+    # Add GSP last updated time
     gsp_request = dp.GetLatestObservationsRequest(
         location_uuids=[location_uuid],
         energy_source=dp.EnergySource.SOLAR,
@@ -337,29 +337,29 @@ async def get_metadata_for_forecast(
     )
     gsp_last_updated = await client.get_latest_observations(gsp_request)
     if len(gsp_last_updated.observations) > 0:
-        metadata["gsp_last_updated"] \
-            = Value(string_value=gsp_last_updated.observations[-1].timestamp_utc.isoformat())
+        metadata["gsp_last_updated"] = Value(
+            string_value=gsp_last_updated.observations[-1].timestamp_utc.isoformat(),
+        )
 
-    # add nwp and satellite last updated time, load file from s3 if exists
-    env_vars = [
-        "NWP_ECMWF_ZARR_PATH",
-        "NWP_UKV_ZARR_PATH",
-    ]
-    for env_var in env_vars:
-        file = os.getenv(env_var)
-        if file is not None:
+    # Add NWP and satellite last updated time from s3 if exists
+    fs = fsspec.filesystem("s3", anon=False)
+    input_sources = {
+        "nwp_ecmwf": "NWP_ECMWF_ZARR_PATH",
+        "nwp_ukv": "NWP_UKV_ZARR_PATH",
+        "satellite": "SATELLITE_ICECHUNK_PATH_5",
+        "satellite_15": "SATELLITE_ICECHUNK_PATH_15",
+    }
+    for name, env_var in input_sources.items():
+        path = os.getenv(env_var)
+        if path is not None:
             try:
-                fs = fsspec.open(f"{file}/.zattrs").fs
-                if "zip" in file:
-                    modified_date = fs.modified(file)
-                else:
-                    modified_date = fs.modified(f"{file}/.zattrs")
-
-                name = env_var.lower().replace("_zarr_path", "")
+                if path.endswith(".zarr"):
+                    modified_date = fs.modified(f"{path}/.zattrs")
+                elif path.endswith(".icechunk"):
+                    modified_date = fs.modified(f"{path}/refs/branch.main")
                 metadata[f"{name}_last_modified"] = Value(string_value=modified_date.isoformat())
             except Exception as e:
                 logger.debug(f"Could not get metadata for {env_var}: {e}")
 
-    metadata = Struct(fields=metadata)
-    return metadata
+    return Struct(fields=metadata)
 
