@@ -245,22 +245,22 @@ async def make_forecaster_adjuster(
     deltas_response = await client.get_week_average_deltas(deltas_request)
     deltas = deltas_response.deltas
 
+    # get location
+    location = await client.get_location(
+        dp.GetLocationRequest(
+            location_uuid=location_uuid,
+            energy_source=dp.EnergySource.SOLAR,
+            include_geometry=False,
+        ),
+    )
+    capacity_mw = location.effective_capacity_watts / 1_000_000.0
+
     # adjust the current forecast values
     new_forecast_values = []
     for fv in forecast_values:
         horizon_mins = fv.horizon_mins
         delta_fractions = [d.delta_fraction for d in deltas if d.horizon_mins == horizon_mins]
         delta_fraction = delta_fractions[0] if len(delta_fractions) > 0 else 0
-
-        # get location
-        location = await client.get_location(
-            dp.GetLocationRequest(
-                location_uuid=location_uuid,
-                energy_source=dp.EnergySource.SOLAR,
-                include_geometry=False,
-            ),
-        )
-        capacity_mw = location.effective_capacity_watts / 1_000_000.0
 
         # limit adjuster
         delta_fraction = limit_adjuster(
