@@ -9,6 +9,7 @@ from importlib.metadata import version
 
 import betterproto
 import fsspec
+import numpy as np
 import pandas as pd
 import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
@@ -268,12 +269,12 @@ async def make_forecaster_adjuster(
         )
 
         # delta values are forecast - observed, so we need to subtract
-        new_p50 = max(0.0, min(1.0, fv.p50_fraction - delta_fraction))
+        new_p50 = np.clip(fv.p50_fraction - delta_fraction, 0.0, 1.0)
 
         # adjust p10 and p90s
         new_other_statistics = {}
         for key, val in fv.other_statistics_fractions.items():
-            new_val = max(0.0, min(1.0, val - delta_fraction))
+            new_val = np.clip(val - delta_fraction, 0.0, 1.0)
             new_other_statistics[key] = new_val
 
         new_forecast_values.append(
@@ -305,22 +306,9 @@ async def make_forecaster_adjuster(
 
 
 def limit_adjuster(delta_fraction: float, value_fraction: float, capacity_mw: float) -> float:
-    """Limit the adjuster to 10% of forecast and max 1000 MW."""
-    # limit adjusted fractions to 10% of fv.p50_fraction
-    max_delta = 0.1 * value_fraction
-    if delta_fraction > max_delta:
-        delta_fraction = max_delta
-    elif delta_fraction < -max_delta:
-        delta_fraction = -max_delta
-
-    # limit adjust to 1000 MW
-    max_delta_absolute = 1000.0 / capacity_mw
-    if delta_fraction > max_delta_absolute:
-        delta_fraction = max_delta_absolute
-    elif delta_fraction < -max_delta_absolute:
-        delta_fraction = -max_delta_absolute
-
-    return delta_fraction
+    """Limit adjuster fraction to 10% of forecast or 1000 MW, whichever is smaller."""
+    adjuster_max = min(0.1 * value_fraction, 1000 / capacity_mw)
+    return np.clip(delta_fraction, -adjuster_max, adjuster_max)
 
 
 async def get_metadata_for_forecast(
