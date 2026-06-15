@@ -20,7 +20,7 @@ from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownl
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_configs.pydantic_models import get_all_models
-from pvnet_app.save import fetch_dp_gsp_uuid_map
+from pvnet_app.save import fetch_locations, build_input_metadata
 from pvnet_app.utils import check_model_runs_finished, get_boolean_env_var, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
@@ -78,10 +78,6 @@ async def run(
     The following are optional:
         - SENTRY_DSN, optional link to sentry
         - ENVIRONMENT, the environment this is running in, defaults to local
-        - ALLOW_ADJUSTER: Option to allow the adjuster to be used. If false this overwrites the
-          adjuster option in the model configs so it is not used. Defaults to true.
-        - ALLOW_SAVE_GSP_SUM: Option to allow model to save the GSP sum. If false this overwrites
-          the model configs so saving of the GSP sum is not used. Defaults to false.
         - RUN_CRITICAL_MODELS_ONLY, option to run critical models only, defaults to false
         - FORECAST_VALIDATE_ZIG_ZAG_WARNING, threshold for forecast zig-zag warning,
           defaults to 250 MW.
@@ -103,16 +99,16 @@ async def run(
     # ---------------------------------------------------------------------------
     # 0. Basic set up
 
-    # If inference datetime is None, round down to last 30 minutes
+    # If inference datetime is None, set to now
     if t0 is None:
-        t0 = pd.Timestamp.now(tz="UTC").replace(tzinfo=None).floor("30min")
+        t0 = pd.Timestamp.now(tz="UTC")
     else:
-        t0 = pd.Timestamp(t0).floor("30min")
+        t0 = pd.Timestamp(t0).tz_localize("UTC")
+    # Round down to last 30 minutes
+    t0 = t0.replace(tzinfo=None).floor("30min")
 
     # --- Unpack the environment variables
     run_critical_models_only = get_boolean_env_var("RUN_CRITICAL_MODELS_ONLY", default=False)
-    allow_adjuster = get_boolean_env_var("ALLOW_ADJUSTER", default=True)
-    allow_save_gsp_sum = get_boolean_env_var("ALLOW_SAVE_GSP_SUM", default=False)
     filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
     raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
     hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
@@ -137,15 +133,9 @@ async def run(
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Making forecast for init time: {t0}")
     logger.info(f"Running critical models only: {run_critical_models_only}")
-    logger.info(f"Allow adjuster: {allow_adjuster}")
-    logger.info(f"Allow saving GSP sum: {allow_save_gsp_sum}")
 
     # --- Get the model configurations
-    model_configs = get_all_models(
-        allow_adjuster=allow_adjuster,
-        allow_save_gsp_sum=allow_save_gsp_sum,
-        get_critical_only=run_critical_models_only,
-    )
+    model_configs = get_all_models(get_critical_only=run_critical_models_only)
 
     if len(model_configs) == 0:
         raise Exception("No models found after filtering")
@@ -287,7 +277,7 @@ async def run(
     logger.info("Validating forecasts")
     for model_name in list(forecasters.keys()):
         national_forecast = (
-            forecasters[model_name].da_abs_all.sel(gsp_id=0, output_label="forecast_mw")
+            forecasters[model_name].da_abs_all.sel(gsp_id=0, output_label="p50")
         ).to_series()
 
         forecast_okay = validate_forecast(
@@ -319,16 +309,29 @@ async def run(
 
     dp_channel = Channel(data_platform_host, data_platform_port)
     dp_client = dp.DataPlatformDataServiceStub(dp_channel)
-    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=dp_client)
+    gsp_locations = await fetch_locations(client=dp_client)
+    input_metadata = await build_input_metadata(
+        client=dp_client, 
+        location_uuid=gsp_locations[0].location_uuid
+    )
 
-    tasks = [
-        forecaster.save_forecast_to_dataplatform(
-            locations_gsp_uuid_map=gsp_uuid_map,
-            client=dp_client,
+    requests: list[dp.CreateForecastRequest] = []
+    for forecaster in forecasters.values():
+        requests.extend(
+            await forecaster.create_write_requests(
+                locations=gsp_locations,
+                client=dp_client,
+                metadata=input_metadata,
+            )
         )
-        for forecaster in forecasters.values()
-    ]
-    await asyncio.gather(*tasks)
+
+    write_results = await asyncio.gather(
+        *(dp_client.create_forecast(req) for req in requests), 
+        return_exceptions=True,
+    )
+    for exc in filter(lambda x: isinstance(x, Exception), write_results):
+        raise exc
+
     dp_channel.close()
 
     logger.info("Finished forecast")

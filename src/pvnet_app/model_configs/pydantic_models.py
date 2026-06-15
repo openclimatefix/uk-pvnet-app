@@ -25,16 +25,7 @@ class ModelConfig(BaseModel):
     pvnet: HuggingFaceCommit = Field(..., description="The PVNet model location")
     summation: HuggingFaceCommit = Field(..., description="The summation model location")
 
-    use_adjuster: bool = Field(False, description="Whether to use the adjuster")
-    save_gsp_sum: bool = Field(
-        False,
-        description="Whether to save the sum of GSPs as welll as the national estimate",
-    )
     log_level: Literal["INFO", "DEBUG"] = Field(..., description="Log level to use for the model")
-    save_gsp_to_recent: bool = Field(
-        False,
-        description="Whether to save the GSP results to the `ForecastValueLastSevenDays` table",
-    )
     is_day_ahead: bool = Field(
         False,
         description="If this model makes day-ahead forecasts (as opposed to intra-day)",
@@ -69,16 +60,10 @@ class ModelConfigCollection(BaseModel):
         return v
 
 
-def get_all_models(
-    allow_adjuster: bool = True,
-    allow_save_gsp_sum: bool = True,
-    get_critical_only: bool = False,
-) -> list[ModelConfig]:
+def get_all_models(get_critical_only: bool = False) -> list[ModelConfig]:
     """Returns all the models for a given client.
 
     Args:
-        allow_adjuster: If set to false, all models will have use_adjuster set to false
-        allow_save_gsp_sum: If set to false, all models will have save_gsp_sum set to false
         get_critical_only: If only the critical models should be returned
     """
     filename = files("pvnet_app.model_configs").joinpath("all_models.yaml")
@@ -91,13 +76,6 @@ def get_all_models(
             log.error(f"Error parsing model configuration: {config_error}")
             raise config_error
 
-    # Override the use_adjuster and save_gsp_sum properties
-    if not allow_adjuster:
-        for model in model_collection.models:
-            model.use_adjuster = False
-    if not allow_save_gsp_sum:
-        for model in model_collection.models:
-            model.save_gsp_sum = False
 
     # Filter models
     filtered_models = model_collection.models.copy()
