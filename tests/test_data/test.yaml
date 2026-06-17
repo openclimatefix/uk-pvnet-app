@@ -2,7 +2,7 @@ general:
   description: Config for training the saved PVNet model
   name: PVNet current
 input_data:
-  gsp:
+  generation:
     dropout_fraction: 0
     dropout_timedeltas_minutes: []
     interval_end_minutes: 480

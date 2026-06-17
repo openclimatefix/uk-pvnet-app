@@ -243,50 +243,8 @@ class ECMWFDownloader(NWPDownloader):
         "longitude": 50,
     }
 
-    @staticmethod
-    def rename_variables(ds: xr.Dataset) -> xr.Dataset:
-        """Rename the ECMWF variables to match the training data.
-
-        Rename variable names in the variable coordinate to match the names the model expects and
-        was trained on.
-
-        This change happened in the new nwp-consumer>=1.0.0. Ideally we won't need this step in the
-        future once the training data is updated.
-        """
-        logger.info("Renaming the ECMWF variables")
-
-        ds = ds.rename({"hres-ifs_uk": "ECMWF_UK"})
-
-        varname_mapping = {
-            "cloud_cover_high": "hcc",
-            "cloud_cover_low": "lcc",
-            "cloud_cover_medium": "mcc",
-            "cloud_cover_total": "tcc",
-            "snow_depth_gl": "sd",
-            "direct_shortwave_radiation_flux_gl": "sr",
-            "downward_longwave_radiation_flux_gl": "dlwrf",
-            "downward_shortwave_radiation_flux_gl": "dswrf",
-            "downward_ultraviolet_radiation_flux_gl": "duvrs",
-            "temperature_sl": "t2m",
-            "total_precipitation_rate_gl": "prate",
-            "visibility_sl": "vis",
-            "wind_u_component_100m": "u100",
-            "wind_u_component_10m": "u10",
-            "wind_u_component_200m": "u200",
-            "wind_v_component_100m": "v100",
-            "wind_v_component_10m": "v10",
-            "wind_v_component_200m": "v200",
-        }
-
-        variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
-
-        ds = ds.assign_coords(variable=variable_coords)
-
-        return ds
-
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-        ds = self.rename_variables(ds)
         return ds
 
     @override
@@ -301,8 +259,8 @@ class UKVDownloader(NWPDownloader):
     nwp_source = "ukv"
     save_chunk_dict = { # noqa: RUF012
         "step": 10,
-        "x": 100,
-        "y": 100,
+        "x_osgb": 100,
+        "y_osgb": 100,
     }
 
     @staticmethod
@@ -321,50 +279,6 @@ class UKVDownloader(NWPDownloader):
         )
 
     @staticmethod
-    def fix_dtype(ds: xr.Dataset) -> xr.Dataset:
-        """Fix the dtype of the UKV data.
-
-        In training the UKV data is float16. This caused it to overflow into inf values for the
-        visibility channel which is measured in metres and can be above 2**16=65km. We
-        need to force this overflow to happen in production to be consistent with training.
-        """
-        return ds.astype(np.float16)
-
-    @staticmethod
-    def rename_variables(ds: xr.Dataset) -> xr.Dataset:
-        """Change the UKV variable names to match the training data."""
-        # This is for nwp-consumer>=1.0.0
-        logger.info("Renaming the UKV variables")
-
-        ds = ds.rename({"um-ukv": "UKV"})
-
-        varname_mapping = {
-            "cloud_cover_high": "hcc",
-            "cloud_cover_low": "lcc",
-            "cloud_cover_medium": "mcc",
-            "cloud_cover_total": "tcc",
-            "snow_depth_gl": "sde",
-            "direct_shortwave_radiation_flux_gl": "sr",
-            "downward_longwave_radiation_flux_gl": "dlwrf",
-            "downward_shortwave_radiation_flux_gl": "dswrf",
-            "downward_ultraviolet_radiation_flux_gl": "duvrs",
-            "relative_humidity_sl": "r",
-            "temperature_sl": "t",
-            "total_precipitation_rate_gl": "prate",
-            "visibility_sl": "vis",
-            "wind_direction_10m": "wdir10",
-            "wind_speed_10m": "si10",
-            "wind_v_component_10m": "v10",
-            "wind_u_component_10m": "u10",
-        }
-
-        variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
-
-        ds = ds.assign_coords(variable=variable_coords)
-
-        return ds
-
-    @staticmethod
     def add_lon_lat_coords(ds: xr.Dataset) -> xr.Dataset:
         """Add latitude and longitude coords to the UKV data.
 
@@ -374,8 +288,6 @@ class UKVDownloader(NWPDownloader):
         """
         # This is for nwp-consumer>=1.0.0
         logger.info("Adding lon-lat coords to the UKV data")
-
-        ds = ds.rename({"x_laea": "x", "y_laea": "y"})
 
         # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
         laea = pyproj.Proj(
@@ -396,27 +308,22 @@ class UKVDownloader(NWPDownloader):
         # Calculate longitude and latitude from x_laea and y_laea
         # - x is an array of shape (455,)
         # - y is an array of shape (639,)
-        # We need to change x and y to a 2D arrays of shape (455, 639)
-        x, y = ds.x.values, ds.y.values
-        x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
-        y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
+        # We need to change x and y to a 2D arrays
+        x_laea, y_laea = np.meshgrid(ds.x_laea, ds.y_laea)
 
-        lons, lats = laea_to_lon_lat(xx=x, yy=y)
+        lons, lats = laea_to_lon_lat(xx=x_laea, yy=y_laea)
 
         ds = ds.assign_coords(
-            longitude=(["y", "x"], lons),
-            latitude=(["y", "x"], lats),
+            longitude=(["y_laea", "x_laea"], lons),
+            latitude=(["y_laea", "x_laea"], lats),
         )
 
         return ds
 
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-        ds = self.rename_variables(ds)
         ds = self.add_lon_lat_coords(ds)
         ds = self.regrid(ds)
-        ds = self.fix_dtype(ds)
-
         return ds
 
     @override
