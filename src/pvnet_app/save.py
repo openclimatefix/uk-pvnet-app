@@ -16,33 +16,32 @@ logger = logging.getLogger(__name__)
 
 
 async def fetch_locations(
-    client: dp.DataPlatformDataServiceStub
+    client: dp.DataPlatformDataServiceStub,
 ) -> dict[int, dp.ListLocationsResponseLocationSummary]:
     """Fetch all UK locations from data platform."""
-
     # Get the UK nation location
     nat_resp = await client.list_locations(
         dp.ListLocationsRequest(
             location_type_filter=dp.LocationType.NATION,
             energy_source_filter=dp.EnergySource.SOLAR,
             location_names_filter=["uk"],
-        )
+        ),
     )
 
     if len(nat_resp.locations) != 1:
         raise ValueError(f"Expected exactly one location for UK nation, got: {nat_resp.locations}")
 
     national_location = nat_resp.locations[0]
-    
+
     # Get all GSPs within the UK nation
     gsp_resp = await client.list_locations(
         dp.ListLocationsRequest(
             location_type_filter=dp.LocationType.GSP,
             energy_source_filter=dp.EnergySource.SOLAR,
-            # TODO: We should filter specifically within the UK, but the current locations in the 
+            # TODO: We should filter specifically within the UK, but the current locations in the
             # data platform don't allow this yet. See commented line below for future use.
             #enclosing_location_uuid_filter=national_location.location_uuid,
-        )
+        ),
     )
 
     locations_lookup = {0: national_location}
@@ -66,13 +65,13 @@ async def fetch_or_create_forecaster(
     version = "2.8.0"
 
     list_forecasters_response = await client.list_forecasters(
-        dp.ListForecastersRequest(forecaster_names_filter=[name])
+        dp.ListForecastersRequest(forecaster_names_filter=[name]),
     )
 
     # Forecaster does not exist, create it
     if len(list_forecasters_response.forecasters) == 0:
         create_forecaster_response = await client.create_forecaster(
-            dp.CreateForecasterRequest(name=name, version=version)
+            dp.CreateForecasterRequest(name=name, version=version),
         )
         return create_forecaster_response.forecaster
 
@@ -83,19 +82,19 @@ async def fetch_or_create_forecaster(
 
         # Forecaster version does not exist, update it
         if len(filtered_forecasters) == 0:
-            
+
             update_forecaster_response = await client.update_forecaster(
-                dp.UpdateForecasterRequest(name=name, new_version=version)
+                dp.UpdateForecasterRequest(name=name, new_version=version),
             )
             return update_forecaster_response.forecaster
-        
+
         # Forecaster exists
         else:
             return filtered_forecasters[0]
 
 
 async def build_input_metadata(
-    client: dp.DataPlatformDataServiceStub, 
+    client: dp.DataPlatformDataServiceStub,
     location_uuid: str,
 ) -> Struct:
     """Get metadata for the forecast."""
@@ -107,7 +106,7 @@ async def build_input_metadata(
             location_uuids=[location_uuid],
             energy_source=dp.EnergySource.SOLAR,
             observer_name="pvlive_in_day",
-        )
+        ),
     )
     if len(gsp_last_updated.observations) > 0:
         metadata["gsp_last_updated"] = Value(
@@ -139,7 +138,7 @@ async def build_input_metadata(
 
 async def build_multi_forecast_creation_request(
     forecast_normed_da: xr.DataArray,
-    locations: dict,
+    locations: dict[int, dp.ListLocationsResponseLocationSummary],
     model_tag: str,
     init_time_utc: pd.Timestamp,
     client: dp.DataPlatformDataServiceStub,
@@ -149,17 +148,16 @@ async def build_multi_forecast_creation_request(
 
     Args:
         forecast_normed_da: DataArray of normalized forecasts for all GSPs
-        locations_gsp_uuid_map: Mapping of GSP IDs to location UUIDs
+        locations: Mapping of GSP IDs to location summaries
         model_tag: the name of the model to saved to the database
         init_time_utc: Forecast initialization time
         client: Data platform client. If None, a new client will be created.
         metadata: Optional metadata to include with the forecast.
     """
-
     # Fetch the forecaster and adjuster forecaster in parallel
     forecaster, adjuster_forecaster = await asyncio.gather(
         fetch_or_create_forecaster(client=client, model_tag=model_tag),
-        fetch_or_create_forecaster(client=client, model_tag=f"{model_tag}_adjust")
+        fetch_or_create_forecaster(client=client, model_tag=f"{model_tag}_adjust"),
     )
 
     forecast_requests: list[dp.CreateForecastRequest] = []
@@ -214,7 +212,6 @@ def build_forecast_creation_request(
         init_time_utc: Forecast initialization time
         metadata: Optional metadata to include with the forecast.
     """
-
     gsp_id = int(gsp_normed_da.gsp_id.values)
 
     p50s = gsp_normed_da.sel(output_label="p50").values
@@ -230,7 +227,7 @@ def build_forecast_creation_request(
                 f"gsp_id={gsp_id}, horizon_mins={h}; clamping to 1.1",
             )
             p90 = 1.1
-        
+
         forecast_values.append(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=h,
@@ -256,7 +253,6 @@ async def fetch_adjuster_values(
     forecaster: dp.Forecaster,
 ) -> dict[int, float]:
     """Make a forecaster adjuster based on week average deltas."""
-    
     deltas_response = await client.get_week_average_deltas(
         dp.GetWeekAverageDeltasRequest(
             location_uuid=location_uuid,
@@ -264,9 +260,9 @@ async def fetch_adjuster_values(
             pivot_timestamp_utc=init_time_utc.tz_localize("UTC").to_pydatetime(),
             forecaster=forecaster,
             observer_name="pvlive_day_after",
-        )
+        ),
     )
-    
+
     return {d.horizon_mins: d.delta_fraction for d in deltas_response.deltas}
 
 
@@ -276,7 +272,6 @@ def apply_adjuster_values(
     effective_capacity_watts: float,
 ) -> xr.DataArray:
     """Apply adjuster values to a forecast DataArray."""
-    
     adjuster_values_array = np.zeros(len(da_forecast.horizon_mins.values.tolist()), dtype=float)
     for i, h in enumerate(da_forecast.horizon_mins.values.tolist()):
         if h in adjuster_values:
@@ -307,13 +302,12 @@ def apply_adjuster_values(
 
 async def calculate_adjusted_forecast(
     client: dp.DataPlatformDataServiceStub,
-    location,
+    location: dp.ListLocationsResponseLocationSummary,
     init_time_utc: pd.Timestamp,
     da_forecast: xr.DataArray,
     forecaster: dp.Forecaster,
 ) -> xr.DataArray:
     """Make an adjusted forecast based on week average deltas."""
-    
     adjuster_values = await fetch_adjuster_values(
         client=client,
         location_uuid=location.location_uuid,

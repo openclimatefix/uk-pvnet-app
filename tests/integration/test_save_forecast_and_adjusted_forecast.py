@@ -1,14 +1,14 @@
-from datetime import datetime, UTC, timedelta
+import asyncio
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 import pytest
+import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
 from ocf import dp
-import asyncio
 
-from src.pvnet_app.save import fetch_or_create_forecaster, build_multi_forecast_creation_request
+from src.pvnet_app.save import build_multi_forecast_creation_request, fetch_or_create_forecaster
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -31,7 +31,7 @@ async def test_save_forecast_and_adjusted_forecast(
     # This will be the init time for the forecast we test on
     t0 = datetime(2025, 1, 1, tzinfo=UTC)
     t0_yesterday = t0 - timedelta(days=1)
-    
+
     n_steps = 24 # number of forecast steps
     freq_mins = 30 # frequency of forecast steps in minutes
     capacity_watts = 1_000
@@ -42,10 +42,10 @@ async def test_save_forecast_and_adjusted_forecast(
     forecaster_name = "test_model"
 
     def create_location_request(
-        gsp_id: int, 
-        location_name: str, 
-        location_type: dp.LocationType, 
-        geometry_wkt: str
+        gsp_id: int,
+        location_name: str,
+        location_type: dp.LocationType,
+        geometry_wkt: str,
     ) -> dp.CreateLocationRequest:
         return dp.CreateLocationRequest(
             location_name=location_name,
@@ -56,7 +56,7 @@ async def test_save_forecast_and_adjusted_forecast(
             metadata=Struct(fields={"gsp_id": Value(number_value=gsp_id)}),
             valid_from_utc=t0_yesterday,
         )
-    
+
     # Setup: Create locations
     locations = {}
 
@@ -66,16 +66,16 @@ async def test_save_forecast_and_adjusted_forecast(
                 location_name="test_save_gsp0",
                 geometry_wkt="POINT(10 10)",
                 location_type=dp.LocationType.NATION,
-            )
+            ),
     )
-    
+
     locations[1] = await client.create_location(
         create_location_request(
             gsp_id=1,
             location_name="test_save_gsp1",
             geometry_wkt="POINT(11 11)",
             location_type=dp.LocationType.GSP,
-        )
+        ),
     )
 
 
@@ -90,12 +90,12 @@ async def test_save_forecast_and_adjusted_forecast(
             init_time_utc=t0_yesterday,
             values=[
                 dp.CreateForecastRequestForecastValue(
-                    horizon_mins=i*freq_mins, 
+                    horizon_mins=i*freq_mins,
                     p50_fraction=p50_frac,
                 )
                 for i in range(n_steps)
             ],
-        )
+        ),
     )
 
     # Setup: Add fake generation data so that the adjusted forecast can be calculated
@@ -104,7 +104,7 @@ async def test_save_forecast_and_adjusted_forecast(
         .to_pydatetime()
     )
     prev_values = np.array([0.5 + 0.01 * i for i in range(n_steps)]) * capacity_watts
-    
+
     _ = await client.create_observations(
         dp.CreateObservationsRequest(
             location_uuid=locations[0].location_uuid,
@@ -113,12 +113,12 @@ async def test_save_forecast_and_adjusted_forecast(
             values=[
                 # Go from 500W to 730W in 10W increments
                 dp.CreateObservationsRequestValue(
-                    timestamp_utc=dt, 
-                    value_watts=int(prev_values[i])
+                    timestamp_utc=dt,
+                    value_watts=int(prev_values[i]),
                 )
                 for i, dt in enumerate(prev_valid_times)
             ],
-        )
+        ),
     )
 
     forecast_normed_da = xr.DataArray(
@@ -149,14 +149,14 @@ async def test_save_forecast_and_adjusted_forecast(
 
     # Test: Save the forecasts to the data platform
     _ = await asyncio.gather(
-        *(client.create_forecast(req) for req in requests), 
+        *(client.create_forecast(req) for req in requests),
         return_exceptions=True,
     )
 
     # Check: Read from the data platform to check it was saved
     forecasters_resp = await client.list_forecasters(
         dp.ListForecastersRequest(
-            forecaster_names_filter=[forecaster_name, f"{forecaster_name}_adjust"]
+            forecaster_names_filter=[forecaster_name, f"{forecaster_name}_adjust"],
         ),
     )
 
@@ -171,22 +171,22 @@ async def test_save_forecast_and_adjusted_forecast(
         dp.GetLatestForecastsRequest(
             energy_source=dp.EnergySource.SOLAR,
             location_uuid=locations[1].location_uuid,
-        )
+        ),
     )
     assert len(latest_forecasts_resp.forecasts) == 1
     assert latest_forecasts_resp.forecasts[0].forecaster.forecaster_name == forecaster_name
 
-    # Check: There are two forecasts for GSP 0, one with the non-adjusted forecaster and one with 
+    # Check: There are two forecasts for GSP 0, one with the non-adjusted forecaster and one with
     # the adjusted forecaster
     latest_forecasts_resp = await client.get_latest_forecasts(
         dp.GetLatestForecastsRequest(
             energy_source=dp.EnergySource.SOLAR,
             location_uuid=locations[0].location_uuid,
-        )
+        ),
     )
     assert len(latest_forecasts_resp.forecasts) == 2
     assert (
-        set([f.forecaster.forecaster_name for f in latest_forecasts_resp.forecasts]) 
+        {f.forecaster.forecaster_name for f in latest_forecasts_resp.forecasts}
         == expected_forecasters
     )
 
@@ -222,8 +222,8 @@ async def test_save_forecast_and_adjusted_forecast(
     # - The deltas are 0, -0.01, -0.02, ...
     # - Limited to 10% of forecasted value
     expected_adjustments = np.clip(
-        p50_frac - prev_values/capacity_watts, 
-        -p50_frac* 0.1, 
+        p50_frac - prev_values/capacity_watts,
+        -p50_frac* 0.1,
         p50_frac * 0.1,
     )
 

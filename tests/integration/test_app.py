@@ -16,7 +16,7 @@ NUM_GSPS = 334
 async def check_number_of_forecasts(client, model_configs, test_t0):
     gsp_uuid_map = await fetch_locations(client=client)
     national_uuid = gsp_uuid_map[0].location_uuid
-    location_uuids = list(loc.location_uuid for loc in gsp_uuid_map.values())
+    location_uuids = [loc.location_uuid for loc in gsp_uuid_map.values()]
     init_time_utc = test_t0.to_pydatetime().replace(tzinfo=datetime.UTC)
     first_target_time_utc = init_time_utc + datetime.timedelta(minutes=30)
 

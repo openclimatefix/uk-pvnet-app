@@ -268,7 +268,7 @@ class Forecaster:
         self.logger.debug(
             f"National forecast is {da_abs_national.sel(output_label='p50').values}",
         )
-        
+
         # Store the compiled predictions internally
         self.da_abs_all = xr.concat([da_abs_national, da_abs], dim="gsp_id")
         self.da_normed_all = xr.concat([da_normed_national, da_normed], dim="gsp_id")

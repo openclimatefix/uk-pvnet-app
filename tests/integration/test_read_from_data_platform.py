@@ -63,7 +63,7 @@ async def test_fetch_capacities_with_custom_capacity(
             effective_capacity_watts=custom_capacity_watts,
             metadata=metadata,
             valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
-        )
+        ),
     )
 
     capacities = await fetch_capacities(client=client, gsp_ids=[custom_gsp_id])

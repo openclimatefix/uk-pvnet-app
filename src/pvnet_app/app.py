@@ -20,7 +20,7 @@ from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownl
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_configs.pydantic_models import get_all_models
-from pvnet_app.save import fetch_locations, build_input_metadata
+from pvnet_app.save import build_input_metadata, fetch_locations
 from pvnet_app.utils import check_model_runs_finished, get_boolean_env_var, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
@@ -100,10 +100,7 @@ async def run(
     # 0. Basic set up
 
     # If inference datetime is None, set to now
-    if t0 is None:
-        t0 = pd.Timestamp.now(tz="UTC")
-    else:
-        t0 = pd.Timestamp(t0).tz_localize("UTC")
+    t0 = pd.Timestamp.now(tz="UTC") if t0 is None else pd.Timestamp(t0).tz_localize("UTC")
     # Round down to last 30 minutes
     t0 = t0.replace(tzinfo=None).floor("30min")
 
@@ -311,8 +308,8 @@ async def run(
     dp_client = dp.DataPlatformDataServiceStub(dp_channel)
     gsp_locations = await fetch_locations(client=dp_client)
     input_metadata = await build_input_metadata(
-        client=dp_client, 
-        location_uuid=gsp_locations[0].location_uuid
+        client=dp_client,
+        location_uuid=gsp_locations[0].location_uuid,
     )
 
     requests: list[dp.CreateForecastRequest] = []
@@ -322,11 +319,11 @@ async def run(
                 locations=gsp_locations,
                 client=dp_client,
                 metadata=input_metadata,
-            )
+            ),
         )
 
     write_results = await asyncio.gather(
-        *(dp_client.create_forecast(req) for req in requests), 
+        *(dp_client.create_forecast(req) for req in requests),
         return_exceptions=True,
     )
     for exc in filter(lambda x: isinstance(x, Exception), write_results):
