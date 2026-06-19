@@ -3,7 +3,7 @@ FROM quay.io/condaforge/miniforge3:latest AS build-venv
 
 RUN apt-get update && \
     echo "Creating virtualenv at /app/.venv" && \
-    conda create --quiet --yes -p /app/.venv python=3.12 "esmf=*=nompi_*" esmpy gdal hdf5=1.14.4
+    conda create --quiet --yes -p /app/.venv python=3.12 "esmf=*=nompi_*" esmpy hdf5=1.14.4
 
 
 # --- Build dependencies --- #
@@ -38,6 +38,6 @@ COPY --from=build-app /usr/bin/git /usr/bin/git
 
 # This is just a check to make sure it works, we've had problems with this in the past
 ENV PATH="/app/.venv/bin:${PATH}"
-RUN /app/.venv/bin/python -c "import torchvision"
+RUN /app/.venv/bin/python -c "import torch"
 
 ENTRYPOINT ["/app/.venv/bin/pvnet-app"]
