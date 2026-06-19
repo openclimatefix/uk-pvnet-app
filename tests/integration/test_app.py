@@ -75,7 +75,8 @@ async def check_number_of_forecasts(client, model_configs, test_t0):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app(
-    client,
+    dp_client,
+    dp_host_and_port,
     setup_dp_locations,  # noqa: ARG001
     test_t0,
     nwp_ukv_data,
@@ -84,6 +85,8 @@ async def test_app(
     cloudcasting_data,
 ):
     """Test the app running the intraday models"""
+
+    host, port = dp_host_and_port
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.chdir(tmpdirname)
@@ -100,7 +103,6 @@ async def test_app(
         cloudcasting_data.to_zarr(cloudcasting_path)
 
         settings = AppSettings(
-            data_platform_host="localhost",
             nwp_ukv_zarr_path=ukv_path,
             nwp_ecmwf_zarr_path=ecmwf_path,
             cloudcasting_zarr_path=cloudcasting_path,
@@ -109,6 +111,8 @@ async def test_app(
             run_critical_models_only=False,
             forecast_validate_zig_zag_error_threshold=100000,
             forecast_validate_sun_elevation_lower_limit=90,
+            data_platform_host=host,
+            data_platform_port=port,
         )
 
         with patch(
@@ -119,18 +123,21 @@ async def test_app(
             await run(settings=settings, t0=test_t0)
 
     model_configs = get_all_models(get_critical_only=False)
-    await check_number_of_forecasts(client, model_configs, test_t0)
+    await check_number_of_forecasts(dp_client, model_configs, test_t0)
 
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_app_no_sat(
-    client,
+    dp_client,
+    dp_host_and_port,
     setup_dp_locations,  # noqa: ARG001
     test_t0,
     nwp_ukv_data,
     nwp_ecmwf_data,
 ):
     """Test the app for the case when no satellite data is available"""
+
+    host, port = dp_host_and_port
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         os.chdir(tmpdirname)
@@ -143,7 +150,6 @@ async def test_app_no_sat(
         nwp_ecmwf_data.to_zarr(ecmwf_path)
 
         settings = AppSettings(
-            data_platform_host="localhost",
             nwp_ukv_zarr_path=ukv_path,
             nwp_ecmwf_zarr_path=ecmwf_path,
             # Satellite data will be mocked as unavailable
@@ -151,6 +157,8 @@ async def test_app_no_sat(
             run_critical_models_only=False,
             forecast_validate_zig_zag_error_threshold=100000,
             forecast_validate_sun_elevation_lower_limit=90,
+            data_platform_host=host,
+            data_platform_port=port,
         )
 
 
@@ -161,4 +169,4 @@ async def test_app_no_sat(
     model_configs = get_all_models()
     model_configs = [model for model in model_configs if not model.uses_satellite_data]
 
-    await check_number_of_forecasts(client, model_configs, test_t0)
+    await check_number_of_forecasts(dp_client, model_configs, test_t0)
