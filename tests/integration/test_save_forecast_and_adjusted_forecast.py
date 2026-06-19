@@ -41,43 +41,40 @@ async def test_save_forecast_and_adjusted_forecast(
 
     forecaster_name = "test_model"
 
-    def create_location_request(
+    async def create_location(
         gsp_id: int,
         location_name: str,
         location_type: dp.LocationType,
         geometry_wkt: str,
-    ) -> dp.CreateLocationRequest:
-        return dp.CreateLocationRequest(
-            location_name=location_name,
-            energy_source=dp.EnergySource.SOLAR,
-            geometry_wkt=geometry_wkt,
-            location_type=location_type,
-            effective_capacity_watts=capacity_watts,
-            metadata=Struct(fields={"gsp_id": Value(number_value=gsp_id)}),
-            valid_from_utc=t0_yesterday,
+    ):
+        return await client.create_location(
+                dp.CreateLocationRequest(
+                location_name=location_name,
+                energy_source=dp.EnergySource.SOLAR,
+                geometry_wkt=geometry_wkt,
+                location_type=location_type,
+                effective_capacity_watts=capacity_watts,
+                metadata=Struct(fields={"gsp_id": Value(number_value=gsp_id)}),
+                valid_from_utc=t0_yesterday,
+            ),
         )
 
     # Setup: Create locations
     locations = {}
 
-    locations[0] = await client.create_location(
-        create_location_request(
-                gsp_id=0,
-                location_name="test_save_gsp0",
-                geometry_wkt="POINT(10 10)",
-                location_type=dp.LocationType.NATION,
-            ),
+    locations[0] = await create_location(
+        gsp_id=0,
+        location_name="test_save_gsp0",
+        geometry_wkt="POINT(10 10)",
+        location_type=dp.LocationType.NATION,
     )
 
-    locations[1] = await client.create_location(
-        create_location_request(
-            gsp_id=1,
-            location_name="test_save_gsp1",
-            geometry_wkt="POINT(11 11)",
-            location_type=dp.LocationType.GSP,
-        ),
+    locations[1] = await create_location(
+        gsp_id=1,
+        location_name="test_save_gsp1",
+        geometry_wkt="POINT(11 11)",
+        location_type=dp.LocationType.GSP,
     )
-
 
     # Setup: Add forecast from same time "yesterday" so that the adjusted forecast can be calculated
     forecaster = await fetch_or_create_forecaster(client, model_tag=forecaster_name)
