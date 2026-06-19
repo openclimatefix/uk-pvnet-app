@@ -312,18 +312,19 @@ async def run(
         location_uuid=gsp_locations[0].location_uuid,
     )
 
-    requests: list[dp.CreateForecastRequest] = []
-    for forecaster in forecasters.values():
-        requests.extend(
-            await forecaster.create_write_requests(
-                locations=gsp_locations,
+    all_requests: list[list[dp.CreateForecastRequest]] = await asyncio.gather(
+        *(
+            forecaster.create_write_requests(
                 client=dp_client,
+                locations=gsp_locations,
                 metadata=input_metadata,
-            ),
-        )
+            )
+            for forecaster in forecasters.values()
+        ),
+    )
 
     write_results = await asyncio.gather(
-        *(dp_client.create_forecast(req) for req in requests),
+        *(dp_client.create_forecast(req) for reqs in all_requests for req in reqs),
         return_exceptions=True,
     )
     for exc in filter(lambda x: isinstance(x, Exception), write_results):

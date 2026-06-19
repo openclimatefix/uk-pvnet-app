@@ -20,32 +20,36 @@ async def fetch_locations(
 ) -> dict[int, dp.ListLocationsResponseLocationSummary]:
     """Fetch all UK locations from data platform."""
     # Get the UK nation location
-    nat_resp = await client.list_locations(
-        dp.ListLocationsRequest(
-            location_type_filter=dp.LocationType.NATION,
-            energy_source_filter=dp.EnergySource.SOLAR,
-            location_names_filter=["uk"],
-        ),
-    )
+    national_locations = (
+        await client.list_locations(
+            dp.ListLocationsRequest(
+                location_type_filter=dp.LocationType.NATION,
+                energy_source_filter=dp.EnergySource.SOLAR,
+                location_names_filter=["uk"],
+            ),
+        )
+    ).locations
 
-    if len(nat_resp.locations) != 1:
-        raise ValueError(f"Expected exactly one location for UK nation, got: {nat_resp.locations}")
+    if len(national_locations) != 1:
+        raise ValueError(f"Expected exactly one location for UK nation, got: {national_locations}")
 
-    national_location = nat_resp.locations[0]
+    national_location = national_locations[0]
 
     # Get all GSPs within the UK nation
-    gsp_resp = await client.list_locations(
-        dp.ListLocationsRequest(
-            location_type_filter=dp.LocationType.GSP,
-            energy_source_filter=dp.EnergySource.SOLAR,
-            # TODO: We should filter specifically within the UK, but the current locations in the
-            # data platform don't allow this yet. See commented line below for future use.
-            #enclosing_location_uuid_filter=national_location.location_uuid,
-        ),
-    )
+    gsp_locations = (
+        await client.list_locations(
+            dp.ListLocationsRequest(
+                location_type_filter=dp.LocationType.GSP,
+                energy_source_filter=dp.EnergySource.SOLAR,
+                # TODO: We should filter specifically within the UK, but the current locations in
+                # the data-platform don't allow this yet. See commented line below for future use.
+                #enclosing_location_uuid_filter=national_location.location_uuid,
+            ),
+        )
+    ).locations
 
     locations_lookup = {0: national_location}
-    for loc in gsp_resp.locations:
+    for loc in gsp_locations:
         gsp_id = int(loc.metadata.fields["gsp_id"].number_value)
         if gsp_id in locations_lookup:
             raise ValueError(f"Duplicate GSP ID {gsp_id} found in locations")
@@ -64,21 +68,21 @@ async def fetch_or_create_forecaster(
     # this is stored in the forecast metadata
     version = "2.8.0"
 
-    list_forecasters_response = await client.list_forecasters(
-        dp.ListForecastersRequest(forecaster_names_filter=[name]),
-    )
+    forecasters = (
+        await client.list_forecasters(
+            dp.ListForecastersRequest(forecaster_names_filter=[name]),
+        )
+    ).forecasters
 
     # Forecaster does not exist, create it
-    if len(list_forecasters_response.forecasters) == 0:
+    if len(forecasters) == 0:
         create_forecaster_response = await client.create_forecaster(
             dp.CreateForecasterRequest(name=name, version=version),
         )
         return create_forecaster_response.forecaster
 
     else:
-        filtered_forecasters = [
-            f for f in list_forecasters_response.forecasters if f.forecaster_version == version
-        ]
+        filtered_forecasters = [f for f in forecasters if f.forecaster_version == version]
 
         # Forecaster version does not exist, update it
         if len(filtered_forecasters) == 0:
@@ -101,16 +105,19 @@ async def build_input_metadata(
     metadata = {"app_version": Value(string_value=version("pvnet_app"))}
 
     # Add timestamp when ground truths were last updated
-    gsp_last_updated = await client.get_latest_observations(
-        dp.GetLatestObservationsRequest(
-            location_uuids=[location_uuid],
-            energy_source=dp.EnergySource.SOLAR,
-            observer_name="pvlive_in_day",
-        ),
-    )
-    if len(gsp_last_updated.observations) > 0:
+    latest_observations = (
+        await client.get_latest_observations(
+            dp.GetLatestObservationsRequest(
+                location_uuids=[location_uuid],
+                energy_source=dp.EnergySource.SOLAR,
+                observer_name="pvlive_in_day",
+            ),
+        )
+    ).observations
+
+    if len(latest_observations) > 0:
         metadata["gsp_last_updated"] = Value(
-            string_value=gsp_last_updated.observations[-1].timestamp_utc.isoformat(),
+            string_value=latest_observations[-1].timestamp_utc.isoformat(),
         )
 
     # Add timestamp when the NWP and satellite were last updated
@@ -253,17 +260,19 @@ async def fetch_adjuster_values(
     forecaster: dp.Forecaster,
 ) -> dict[int, float]:
     """Make a forecaster adjuster based on week average deltas."""
-    deltas_response = await client.get_week_average_deltas(
-        dp.GetWeekAverageDeltasRequest(
-            location_uuid=location_uuid,
-            energy_source=dp.EnergySource.SOLAR,
-            pivot_timestamp_utc=init_time_utc.tz_localize("UTC").to_pydatetime(),
-            forecaster=forecaster,
-            observer_name="pvlive_day_after",
-        ),
-    )
+    deltas = (
+        await client.get_week_average_deltas(
+            dp.GetWeekAverageDeltasRequest(
+                location_uuid=location_uuid,
+                energy_source=dp.EnergySource.SOLAR,
+                pivot_timestamp_utc=init_time_utc.tz_localize("UTC").to_pydatetime(),
+                forecaster=forecaster,
+                observer_name="pvlive_day_after",
+            ),
+        )
+    ).deltas
 
-    return {d.horizon_mins: d.delta_fraction for d in deltas_response.deltas}
+    return {d.horizon_mins: d.delta_fraction for d in deltas}
 
 
 def apply_adjuster_values(
