@@ -89,7 +89,6 @@ async def dp_client(
 @pytest_asyncio.fixture(scope="session")
 async def setup_dp_locations(dp_client) -> None:
     """Set up GSP locations and observer in the shared Data Platform for integration tests."""
-
     total_gsps = 348
     for i in range(total_gsps + 1):
         metadata = Struct(fields={"gsp_id": Value(number_value=i)})
