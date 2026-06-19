@@ -77,7 +77,7 @@ def dp_host_and_port() -> Generator[tuple[str, str], None, None]:
 
 @pytest_asyncio.fixture(scope="session")
 async def dp_client(
-    dp_host_and_port: tuple[str, str]
+    dp_host_and_port: tuple[str, str],
 ) -> Generator[dp.DataPlatformDataServiceStub, None, None]:
     """Create a gRPC client connected to the shared Data Platform server."""
     host, port = dp_host_and_port
@@ -89,7 +89,7 @@ async def dp_client(
 @pytest_asyncio.fixture(scope="session")
 async def setup_dp_locations(dp_client) -> None:
     """Set up GSP locations and observer in the shared Data Platform for integration tests."""
-    
+
     total_gsps = 348
     for i in range(total_gsps + 1):
         metadata = Struct(fields={"gsp_id": Value(number_value=i)})
