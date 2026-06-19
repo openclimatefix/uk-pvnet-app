@@ -47,6 +47,7 @@ dependencies = [
     "pytest-asyncio>=1.2.0",
     "h5py<3.12.0",
     "icechunk==2.0.6",
+    "pydantic-settings==2.14.2",
 ]
 
 [dependency-groups]

@@ -11,41 +11,7 @@ The app supports multiple model versions being deployed to live environments and
 
 ## Environment Variables
 
-The following environment variables are used in the app:
-
-### Required Environment Variables
-
-- `NWP_UKV_ZARR_PATH`: The path to the UKV NWP data in Zarr format.
-- `NWP_ECMWF_ZARR_PATH`: The path to the ECMWF NWP data in Zarr format.
-- `CLOUDCASTING_ZARR_PATH`: The path to the cloudcasting forecast data in Zarr format.
-- `SATELLITE_ICECHUNK_PATH_5`: The path to the satellite data icechunk.
-- `SATELLITE_ICECHUNK_PATH_15`: The path to the satellite data icechunk.
-- `SATELLITE_S3_REGION`: The s3 region for the satellite icechunk.
-
-#### These control the data platform connection
-
-Forecasts and GSP capacities are read from and written to the data platform.
-
-- `DATA_PLATFORM_HOST`: The host address for the data platform, default is localhost.
-- `DATA_PLATFORM_PORT`: The port for the data platform, default is 50051.
-
-#### These control the model(s) run
-
-- `RUN_CRITICAL_MODELS_ONLY`: Option to run critical models only. Defaults to false.
-
-#### These extra variables control validation and logging
-
-- `SENTRY_DSN`: Optional link to Sentry.
-- `ENVIRONMENT`: The environment this is running in. Defaults to local.
-- `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250MW.
-- `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500MW.
-- `FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT`, when the solar elevation is above this,
-  we expect positive forecast values. Defaults to 10 degrees.
-- `FILTER_BAD_FORECASTS`: If set to true and the forecast fails validation checks, it will not be 
-  saved. Defaults to false, where all forecasts are saved even if they fail the checks.
-- `RAISE_MODEL_FAILURE`: Option to raise an exception if a model fails to run. If set to "any" it 
-  will raise an exception if any model fails. If set to "critical" it will raise an exception if any
-  critical model fails. If not set, it will not raise an exception.
+The app is configured at runtime with many environmental variables. See [settings.py](src/pvnet_app/settings.py).
 
 
 ## ML Models Used for PVNet
