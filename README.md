@@ -33,13 +33,6 @@ Forecasts and GSP capacities are read from and written to the data platform.
 
 - `RUN_CRITICAL_MODELS_ONLY`: Option to run critical models only. Defaults to false.
 
-#### These control the saved results
-
-- `ALLOW_ADJUSTER`: Option to allow the adjuster to be used. If false this overwrites the adjuster 
-  option in the model configs so it is not used. Defaults to true.
-- `ALLOW_SAVE_GSP_SUM`: Option to allow model to save the GSP sum. If false this overwrites the
-  model configs so saving of the GSP sum is not used. Defaults to false.
-
 #### These extra variables control validation and logging
 
 - `SENTRY_DSN`: Optional link to Sentry.

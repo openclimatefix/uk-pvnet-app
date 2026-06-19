@@ -17,7 +17,7 @@ def get_gsp_locations() -> pd.DataFrame:
     return pd.read_csv(gsp_coordinates_path, index_col="gsp_id")
 
 
-async def get_capacities_from_dp(
+async def fetch_capacities(
     client: dp.DataPlatformDataServiceStub,
     gsp_ids: list[int],
 ) -> pd.Series:
@@ -93,7 +93,7 @@ async def create_null_generation_data(
     dp_channel = Channel(*dp_address)
     dp_client = dp.DataPlatformDataServiceStub(dp_channel)
 
-    capacities = await get_capacities_from_dp(
+    capacities = await fetch_capacities(
         client=dp_client,
         gsp_ids=df_locs.index.values.tolist(),
     )

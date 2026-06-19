@@ -5,10 +5,7 @@
 # These are the default arguments if not specified:
 #    is_critical: False
 #    is_day_ahead: False
-#    use_adjuster: False
 #    verbose_logging: False
-#    save_gsp_sum: False
-#    save_gsp_to_recent: False
 #    uses_satellite_data: True
 
 
@@ -27,10 +24,7 @@ models:
         commit: d756a68fcbafdea4b56226bd3c009d6e327856b9
     is_critical: True
     is_day_ahead: False
-    use_adjuster: True
-    save_gsp_sum: False
     log_level: DEBUG
-    save_gsp_to_recent: True
     uses_satellite_data: True
 
   # This uses 2NWP + satellite with 0-minute delay
@@ -43,10 +37,7 @@ models:
         commit: c78e796211f33e6f2561dced07d1de4845fb0bac
     is_critical: False
     is_day_ahead: False
-    use_adjuster: False
-    save_gsp_sum: False
     log_level: INFO
-    save_gsp_to_recent: False
     uses_satellite_data: True
 
   # Only uses ECMWF data
@@ -59,10 +50,7 @@ models:
         commit: 62d13dbe1458003995f671656e4db5c7b36dc912
     is_critical: True
     is_day_ahead: True
-    use_adjuster: False
-    save_gsp_sum: False
     log_level: INFO
-    save_gsp_to_recent: False
     uses_satellite_data: False
 
   # Only uses satellite data with 30 minute delay
@@ -75,10 +63,7 @@ models:
       commit: eb779e7aaa9e0fb5813889a8f9a02d6c518b432a
     is_critical: True
     is_day_ahead: False
-    use_adjuster: False
-    save_gsp_sum: False
     log_level: INFO
-    save_gsp_to_recent: False
     uses_satellite_data: True
 
   # Only uses UKV data
@@ -91,10 +76,7 @@ models:
         commit: 48ec9568d1f5e1e83618c84a8f53384bbc2c5b74
     is_critical: True
     is_day_ahead: True
-    use_adjuster: False
-    save_gsp_sum: False
     log_level: INFO
-    save_gsp_to_recent: False
     uses_satellite_data: False
 
   # Day-ahead model which does not use satellite data
@@ -107,8 +89,5 @@ models:
         commit: ad347ddcbce7e8b21d67dea0f93160ab49d4fa50
     is_critical: True
     is_day_ahead: True
-    use_adjuster: True
-    save_gsp_sum: True
     log_level: INFO
-    save_gsp_to_recent: True
     uses_satellite_data: False

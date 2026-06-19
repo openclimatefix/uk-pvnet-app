@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 import xarray as xr
 import yaml
-from dateutil.tz import UTC
+from betterproto.lib.google.protobuf import Struct
 from ocf import dp
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.pvnet_dataset import PVNetConcurrentDataset
@@ -23,7 +23,7 @@ from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.data.gsp import get_gsp_locations
 from pvnet_app.model_configs.pydantic_models import ModelConfig
-from pvnet_app.save import save_forecast_to_data_platform
+from pvnet_app.save import build_multi_forecast_creation_request
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -87,9 +87,6 @@ class Forecaster:
         self.device = device
         self.gsp_capacities = gsp_capacities
         self.national_capacity = national_capacity
-        self.apply_adjuster = model_config.use_adjuster
-        self.save_gsp_sum = model_config.save_gsp_sum
-        self.save_gsp_to_recent = model_config.save_gsp_to_recent
 
         # Load the GSP and summation models
         self.model, self.summation_model = self.load_model(
@@ -109,11 +106,8 @@ class Forecaster:
         self.da_normed_all: xr.DataArray
 
         # These are the valid times this forecast will predict for
-        self.valid_times = t0 + pd.timedelta_range(
-            start="30min",
-            freq="30min",
-            periods=self.model.forecast_len,
-        )
+        self.horizon_mins = np.arange(1, self.model.forecast_len+1) * 30
+        self.valid_times = self.t0 + pd.to_timedelta(self.horizon_mins, unit="m")
 
     def load_model(
         self,
@@ -213,10 +207,10 @@ class Forecaster:
         elevation = elevation[:, -normed_preds.shape[1]:]
         da_sundown_mask = xr.DataArray(
             data=elevation < MIN_DAY_ELEVATION,
-            dims=["gsp_id", "target_datetime_utc"],
+            dims=["gsp_id", "valid_times_utc"],
             coords={
                 "gsp_id": gsp_ids,
-                "target_datetime_utc": self.valid_times,
+                "valid_times_utc": self.valid_times,
             },
         )
         da_normed = da_normed.where(~da_sundown_mask).fillna(0.0)
@@ -224,7 +218,7 @@ class Forecaster:
         self.logger.debug("Converting to absolute MW")
         da_abs = da_normed * self.gsp_capacities[:, None, None]
 
-        max_preds = da_abs.sel(output_label="forecast_mw").max(dim="target_datetime_utc")
+        max_preds = da_abs.sel(output_label="p50").max(dim="valid_times_utc")
         self.logger.debug(f"Maximum predictions: {max_preds}")
 
         if self.summation_model is None:
@@ -272,20 +266,12 @@ class Forecaster:
             da_abs_national = da_normed_national * self.national_capacity
 
         self.logger.debug(
-            f"National forecast is {da_abs_national.sel(output_label='forecast_mw').values}",
+            f"National forecast is {da_abs_national.sel(output_label='p50').values}",
         )
-
-        # Rename the labels in the normalized dataset
-        ds_normed_all = xr.concat(
-            [da_normed_national, da_normed],
-            dim="gsp_id",
-        ).to_dataset(dim="output_label")
-        for var in ds_normed_all.data_vars:
-            ds_normed_all = ds_normed_all.rename({var: var.replace("_mw", "_fraction")})
 
         # Store the compiled predictions internally
         self.da_abs_all = xr.concat([da_abs_national, da_abs], dim="gsp_id")
-        self.da_normed_all = ds_normed_all.to_array(dim="output_label")
+        self.da_normed_all = xr.concat([da_normed_national, da_normed], dim="gsp_id")
 
     def preds_to_dataarray(
         self,
@@ -295,34 +281,35 @@ class Forecaster:
     ) -> xr.DataArray:
         """Put numpy array of predictions into a dataarray."""
         if output_quantiles is not None:
-            output_labels = [f"forecast_mw_plevel_{int(q * 100):02}" for q in output_quantiles]
-            output_labels[output_labels.index("forecast_mw_plevel_50")] = "forecast_mw"
+            output_labels = [f"p{int(q * 100):02}" for q in output_quantiles]
         else:
-            output_labels = ["forecast_mw"]
+            output_labels = ["p50"]
             preds = preds[..., np.newaxis]
 
         da = xr.DataArray(
             data=preds,
-            dims=["gsp_id", "target_datetime_utc", "output_label"],
+            dims=["gsp_id", "valid_times_utc", "output_label"],
             coords={
                 "gsp_id": gsp_ids,
-                "target_datetime_utc": self.valid_times,
                 "output_label": output_labels,
+                "valid_times_utc": self.valid_times,
+                "horizon_mins": ("valid_times_utc", self.horizon_mins),
             },
         )
         return da
 
-    async def save_forecast_to_dataplatform(
+    async def create_write_requests(
         self,
         client: dp.DataPlatformDataServiceStub,
-        locations_gsp_uuid_map: dict[int, str],
-    ) -> None:
+        locations: dict,
+        metadata: Struct | None,
+    ) -> list[dp.CreateForecastRequest]:
         """Save the compiled forecast to the data platform."""
-        self.logger.debug("Saving forecast to data platform")
-        await save_forecast_to_data_platform(
+        return await build_multi_forecast_creation_request(
             forecast_normed_da=self.da_normed_all,
-            locations_gsp_uuid_map=locations_gsp_uuid_map,
+            locations=locations,
             model_tag=self.model_tag,
-            init_time_utc=self.t0.to_pydatetime().replace(tzinfo=UTC),
+            init_time_utc=self.t0,
             client=client,
+            metadata=metadata,
     )

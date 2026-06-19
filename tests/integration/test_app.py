@@ -8,15 +8,15 @@ from ocf import dp
 
 from pvnet_app.app import run
 from pvnet_app.model_configs.pydantic_models import get_all_models
-from pvnet_app.save import fetch_dp_gsp_uuid_map
+from pvnet_app.save import fetch_locations
 
 NUM_GSPS = 334
 
 
 async def check_number_of_forecasts(client, model_configs, test_t0):
-    gsp_uuid_map = await fetch_dp_gsp_uuid_map(client=client)
-    national_uuid = gsp_uuid_map[0]
-    location_uuids = list(gsp_uuid_map.values())
+    gsp_uuid_map = await fetch_locations(client=client)
+    national_uuid = gsp_uuid_map[0].location_uuid
+    location_uuids = [loc.location_uuid for loc in gsp_uuid_map.values()]
     init_time_utc = test_t0.to_pydatetime().replace(tzinfo=datetime.UTC)
     first_target_time_utc = init_time_utc + datetime.timedelta(minutes=30)
 
@@ -103,7 +103,6 @@ async def test_app(
 
         # Set environmental variables
         os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
-        os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
@@ -141,7 +140,6 @@ async def test_app_no_sat(
         os.environ["SATELLITE_ICECHUNK_PATH_5"] = "s3://fake/sat5"
 
         os.environ["RUN_CRITICAL_MODELS_ONLY"] = "False"
-        os.environ["ALLOW_SAVE_GSP_SUM"] = "True"
         os.environ["FORECAST_VALIDATE_ZIG_ZAG_ERROR"] = "100000"
         os.environ["FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT"] = "90"
 
