@@ -1,7 +1,7 @@
 import datetime
 import os
 import time
-from collections.abc import Generator
+from collections.abc import AsyncIterator, Iterator
 from importlib.metadata import version
 
 import numpy as np
@@ -16,6 +16,8 @@ from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import PortWaitStrategy
 from testcontainers.postgres import PostgresContainer
 
+from pvnet_app.data.gsp import get_gsp_locations
+
 test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/test_data"
 
 DATA_PLATFORM_GRPC_PORT = 50051
@@ -26,9 +28,13 @@ DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS = 60
 def test_t0() -> pd.Timestamp:
     return pd.Timestamp.now(tz=None).floor("30min")
 
+@pytest.fixture(scope="session")
+def gsp_ids() -> list[int]:
+    return get_gsp_locations().index.tolist()
+
 
 @pytest.fixture(scope="session")
-def dp_host_and_port() -> Generator[tuple[str, str], None, None]:
+def dp_host_and_port() -> Iterator[tuple[str, int]]:
     """Spin up a single shared Data Platform gRPC server for the entire test session.
 
     Yields (host, port) only. Callers must create their own Channel+stub within
@@ -71,30 +77,31 @@ def dp_host_and_port() -> Generator[tuple[str, str], None, None]:
 
             port = data_platform_server.get_exposed_port(DATA_PLATFORM_GRPC_PORT)
             host = data_platform_server.get_container_host_ip()
-
             yield host, port
 
 
 @pytest_asyncio.fixture(scope="session")
 async def dp_client(
-    dp_host_and_port: tuple[str, str],
-) -> Generator[dp.DataPlatformDataServiceStub, None, None]:
+    dp_host_and_port: tuple[str, int],
+) -> AsyncIterator[dp.DataPlatformDataServiceStub]:
     """Create a gRPC client connected to the shared Data Platform server."""
     host, port = dp_host_and_port
     async with Channel(host=host, port=port) as channel:
-        client_stub = dp.DataPlatformDataServiceStub(channel)
-        yield client_stub
+        yield dp.DataPlatformDataServiceStub(channel)
 
 
 @pytest_asyncio.fixture(scope="session")
-async def setup_dp_locations(dp_client) -> None:
+async def dp_client_with_locations(
+    dp_client: dp.DataPlatformDataServiceStub, 
+    gsp_ids: list[int]
+) -> dp.DataPlatformDataServiceStub:
     """Set up GSP locations and observer in the shared Data Platform for integration tests."""
-    total_gsps = 348
-    for i in range(total_gsps + 1):
-        metadata = Struct(fields={"gsp_id": Value(number_value=i)})
-        location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
-        effective_capacity_watts = 15_000_000_000 if i == 0 else 1_000_000
-        location_name = f"gsp{i}" if i > 0 else "uk"
+
+    for gsp_id in gsp_ids:
+        metadata = Struct(fields={"gsp_id": Value(number_value=gsp_id)})
+        location_type = dp.LocationType.NATION if gsp_id == 0 else dp.LocationType.GSP
+        effective_capacity_watts = 15_000_000_000 if gsp_id == 0 else 1_000_000
+        location_name = "uk" if gsp_id == 0 else f"gsp{gsp_id}"
 
         req = dp.CreateLocationRequest(
             location_name=location_name,
@@ -110,20 +117,18 @@ async def setup_dp_locations(dp_client) -> None:
     # Setup observer
     await dp_client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
 
+    return dp_client
+
 
 def make_nwp_data(shell_path: str, varname: str, init_time: pd.Timestamp) -> xr.Dataset:
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(shell_path).compute()
 
-    ds.init_time.values[:] = init_time
+    ds = ds.assign_coords(init_time=[init_time])
 
     # This is important to avoid saving errors
     for v in list(ds.coords.keys()):
         if ds.coords[v].dtype == object:
-            ds[v].encoding.clear()
-
-    for v in list(ds.variables.keys()):
-        if ds[v].dtype == object:
             ds[v].encoding.clear()
 
     # Add data to dataset
@@ -180,14 +185,9 @@ def make_sat_data(test_t0: pd.Timestamp, delay_mins: int, freq_mins: int) -> xr.
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(f"{test_data_dir}/non_hrv_shell.zarr").compute()
 
-    # Expand time dim to be len 36 = 3 hours of 5 minute data
-    n_hours = 3
-
-    # Add times so they lead up to present
-    t0_datetime_utc = test_t0 - pd.Timedelta(minutes=delay_mins)
     times = pd.date_range(
-        t0_datetime_utc - pd.Timedelta(hours=n_hours),
-        t0_datetime_utc,
+        test_t0 - pd.Timedelta(hours=3),
+        test_t0 - pd.Timedelta(minutes=delay_mins),
         freq=f"{freq_mins}min",
     )
     ds = ds.expand_dims(time=times)

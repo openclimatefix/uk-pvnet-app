@@ -17,8 +17,7 @@ def load_yaml_config(path: str) -> dict:
         path: The path to the config file
     """
     with open(path) as file:
-        config = yaml.safe_load(file)
-    return config
+        return yaml.safe_load(file)
 
 
 def save_yaml_config(config: dict, path: str) -> None:
@@ -38,65 +37,55 @@ def populate_config_with_data_data_filepaths(config: dict) -> dict:
     Args:
         config: The data config
     """
-    production_paths = {
-        "nwp": {
-            "ukv": nwp_ukv_path,
-            "ecmwf": nwp_ecmwf_path,
-            "cloudcasting": nwp_cloudcasting_path,
-        },
-        "satellite": sat_path,
+    nwp_paths = {
+        "ukv": nwp_ukv_path,
+        "ecmwf": nwp_ecmwf_path,
+        "cloudcasting": nwp_cloudcasting_path,
     }
 
-    # Set the GSP input path to null. We don't need it in production
+    # Set the GSP input path
     config["input_data"]["generation"]["zarr_path"] = generation_path
 
     # Replace satellite data path
-    if "satellite" in config["input_data"] and \
-        config["input_data"]["satellite"]["zarr_path"] != "":
-            config["input_data"]["satellite"]["zarr_path"] = production_paths["satellite"]
+    if "satellite" in config["input_data"]:
+        config["input_data"]["satellite"]["zarr_path"] = sat_path
 
     # NWP is nested so much be treated separately
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config:
             provider = nwp_config[nwp_source]["provider"]
-            if nwp_config[nwp_source]["zarr_path"] != "" and \
-                provider not in production_paths["nwp"]:
+            if provider not in nwp_paths:
                 raise ValueError(f"Unknown NWP provider: {provider}")
-            nwp_config[nwp_source]["zarr_path"] = production_paths["nwp"][provider]
+            nwp_config[nwp_source]["zarr_path"] = nwp_paths[provider]
 
     return config
 
 
 def overwrite_config_dropouts(config: dict) -> dict:
-    """Overwrite the config drouput parameters for production.
+    """Overwrite the config dropout parameters for production.
 
     Args:
         config: The data config
     """
-    # Replace data sources
+    # Remove satellite dropout
     if "satellite" in config["input_data"]:
         satellite_config = config["input_data"]["satellite"]
 
-        if satellite_config["zarr_path"] != "":
-            satellite_config["dropout_timedeltas_minutes"] = []
-            satellite_config["dropout_fraction"] = 0
+        satellite_config["dropout_timedeltas_minutes"] = []
+        satellite_config["dropout_fraction"] = 0
 
-    # NWP is nested so must be treated separately
+    # Remove NWP dropout
     if "nwp" in config["input_data"]:
         nwp_config = config["input_data"]["nwp"]
         for nwp_source in nwp_config:
-            if nwp_config[nwp_source]["zarr_path"] != "":
-                nwp_config[nwp_source]["dropout_timedeltas_minutes"] = []
-                nwp_config[nwp_source]["dropout_fraction"] = 0
+            nwp_config[nwp_source]["dropout_timedeltas_minutes"] = []
+            nwp_config[nwp_source]["dropout_fraction"] = 0
 
     return config
 
 
-def modify_data_config_for_production(
-    input_path: str,
-    output_path: str,
-) -> None:
+def modify_data_config_for_production(input_path: str, output_path: str) -> None:
     """Resave the data config with the data source filepaths and dropouts overwritten.
 
     Args:

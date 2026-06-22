@@ -291,16 +291,10 @@ def get_pvnet_satellite_spatial_bounds(
     for x, y, gsp_id in zip(geo_xs, geo_ys, df_locs.index.values, strict=True):
         locations.append(Location(x=x, y=y, coord_system="geostationary", id=gsp_id))
 
-    ds = select_spatial_slice_pixels_multiple(ds, locations, width_pixels, height_pixels)
-
-    return ds
+    return select_spatial_slice_pixels_multiple(ds, locations, width_pixels, height_pixels)
 
 
-def contains_too_many_of_value(
-    ds: xr.Dataset,
-    value: float,
-    threshold: float,
-) -> bool:
+def contains_too_many_of_value(ds: xr.Dataset, value: float, threshold: float) -> bool:
     """Check if the input data contains more than a certain fraction of a given value.
 
     Args:
@@ -310,9 +304,7 @@ def contains_too_many_of_value(
     """
     logger.info(f"Checking satellite data for value ({value})")
 
-    too_many_values = False
-
-    # We will calculate fractional ocurence for each time
+    # We calculate fraction for each time
     reduction_dims = set(ds.data.dims) - {"time"}
     if np.isnan(value):
         # np.nan != np.nan, so we have to use isnan
@@ -320,15 +312,15 @@ def contains_too_many_of_value(
     else:
         fraction_values = (ds.data == value).mean(dim=reduction_dims)
 
-    if fraction_values.max() > threshold:
+    exceeds_threshold = fraction_values.values.max() > threshold
+
+    if exceeds_threshold:
         logger.warning(
             f"Satellite data contains values {value} greater than {threshold:.2%} of the time"
             f"{fraction_values.to_series().to_string()}",
         )
 
-        too_many_values = True
-
-    return too_many_values
+    return exceeds_threshold
 
 
 class SatelliteDownloader:

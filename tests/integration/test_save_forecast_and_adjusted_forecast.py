@@ -13,8 +13,7 @@ from src.pvnet_app.save import build_multi_forecast_creation_request, fetch_or_c
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_save_forecast_and_adjusted_forecast(
-    dp_client: dp.DataPlatformDataServiceStub,
-    setup_dp_locations,  # noqa: ARG001 - ensures observer exists before this test
+    dp_client_with_locations: dp.DataPlatformDataServiceStub,
 ):
     """Test saving data to the data-platform and that the adjusted forecast is calculated correctly.
 
@@ -27,6 +26,8 @@ async def test_save_forecast_and_adjusted_forecast(
     - Check that the forecast values are correct
     - Check that the adjusted forecast values are calculated and saved correctly
     """
+
+    dp_client = dp_client_with_locations
 
     # This will be the init time for the forecast we test on
     t0 = datetime(2025, 1, 1, tzinfo=UTC)

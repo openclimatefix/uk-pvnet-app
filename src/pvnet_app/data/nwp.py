@@ -301,9 +301,13 @@ class UKVDownloader(NWPDownloader):
         )
 
         # WGS84 is short for "World Geodetic System 1984". This is a lon-lat coord system
-        wgs84 = pyproj.Proj("+init=EPSG:4326")
+        wgs84 = pyproj.CRS("EPSG:4326")
 
-        laea_to_lon_lat = pyproj.Transformer.from_proj(laea, wgs84, always_xy=True).transform
+        laea_to_lon_lat = pyproj.Transformer.from_crs(
+            laea.crs,
+            wgs84,
+            always_xy=True,
+        ).transform
 
         # Calculate longitude and latitude from x_laea and y_laea
         # - x is an array of shape (455,)

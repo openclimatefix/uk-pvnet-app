@@ -301,7 +301,7 @@ class Forecaster:
     async def create_write_requests(
         self,
         client: dp.DataPlatformDataServiceStub,
-        locations: dict,
+        locations: dict[int, dp.ListLocationsResponseLocationSummary],
         metadata: Struct | None,
     ) -> list[dp.CreateForecastRequest]:
         """Save the compiled forecast to the data platform."""
