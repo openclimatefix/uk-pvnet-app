@@ -20,7 +20,7 @@ def test_validate_forecast_ok():
         index=pd.date_range("2025-01-01 00:00", periods=3, freq="30min"),
     )
     national_capacity = 50  # MW
-    zip_zag_warning_threshold = 500  # MW
+    zig_zag_warning_threshold = 500  # MW
     zig_zag_error_threshold = 1000  # MW
     sun_elevation_lower_limit = 10  # degrees
 
@@ -32,7 +32,7 @@ def test_validate_forecast_ok():
 
     assert check_forecast_fluctuations(
         national_forecast=national_forecast,
-        warning_threshold=zip_zag_warning_threshold,
+        warning_threshold=zig_zag_warning_threshold,
         error_threshold=zig_zag_error_threshold,
         model_name="test_model",
     )
@@ -46,7 +46,7 @@ def test_validate_forecast_ok():
     assert validate_forecast(
         national_forecast=national_forecast,
         national_capacity=national_capacity,
-        zip_zag_warning_threshold=zip_zag_warning_threshold,
+        zig_zag_warning_threshold=zig_zag_warning_threshold,
         zig_zag_error_threshold=zig_zag_error_threshold,
         sun_elevation_lower_limit=sun_elevation_lower_limit,
         model_name="test_model",
@@ -62,7 +62,7 @@ def test_validate_forecast_above_110percent():
     forecast_passes = validate_forecast(
         national_forecast=national_forecast,
         national_capacity=50,
-        zip_zag_warning_threshold=500,
+        zig_zag_warning_threshold=500,
         zig_zag_error_threshold=1000,
         sun_elevation_lower_limit=10,
         model_name="test_model",
@@ -83,7 +83,7 @@ def test_validate_forecast_over_20gw():
     forecast_passes = validate_forecast(
         national_forecast=national_forecast,
         national_capacity=100_000,
-        zip_zag_warning_threshold=500,
+        zig_zag_warning_threshold=500,
         zig_zag_error_threshold=1000,
         sun_elevation_lower_limit=10,
         model_name="test_model",
@@ -104,7 +104,7 @@ def test_validate_forecast_no_fluctuations(caplog):
         forecast_passes = validate_forecast(
             national_forecast=national_forecast,
             national_capacity=2000,
-            zip_zag_warning_threshold=500,
+            zig_zag_warning_threshold=500,
             zig_zag_error_threshold=1000,
             sun_elevation_lower_limit=10,
             model_name="test_model",
@@ -131,7 +131,7 @@ def test_validate_forecast_with_zigzag_warning(caplog):
         forecast_passes = validate_forecast(
             national_forecast=national_forecast,
             national_capacity=2000,
-            zip_zag_warning_threshold=40,
+            zig_zag_warning_threshold=40,
             zig_zag_error_threshold=1000,
             sun_elevation_lower_limit=10,
             model_name="test_model",
@@ -159,7 +159,7 @@ def test_validate_forecast_with_zigzag_failure(caplog):
         forecast_passes = validate_forecast(
             national_forecast=national_forecast,
             national_capacity=2000,
-            zip_zag_warning_threshold=10,
+            zig_zag_warning_threshold=10,
             zig_zag_error_threshold=40,
             sun_elevation_lower_limit=10,
             model_name="test_model",
@@ -189,7 +189,7 @@ def test_validate_forecast_sun_elevation_check(caplog):
         forecast_passes = validate_forecast(
             national_forecast=national_forecast,
             national_capacity=national_capacity,
-            zip_zag_warning_threshold=10,
+            zig_zag_warning_threshold=10,
             zig_zag_error_threshold=40,
             sun_elevation_lower_limit=10,
             model_name="test_model",

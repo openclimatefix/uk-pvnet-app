@@ -21,8 +21,6 @@ test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/test_data"
 DATA_PLATFORM_GRPC_PORT = 50051
 DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS = 60
 
-xr.set_options(keep_attrs=True)
-
 
 @pytest.fixture(scope="session")
 def test_t0() -> pd.Timestamp:
@@ -30,7 +28,7 @@ def test_t0() -> pd.Timestamp:
 
 
 @pytest.fixture(scope="session")
-def dp_client() -> Generator[tuple[str, str], None, None]:
+def dp_host_and_port() -> Generator[tuple[str, str], None, None]:
     """Spin up a single shared Data Platform gRPC server for the entire test session.
 
     Yields (host, port) only. Callers must create their own Channel+stub within
@@ -74,30 +72,23 @@ def dp_client() -> Generator[tuple[str, str], None, None]:
             port = data_platform_server.get_exposed_port(DATA_PLATFORM_GRPC_PORT)
             host = data_platform_server.get_container_host_ip()
 
-            # Set env vars so app.py connects to the test container
-            os.environ["DATA_PLATFORM_HOST"] = host
-            os.environ["DATA_PLATFORM_PORT"] = str(port)
-
             yield host, port
 
 
 @pytest_asyncio.fixture(scope="session")
-async def client(dp_client):
+async def dp_client(
+    dp_host_and_port: tuple[str, str],
+) -> Generator[dp.DataPlatformDataServiceStub, None, None]:
     """Create a gRPC client connected to the shared Data Platform server."""
-    host, port = dp_client
-    channel = Channel(host=host, port=port)
-    client_stub = dp.DataPlatformDataServiceStub(channel)
-
-    yield client_stub
-    channel.close()
+    host, port = dp_host_and_port
+    async with Channel(host=host, port=port) as channel:
+        client_stub = dp.DataPlatformDataServiceStub(channel)
+        yield client_stub
 
 
 @pytest_asyncio.fixture(scope="session")
-async def setup_dp_locations(dp_client: tuple[str, str]) -> None:
+async def setup_dp_locations(dp_client) -> None:
     """Set up GSP locations and observer in the shared Data Platform for integration tests."""
-    host, port = dp_client
-    channel = Channel(host=host, port=port)
-    client = dp.DataPlatformDataServiceStub(channel)
 
     total_gsps = 348
     for i in range(total_gsps + 1):
@@ -115,12 +106,10 @@ async def setup_dp_locations(dp_client: tuple[str, str]) -> None:
             metadata=metadata,
             valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
         )
-        await client.create_location(req)
+        await dp_client.create_location(req)
 
     # Setup observer
-    await client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
-
-    channel.close()
+    await dp_client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
 
 
 def make_nwp_data(shell_path: str, varname: str, init_time: pd.Timestamp) -> xr.Dataset:

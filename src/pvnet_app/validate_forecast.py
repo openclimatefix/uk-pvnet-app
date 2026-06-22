@@ -76,7 +76,7 @@ def check_forecast_fluctuations(
         national_forecast: The forecast values for the nation (in MW)
         warning_threshold: The threshold in MW for a warning
         error_threshold: The threshold in MW where the forecast is considered to be in error
-        model_name: The name of the model that generated
+        model_name: The name of the model that generated the forecast
     """
     forecast_okay = True
 
@@ -125,8 +125,8 @@ def check_forecast_positive_during_daylight(
     )
 
     # Check if forecast values are > 0 when sun elevation is over the threshold
-    daylight_mask = solpos["elevation"] > sun_elevation_lower_limit
-    bad_times = national_forecast[daylight_mask][national_forecast[daylight_mask] <= 0]
+    is_daylight = solpos["elevation"] > sun_elevation_lower_limit
+    bad_times = national_forecast[is_daylight & (national_forecast <= 0)]
 
     if not bad_times.empty:
         logger.warning(
@@ -142,7 +142,7 @@ def check_forecast_positive_during_daylight(
 def validate_forecast(
     national_forecast: pd.Series,
     national_capacity: float,
-    zip_zag_warning_threshold: float,
+    zig_zag_warning_threshold: float,
     zig_zag_error_threshold: float,
     sun_elevation_lower_limit: float,
     model_name: str,
@@ -157,7 +157,7 @@ def validate_forecast(
     Args:
         national_forecast: All the forecast values for the nation (in MW).
         national_capacity: The national PV capacity (in MW).
-        zip_zag_warning_threshold: The threshold in MW for zig-zag check warning.
+        zig_zag_warning_threshold: The threshold in MW for zig-zag check warning.
         zig_zag_error_threshold:  The threshold in MW for zig-zag check failure.
         sun_elevation_lower_limit: The lower limit for the sun elevation (in degrees). The forecast
             values must be positive when the sun is above this angle.
@@ -172,7 +172,7 @@ def validate_forecast(
     forecast_fluctuations_okay = check_forecast_fluctuations(
         national_forecast=national_forecast,
         model_name=model_name,
-        warning_threshold=zip_zag_warning_threshold,
+        warning_threshold=zig_zag_warning_threshold,
         error_threshold=zig_zag_error_threshold,
     )
 

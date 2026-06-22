@@ -2,8 +2,6 @@
 
 import asyncio
 import logging
-import os
-from importlib.metadata import version
 
 import fsspec
 import numpy as np
@@ -58,6 +56,13 @@ async def fetch_locations(
     return locations_lookup
 
 
+def extract_location_capacities_mwp(
+    locations: dict[int, dp.ListLocationsResponseLocationSummary],
+) -> dict[int, float]:
+    """Extract capacities from location summaries."""
+    return {gsp_id: loc.effective_capacity_watts / 1e6 for gsp_id, loc in locations.items()}
+
+
 async def fetch_or_create_forecaster(
     client: dp.DataPlatformDataServiceStub,
     model_tag: str,
@@ -100,9 +105,11 @@ async def fetch_or_create_forecaster(
 async def build_input_metadata(
     client: dp.DataPlatformDataServiceStub,
     location_uuid: str,
+    input_s3_paths: dict[str, str],
+    app_version: str,
 ) -> Struct:
     """Get metadata for the forecast."""
-    metadata = {"app_version": Value(string_value=version("pvnet_app"))}
+    metadata = {"app_version": Value(string_value=app_version)}
 
     # Add timestamp when ground truths were last updated
     latest_observations = (
@@ -122,23 +129,17 @@ async def build_input_metadata(
 
     # Add timestamp when the NWP and satellite were last updated
     fs = fsspec.filesystem("s3", anon=False)
-    input_sources = {
-        "nwp_ecmwf": "NWP_ECMWF_ZARR_PATH",
-        "nwp_ukv": "NWP_UKV_ZARR_PATH",
-        "satellite": "SATELLITE_ICECHUNK_PATH_5",
-        "satellite_15": "SATELLITE_ICECHUNK_PATH_15",
-    }
-    for name, env_var in input_sources.items():
-        path = os.getenv(env_var)
-        if path is not None:
+
+    for name, s3_path in input_s3_paths.items():
+        if s3_path is not None:
             try:
-                if path.endswith(".zarr"):
-                    modified_date = fs.modified(f"{path}/.zattrs")
-                elif path.endswith(".icechunk"):
-                    modified_date = fs.modified(f"{path}/refs/branch.main")
+                if s3_path.endswith(".zarr"):
+                    modified_date = fs.modified(f"{s3_path}/.zattrs")
+                elif s3_path.endswith(".icechunk"):
+                    modified_date = fs.modified(f"{s3_path}/refs/branch.main")
                 metadata[f"{name}_last_modified"] = Value(string_value=modified_date.isoformat())
             except Exception as e:
-                logger.debug(f"Could not get metadata for {env_var}: {e}")
+                logger.debug(f"Could not get metadata for {name}: {e}")
 
     return Struct(fields=metadata)
 

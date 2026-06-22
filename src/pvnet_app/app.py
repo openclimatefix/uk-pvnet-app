@@ -20,8 +20,9 @@ from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownl
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_configs.pydantic_models import get_all_models
-from pvnet_app.save import build_input_metadata, fetch_locations
-from pvnet_app.utils import check_model_runs_finished, get_boolean_env_var, save_batch_to_s3
+from pvnet_app.save import build_input_metadata, extract_location_capacities_mwp, fetch_locations
+from pvnet_app.settings import AppSettings
+from pvnet_app.utils import check_model_runs_finished, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
 __version__ = version("pvnet-app")
@@ -39,16 +40,6 @@ logger = logging.getLogger()
 # Turn off logs from aiobotocore
 logging.getLogger("aiobotocore").setLevel(logging.ERROR)
 
-# Sentry
-sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"),
-    environment=os.getenv("ENVIRONMENT", "local"),
-    traces_sample_rate=1,
-)
-
-sentry_sdk.set_tag("app_name", "pvnet_app")
-sentry_sdk.set_tag("version", __version__)
-
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
 
@@ -59,85 +50,49 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # APP MAIN
 
 async def run(
+    settings: AppSettings,
     t0: str | None = None,
     write_predictions: bool = True,
 ) -> None:
     """Inference function to run PVNet.
 
     Args:
+        settings: The application settings
         t0 (str): Datetime at which forecast is made
         write_predictions (bool): Whether to write prediction to the database. Else returns as
             DataArray for local testing.
-
-    These variables are optional depending on the models being run:
-        - NWP_UKV_ZARR_PATH
-        - NWP_ECMWF_ZARR_PATH
-        - CLOUDCASTING_ZARR_PATH
-        - SATELLITE_ICECHUNK_PATH_5
-        - SATELLITE_ICECHUNK_PATH_15
-    The following are optional:
-        - SENTRY_DSN, optional link to sentry
-        - ENVIRONMENT, the environment this is running in, defaults to local
-        - RUN_CRITICAL_MODELS_ONLY, option to run critical models only, defaults to false
-        - FORECAST_VALIDATE_ZIG_ZAG_WARNING, threshold for forecast zig-zag warning,
-          defaults to 250 MW.
-        - FORECAST_VALIDATE_ZIG_ZAG_ERROR, threshold for forecast zig-zag error on,
-          defaults to 500 MW.
-        - FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT, when the solar elevation is above this,
-          we expect positive forecast values. Defaults to 10 degrees.
-        - FILTER_BAD_FORECASTS, option to filter out bad forecasts. If set to true and the forecast
-          fails the validation checks, it will not be saved. Defaults to false, where all forecasts
-          are saved even if they fail the checks.
-        - RAISE_MODEL_FAILURE: Option to raise an exception if a model fails to run. If set to
-          "any" it will raise an exception if any model fails. If set to "critical" it will raise
-          an exception if any critical model fails. If not set, it will not raise an exception.
-        - DATA_PLATFORM_HOST: Hostname of the data platform gRPC server. Defaults to localhost.
-        - DATA_PLATFORM_PORT: Port of the data platform gRPC server. Defaults to 50051.
-        - HUGGINGFACE_TOKEN: Huggingface token, required if any of the models being run are in
-          private repositories.
     """
     # ---------------------------------------------------------------------------
-    # 0. Basic set up
+    # Basic set up
+
+    # -- Initialize Sentry
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        traces_sample_rate=1,
+    )
+    sentry_sdk.set_tag("app_name", "pvnet_app")
+    sentry_sdk.set_tag("version", __version__)
 
     # If inference datetime is None, set to now
     t0 = pd.Timestamp.now(tz="UTC") if t0 is None else pd.Timestamp(t0).tz_localize("UTC")
     # Round down to last 30 minutes
     t0 = t0.replace(tzinfo=None).floor("30min")
 
-    # --- Unpack the environment variables
-    run_critical_models_only = get_boolean_env_var("RUN_CRITICAL_MODELS_ONLY", default=False)
-    filter_bad_forecasts = get_boolean_env_var("FILTER_BAD_FORECASTS", default=False)
-    raise_model_failure = os.getenv("RAISE_MODEL_FAILURE", None)
-    hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
-
-    zig_zag_warning_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_WARNING", 250))
-    zig_zag_error_threshold = float(os.getenv("FORECAST_VALIDATE_ZIG_ZAG_ERROR", 500))
-    sun_elevation_lower_limit = float(os.getenv("FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT", 10))
-
-    data_platform_host = os.getenv("DATA_PLATFORM_HOST", "localhost")
-    data_platform_port = int(os.getenv("DATA_PLATFORM_PORT", "50051"))
-    s3_batch_save_dir = os.getenv("SAVE_BATCHES_DIR", None)
-    ecmwf_source_path = os.getenv("NWP_ECMWF_ZARR_PATH", None)
-    ukv_source_path = os.getenv("NWP_UKV_ZARR_PATH", None)
-    cloudcasting_source_path = os.getenv("CLOUDCASTING_ZARR_PATH", None)
-    sat_source_path_5 = os.getenv("SATELLITE_ICECHUNK_PATH_5", None)
-    sat_source_path_15 = os.getenv("SATELLITE_ICECHUNK_PATH_15", None)
-    sat_s3_region = os.getenv("SATELLITE_S3_REGION", None)
-
     # --- Log version and variables
     pvnet_version = version("pvnet")
     logger.info(f"Using `pvnet` library version: {pvnet_version}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Making forecast for init time: {t0}")
-    logger.info(f"Running critical models only: {run_critical_models_only}")
+    logger.info(f"Running critical models only: {settings.run_critical_models_only}")
 
     # --- Get the model configurations
-    model_configs = get_all_models(get_critical_only=run_critical_models_only)
+    model_configs = get_all_models(get_critical_only=settings.run_critical_models_only)
 
     if len(model_configs) == 0:
         raise Exception("No models found after filtering")
 
-    # 0. Get Model configs
+    # Get Model configs
     data_config_paths: dict[str, str] = {}
     data_configs: list[dict] = []
     for model_config in model_configs:
@@ -145,20 +100,23 @@ async def run(
         data_config_path = PVNetBaseModel.get_data_config(
             model_config.pvnet.repo,
             revision=model_config.pvnet.commit,
-            token=hf_token,
+            token=settings.huggingface_token,
         )
         data_config_paths[model_config.name] = data_config_path
         data_configs.append(load_yaml_config(data_config_path))
 
     # ---------------------------------------------------------------------------
-    # 1. Prepare data sources
+    #  Prepare data sources
 
+    # --- Get locations metadata from the data platform
+    logger.info("Loading locations")
 
-    # --- Get capacities from the database or data platform
-    logger.info("Loading capacities")
-    ds_gen = await create_null_generation_data(
-        dp_address=(data_platform_host, data_platform_port),
+    async with Channel(settings.data_platform_host, settings.data_platform_port) as dp_channel:
+        locations = await fetch_locations(client=dp.DataPlatformDataServiceStub(dp_channel))
+
+    ds_gen = create_null_generation_data(
         t0=t0,
+        capacities_mwp=extract_location_capacities_mwp(locations),
     )
 
     ds_gen.to_zarr(generation_path)
@@ -175,9 +133,9 @@ async def run(
 
         sat_downloader = SatelliteDownloader(
             t0=t0,
-            source_path_5=sat_source_path_5,
-            source_path_15=sat_source_path_15,
-            s3_region=sat_s3_region,
+            source_path_5=settings.satellite_icechunk_path_5,
+            source_path_15=settings.satellite_icechunk_path_15,
+            s3_region=settings.satellite_s3_region,
         )
         sat_downloader.run()
 
@@ -195,25 +153,27 @@ async def run(
                     required_providers.add(source["provider"])
 
         if "ukv" in required_providers:
-            ukv_downloader = UKVDownloader(source_path=ukv_source_path)
+            ukv_downloader = UKVDownloader(source_path=settings.nwp_ukv_zarr_path)
             ukv_downloader.run()
 
             data_downloaders.append(ukv_downloader)
 
         if "ecmwf" in required_providers:
-            ecmwf_downloader = ECMWFDownloader(source_path=ecmwf_source_path)
+            ecmwf_downloader = ECMWFDownloader(source_path=settings.nwp_ecmwf_zarr_path)
             ecmwf_downloader.run()
 
             data_downloaders.append(ecmwf_downloader)
 
         if "cloudcasting" in required_providers:
-            cloudcasting_downloader = CloudcastingDownloader(source_path=cloudcasting_source_path)
+            cloudcasting_downloader = CloudcastingDownloader(
+                source_path=settings.cloudcasting_zarr_path,
+            )
             cloudcasting_downloader.run()
 
             data_downloaders.append(cloudcasting_downloader)
 
     # ---------------------------------------------------------------------------
-    # 2. Set up models
+    # Set up models
 
     # Prepare all the models which can be run
     forecasters = {}
@@ -239,7 +199,7 @@ async def run(
                 device=device,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
-                hf_token=hf_token,
+                hf_token=settings.huggingface_token,
             )
 
         else:
@@ -250,18 +210,18 @@ async def run(
 
     # ---------------------------------------------------------------------------
     # Make predictions
+
     logger.info("Making predictions")
 
-    first_model_name = next(iter(forecasters.keys()))
-    for model_name, forecaster in forecasters.items():
+    for i, (model_name, forecaster) in enumerate(forecasters.items()):
         batch = forecaster.make_batch()
 
         # Do basic validation of the batch: Will raise error if the batch fails the checks
         check_batch(batch)
 
-        if (s3_batch_save_dir is not None) and model_name == first_model_name:
+        if (settings.save_batches_dir is not None) and i == 0:
             # Save the batch under the name of the first model
-            save_batch_to_s3(batch, model_name, s3_batch_save_dir)
+            save_batch_to_s3(batch, model_name, settings.save_batches_dir)
 
         forecaster.predict(batch)
 
@@ -271,6 +231,7 @@ async def run(
 
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
+
     logger.info("Validating forecasts")
     for model_name in list(forecasters.keys()):
         national_forecast = (
@@ -280,15 +241,15 @@ async def run(
         forecast_okay = validate_forecast(
             national_forecast=national_forecast,
             national_capacity=national_capacity,
-            zip_zag_warning_threshold=zig_zag_warning_threshold,
-            zig_zag_error_threshold=zig_zag_error_threshold,
-            sun_elevation_lower_limit=sun_elevation_lower_limit,
+            zig_zag_warning_threshold=settings.forecast_validate_zig_zag_warning_threshold,
+            zig_zag_error_threshold=settings.forecast_validate_zig_zag_error_threshold,
+            sun_elevation_lower_limit=settings.forecast_validate_sun_elevation_lower_limit,
             model_name=model_name,
         )
 
         if not forecast_okay:
             logger.warning(f"Forecast for model {model_name} failed validation")
-            if filter_bad_forecasts:
+            if settings.filter_bad_forecasts:
                 # This forecast will not be saved
                 del forecasters[model_name]
 
@@ -302,48 +263,53 @@ async def run(
 
     # ---------------------------------------------------------------------------
     # Write predictions to data-platform
+
     logger.info("Writing to data platform")
 
-    dp_channel = Channel(data_platform_host, data_platform_port)
-    dp_client = dp.DataPlatformDataServiceStub(dp_channel)
-    gsp_locations = await fetch_locations(client=dp_client)
-    input_metadata = await build_input_metadata(
-        client=dp_client,
-        location_uuid=gsp_locations[0].location_uuid,
-    )
+    async with Channel(settings.data_platform_host, settings.data_platform_port) as dp_channel:
+        dp_client = dp.DataPlatformDataServiceStub(dp_channel)
 
-    all_requests: list[list[dp.CreateForecastRequest]] = await asyncio.gather(
-        *(
-            forecaster.create_write_requests(
-                client=dp_client,
-                locations=gsp_locations,
-                metadata=input_metadata,
-            )
-            for forecaster in forecasters.values()
-        ),
-    )
+        input_metadata = await build_input_metadata(
+            client=dp_client,
+            location_uuid=locations[0].location_uuid,
+            input_s3_paths = {
+                "nwp_ecmwf": settings.nwp_ecmwf_zarr_path,
+                "nwp_ukv": settings.nwp_ukv_zarr_path,
+                "satellite": settings.satellite_icechunk_path_5,
+                "satellite_15": settings.satellite_icechunk_path_15,
+            },
+            app_version=__version__,
+        )
 
-    write_results = await asyncio.gather(
-        *(dp_client.create_forecast(req) for reqs in all_requests for req in reqs),
-        return_exceptions=True,
-    )
+        all_requests: list[list[dp.CreateForecastRequest]] = await asyncio.gather(
+            *(
+                forecaster.create_write_requests(
+                    client=dp_client,
+                    locations=locations,
+                    metadata=input_metadata,
+                )
+                for forecaster in forecasters.values()
+            ),
+        )
+
+        write_results = await asyncio.gather(
+            *(dp_client.create_forecast(req) for reqs in all_requests for req in reqs),
+            return_exceptions=True,
+        )
+
     for exc in filter(lambda x: isinstance(x, Exception), write_results):
         raise exc
 
-    dp_channel.close()
-
     logger.info("Finished forecast")
 
-    if raise_model_failure in ["any", "critical"]:
+    if settings.raise_model_failure in ["any", "critical"]:
         check_model_runs_finished(
             completed_forecasts=list(forecasters.keys()),
             model_configs=model_configs,
-            raise_if_missing=raise_model_failure,
+            raise_if_missing=settings.raise_model_failure,
         )
 
 def main() -> None:
     """Main entrypoint to the inference app."""
-    asyncio.run(run())
-
-if __name__ == "__main__":
-    main()
+    settings = AppSettings()
+    asyncio.run(run(settings=settings))
