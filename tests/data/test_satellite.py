@@ -79,9 +79,9 @@ def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp):
 
 
 def test_run_sat_delayed_5_and_15_data(
-    sat_5_data_delayed: xr.Dataset, 
-    sat_15_data: xr.Dataset, 
-    test_t0: pd.Timestamp
+    sat_5_data_delayed: xr.Dataset,
+    sat_15_data: xr.Dataset,
+    test_t0: pd.Timestamp,
 ):
     """Download and process 5 and 15 minute satellite data. Use the 15 minute data since the
     5 minute data is too delayed

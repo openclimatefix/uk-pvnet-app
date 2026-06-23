@@ -92,8 +92,8 @@ async def dp_client(
 
 @pytest_asyncio.fixture(scope="session")
 async def dp_client_with_locations(
-    dp_client: dp.DataPlatformDataServiceStub, 
-    gsp_ids: list[int]
+    dp_client: dp.DataPlatformDataServiceStub,
+    gsp_ids: list[int],
 ) -> dp.DataPlatformDataServiceStub:
     """Set up GSP locations and observer in the shared Data Platform for integration tests."""
 

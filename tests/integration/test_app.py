@@ -3,8 +3,8 @@ import tempfile
 from unittest.mock import patch
 
 import pandas as pd
-import xarray as xr
 import pytest
+import xarray as xr
 from ocf import dp
 
 from pvnet_app.app import run
@@ -60,7 +60,7 @@ async def check_number_of_forecasts(
                         location_uuid=locations_dict[0].location_uuid,
                         forecaster=forecasters_by_name[forecaster_name],
                         initialization_timestamp_utc=test_t0.tz_localize("UTC").to_pydatetime(),
-                        # Set wide time window to make sure there aren't any values outside the 
+                        # Set wide time window to make sure there aren't any values outside the
                         # expected valid times
                         time_window=dp.TimeWindow(
                             start_timestamp_utc=(
