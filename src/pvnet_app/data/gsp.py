@@ -8,8 +8,10 @@ import xarray as xr
 
 def get_gsp_locations() -> pd.DataFrame:
     """Load the GSP locations metadata."""
-    gsp_coordinates_path = files("pvnet_app.data").joinpath("uk_gsp_locations_20251204.csv")
-    return pd.read_csv(gsp_coordinates_path, index_col="gsp_id")
+    return pd.read_csv(
+        files("pvnet_app.data").joinpath("uk_gsp_locations_20260209_no_shetlands.csv"),
+        index_col="gsp_id",
+    )
 
 
 def create_null_generation_data(t0: pd.Timestamp, capacities_mwp: dict[int, float]) -> xr.Dataset:
