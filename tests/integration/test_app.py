@@ -6,16 +6,16 @@ import pandas as pd
 import pytest
 import xarray as xr
 from ocf import dp
-from pvnet_app.models.pydantic_models import ModelConfig, get_all_models
 
 from pvnet_app.app import run
+from pvnet_app.models.registry import ModelSpec, get_model_specs
 from pvnet_app.save import fetch_locations
 from pvnet_app.settings import AppSettings
 
 
 async def check_number_of_forecasts(
     client: dp.DataPlatformDataServiceStub,
-    model_configs: list[ModelConfig],
+    model_specs: list[ModelSpec],
     test_t0: pd.Timestamp,
     expected_gsp_ids: list[int],
 ) -> None:
@@ -24,12 +24,12 @@ async def check_number_of_forecasts(
     forecasters = (await client.list_forecasters(dp.ListForecastersRequest())).forecasters
     forecasters_by_name = {f.forecaster_name: f for f in forecasters}
 
-    for model_config in model_configs:
-        model_name = model_config.name.replace("-", "_")
+    for model_spec in model_specs:
+        model_name = model_spec.name.replace("-", "_")
         model_adjust = f"{model_name}_adjust"
         expected_valid_times = pd.date_range(
             test_t0 + pd.Timedelta("30min"),
-            periods=(72 if model_config.is_day_ahead else 16),
+            periods=(72 if model_spec.is_day_ahead else 16),
             freq="30min",
             tz="UTC",
         )
@@ -134,8 +134,8 @@ async def test_app(
             # Run prediction
             await run(settings=settings, t0=test_t0)
 
-    model_configs = get_all_models(get_critical_only=False)
-    await check_number_of_forecasts(dp_client_with_locations, model_configs, test_t0, gsp_ids)
+    model_specs = get_model_specs(get_critical_only=False)
+    await check_number_of_forecasts(dp_client_with_locations, model_specs, test_t0, gsp_ids)
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -182,7 +182,7 @@ async def test_app_no_sat(
             await run(settings=settings, t0=t0)
 
     # Only the models which don't use satellite will be run in this case
-    model_configs = get_all_models()
-    model_configs = [model for model in model_configs if not model.uses_satellite_data]
+    model_specs = get_model_specs()
+    model_specs = [model for model in model_specs if not model.uses_satellite_data]
 
-    await check_number_of_forecasts(dp_client_with_locations, model_configs, test_t0, gsp_ids)
+    await check_number_of_forecasts(dp_client_with_locations, model_specs, test_t0, gsp_ids)

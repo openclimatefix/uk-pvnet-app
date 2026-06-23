@@ -20,9 +20,9 @@ from pvnet.utils import validate_batch_against_config
 from pvnet_summation.data.datamodule import construct_sample as construct_sum_sample
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
-from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.data.gsp import get_gsp_locations
-from pvnet_app.models.pydantic_models import ModelConfig
+from pvnet_app.model_input_config import modify_data_config_for_production
+from pvnet_app.models.registry import ModelSpec
 from pvnet_app.save import build_multi_forecast_creation_request
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
@@ -52,7 +52,7 @@ class Forecaster:
 
     def __init__(
         self,
-        model_config: ModelConfig,
+        model_spec: ModelSpec,
         data_config_path: str,
         t0: pd.Timestamp,
         gsp_ids: list[int],
@@ -64,7 +64,7 @@ class Forecaster:
         """Class for making and compiling solar forecasts from for all GB GSPs and national total.
 
         Args:
-            model_config: The configuration for the model
+            model_spec: The configuration for the model
             data_config_path: The path to the model data config
             t0: The forecast init-time
             gsp_ids: List of gsp_ids to make predictions for
@@ -75,12 +75,12 @@ class Forecaster:
                 HF authentication token. If True, the token is read from the HF config folder.
                 If string, it is used as the authentication token.
         """
-        self.logger = logging.getLogger(model_config.name)
-        self.logger.setLevel(getattr(logging, model_config.log_level))
-        self.logger.info(f"Loading model: {model_config.pvnet.repo}")
+        self.logger = logging.getLogger(model_spec.name)
+        self.logger.setLevel(getattr(logging, model_spec.log_level))
+        self.logger.info(f"Loading model: {model_spec.pvnet.repo}")
 
         # Store settings
-        self.model_tag = model_config.name
+        self.model_tag = model_spec.name
         self.data_config_path = data_config_path
         self.t0 = t0
         self.gsp_ids = gsp_ids
@@ -90,10 +90,10 @@ class Forecaster:
 
         # Load the GSP and summation models
         self.model, self.summation_model = self.load_model(
-            model_config.pvnet.repo,
-            model_config.pvnet.commit,
-            model_config.summation.repo,
-            model_config.summation.commit,
+            model_spec.pvnet.repo,
+            model_spec.pvnet.commit,
+            model_spec.summation.repo,
+            model_spec.summation.commit,
             device,
             hf_token,
         )

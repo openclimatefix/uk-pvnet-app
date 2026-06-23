@@ -12,14 +12,14 @@ from grpclib.client import Channel
 from ocf import dp
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
-from pvnet_app.config import load_yaml_config
 from pvnet_app.consts import generation_path
 from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.forecaster import Forecaster
-from pvnet_app.models.pydantic_models import get_all_models
+from pvnet_app.model_input_config import load_yaml_config
+from pvnet_app.models.registry import get_model_specs
 from pvnet_app.save import build_input_metadata, extract_location_capacities_mwp, fetch_locations
 from pvnet_app.settings import AppSettings
 from pvnet_app.utils import check_model_runs_finished, save_batch_to_s3
@@ -87,22 +87,22 @@ async def run(
     logger.info(f"Running critical models only: {settings.run_critical_models_only}")
 
     # --- Get the model configurations
-    model_configs = get_all_models(get_critical_only=settings.run_critical_models_only)
+    model_specs = get_model_specs(get_critical_only=settings.run_critical_models_only)
 
-    if len(model_configs) == 0:
+    if len(model_specs) == 0:
         raise Exception("No models found after filtering")
 
     # Get Model configs
     data_config_paths: dict[str, str] = {}
     data_configs: list[dict] = []
-    for model_config in model_configs:
+    for model_spec in model_specs:
         # First load the data config
         data_config_path = PVNetBaseModel.get_data_config(
-            model_config.pvnet.repo,
-            revision=model_config.pvnet.commit,
+            model_spec.pvnet.repo,
+            revision=model_spec.pvnet.commit,
             token=settings.huggingface_token,
         )
-        data_config_paths[model_config.name] = data_config_path
+        data_config_paths[model_spec.name] = data_config_path
         data_configs.append(load_yaml_config(data_config_path))
 
     # ---------------------------------------------------------------------------
@@ -177,22 +177,22 @@ async def run(
 
     # Prepare all the models which can be run
     forecasters = {}
-    for model_config in model_configs:
+    for model_spec in model_specs:
         # First load the data config
-        data_config_path = data_config_paths[model_config.name]
+        data_config_path = data_config_paths[model_spec.name]
 
         # Check if the data available will allow the model to run
-        logger.info(f"Checking that the input data for model '{model_config.name}' exists")
+        logger.info(f"Checking that the input data for model '{model_spec.name}' exists")
         model_can_run = all(
             downloader.check_model_inputs_available(data_config_path, t0)
             for downloader in data_downloaders
         )
 
         if model_can_run:
-            logger.info(f"The input data for model '{model_config.name}' is available")
+            logger.info(f"The input data for model '{model_spec.name}' is available")
             # Set up a forecast compiler for the model
-            forecasters[model_config.name] = Forecaster(
-                model_config=model_config,
+            forecasters[model_spec.name] = Forecaster(
+                model_spec=model_spec,
                 data_config_path=data_config_path,
                 t0=t0,
                 gsp_ids=gsp_ids,
@@ -203,7 +203,7 @@ async def run(
             )
 
         else:
-            logger.warning(f"The model {model_config.name} cannot be run with input data available")
+            logger.warning(f"The model {model_spec.name} cannot be run with input data available")
 
     if len(forecasters) == 0:
         raise Exception("No models were compatible with the available input data.")
@@ -305,7 +305,7 @@ async def run(
     if settings.raise_model_failure in ["any", "critical"]:
         check_model_runs_finished(
             completed_forecasts=list(forecasters.keys()),
-            model_configs=model_configs,
+            model_specs=model_specs,
             raise_if_missing=settings.raise_model_failure,
         )
 

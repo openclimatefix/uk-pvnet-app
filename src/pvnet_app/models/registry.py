@@ -4,11 +4,10 @@ import logging
 from importlib.resources import files
 from typing import Literal
 
-import fsspec
-from pyaml_env import parse_config
+import yaml
 from pydantic import BaseModel, Field, field_validator
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class HuggingFaceCommit(BaseModel):
@@ -18,8 +17,8 @@ class HuggingFaceCommit(BaseModel):
     commit: str = Field(..., description="The commit hash")
 
 
-class ModelConfig(BaseModel):
-    """Configuration of a model and the settings it will be run with in the app."""
+class ModelSpec(BaseModel):
+    """Specification of a model variant including artifact references and deployment settings."""
 
     name: str = Field(..., description="The name of the model")
     pvnet: HuggingFaceCommit = Field(..., description="The PVNet model location")
@@ -32,7 +31,7 @@ class ModelConfig(BaseModel):
     )
     is_critical: bool = Field(
         False,
-        description="If this model must always be part of the critial set of models which should "
+        description="If this model must always be part of the critical set of models which should "
         "always be run",
     )
     uses_satellite_data: bool = Field(
@@ -41,48 +40,42 @@ class ModelConfig(BaseModel):
     )
 
 
-class ModelConfigCollection(BaseModel):
-    """A collection of model configurations."""
+class ModelRegistry(BaseModel):
+    """The full collection of model specs loaded from the catalog."""
 
-    models: list[ModelConfig] = Field(
+    models: list[ModelSpec] = Field(
         ...,
-        description="A list of model configs to use for the forecast",
+        description="A list of model specs to use for the forecast",
     )
 
     @field_validator("models")
     @classmethod
-    def name_must_be_unique(cls, v: list[ModelConfig]) -> list[ModelConfig]:
+    def name_must_be_unique(cls, v: list[ModelSpec]) -> list[ModelSpec]:
         """Ensure that all model names are unique."""
         names = [model.name for model in v]
 
         if len(names) != len(set(names)):
-            raise Exception(f"Model names must be unique, names are {names}")
+            raise ValueError(f"Model names must be unique, names are {names}")
         return v
 
 
-def get_all_models(get_critical_only: bool = False) -> list[ModelConfig]:
-    """Returns all the models for a given client.
+def get_model_specs(get_critical_only: bool = False) -> list[ModelSpec]:
+    """Return model specs from the catalog.
 
     Args:
         get_critical_only: If only the critical models should be returned
     """
-    filename = files("pvnet_app.model_configs").joinpath("catalogue.yaml")
+    with files("pvnet_app.models").joinpath("catalogue.yaml").open("r") as f:
+        models_dict = yaml.safe_load(f)
 
-    with fsspec.open(filename, mode="r") as stream:
-        try:
-            models_dict = parse_config(data=stream)
-            model_collection = ModelConfigCollection(**models_dict)
-        except Exception as config_error:
-            log.error(f"Error parsing model configuration: {config_error}")
-            raise config_error
+    model_collection = ModelRegistry(**models_dict)
 
     if get_critical_only:
-        log.info("Filtering to critical models")
+        logger.info("Filtering to critical models")
         filtered_models = [model for model in model_collection.models if model.is_critical]
     else:
         filtered_models = model_collection.models
 
-    selected_model_info = [model.name for model in filtered_models]
-    log.info(f"Selected models: {selected_model_info}")
+    logger.info(f"Selected models: {[m.name for m in filtered_models]}")
 
     return filtered_models

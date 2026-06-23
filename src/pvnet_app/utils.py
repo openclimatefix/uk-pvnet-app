@@ -6,7 +6,7 @@ import fsspec
 import torch
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 
-from pvnet_app.models.pydantic_models import ModelConfig
+from pvnet_app.models.registry import ModelSpec
 
 logger = logging.getLogger()
 
@@ -35,25 +35,25 @@ def save_batch_to_s3(batch: NumpyBatch, model_name: str, s3_directory: str) -> N
 
 def check_model_runs_finished(
     completed_forecasts: list[str],
-    model_configs: list[ModelConfig],
+    model_specs: list[ModelSpec],
     raise_if_missing: str,
 ) -> None:
     """Check if the required models have been run and raise an exception if not.
 
     Args:
         completed_forecasts: List of forecast names which have been completed
-        model_configs: List of model configurations
+        model_specs: List of model specifications
         raise_if_missing: If set to "any", any missing model will raise an exception.
             If set to "critical", only missing critical models will raise an exception.
     """
     if raise_if_missing == "any":
-        required_forecasts = {model_config.name for model_config in model_configs}
+        required_forecasts = {model_spec.name for model_spec in model_specs}
         failed_forecasts = required_forecasts - set(completed_forecasts)
         message = "The following models failed to run"
 
     elif raise_if_missing == "critical":
         required_forecasts = {
-            model_config.name for model_config in model_configs if model_config.is_critical
+            model_spec.name for model_spec in model_specs if model_spec.is_critical
         }
         failed_forecasts = required_forecasts - set(completed_forecasts)
         message = "The following critical models failed to run"
