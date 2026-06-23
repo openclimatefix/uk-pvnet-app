@@ -18,10 +18,10 @@ models:
   - name: pvnet_intra_allbells30
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
-        commit: 29071edc6f6ffdba4ce006f95c5291ef73f0258e
+        commit: b88eae46dd40d8670de00b0c0e64d6363886aadf
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
-        commit: d756a68fcbafdea4b56226bd3c009d6e327856b9
+        commit: b10af61ef303566dee6647f0b9eba07432d91957
     is_critical: True
     is_day_ahead: False
     log_level: DEBUG
@@ -31,10 +31,10 @@ models:
   - name: pvnet_intra_allbells0
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
-        commit: 87957a7b582c6530ea8f7a81dabfde0206231d54
+        commit: 0f6a00de0c6a12b36f6c050ba7d9916949803ad8
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
-        commit: c78e796211f33e6f2561dced07d1de4845fb0bac
+        commit: f5b6b7fab06d762e900f6caeb3ec6af07db3ec4c
     is_critical: False
     is_day_ahead: False
     log_level: INFO
@@ -44,10 +44,10 @@ models:
   - name: pvnet_da_ecmwf # This name is important as it used for blending
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
-        commit: 8cd379ad7769aecd532017976e9658d3fea76e02
+        commit: bd376303f753dd869dd0fd194906451b91b2dcd1
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
-        commit: 62d13dbe1458003995f671656e4db5c7b36dc912
+        commit: 2e301b599ab8a15ed02d09aceea43c7f7c6f4516
     is_critical: True
     is_day_ahead: True
     log_level: INFO
@@ -57,10 +57,10 @@ models:
   - name: pvnet_intra_sat30
     pvnet:
       repo: openclimatefix-models/pvnet_uk_region
-      commit: 5fdc7ec353668d4758455430eea8e10d4c638f1e
+      commit: 14f2223681c9741163a3099493d97bcd1c4e0025
     summation:
       repo: openclimatefix-models/pvnet_uk_summation
-      commit: eb779e7aaa9e0fb5813889a8f9a02d6c518b432a
+      commit: ac6d5dc380628f15ad02c53a2ddb8727e1e2907e
     is_critical: True
     is_day_ahead: False
     log_level: INFO
@@ -70,10 +70,10 @@ models:
   - name: pvnet_da_ukv
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
-        commit: e76e0ee7b823ec544985b91fb0902fdb54469125
+        commit: b242aad4ed243efe4e701b9ae61136615795faa8
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
-        commit: 48ec9568d1f5e1e83618c84a8f53384bbc2c5b74
+        commit: 2263afba597d231c0699782b9e44c7208a751345
     is_critical: True
     is_day_ahead: True
     log_level: INFO
@@ -83,10 +83,10 @@ models:
   - name: pvnet_da_2nwp
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
-        commit: 4b519e4bcfc6e784f390131ee310874be90c17c4
+        commit: 723603423d1b2b74fe49715a2d52fa7593a9451e
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
-        commit: ad347ddcbce7e8b21d67dea0f93160ab49d4fa50
+        commit: fe1c826c4141d8cefc5c5b60618ad1654a06f9b0
     is_critical: True
     is_day_ahead: True
     log_level: INFO
