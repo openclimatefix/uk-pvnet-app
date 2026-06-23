@@ -4,19 +4,19 @@ from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
 from pvnet_app.forecaster import Forecaster
-from pvnet_app.model_configs.pydantic_models import get_all_models
+from pvnet_app.models.registry import get_model_specs
 
 
 def test_model_loading():
     """Test that all configured models can be loaded correctly."""
 
-    models = get_all_models(get_critical_only=False)
+    models = get_model_specs(get_critical_only=False)
     device = torch.device("cpu")
 
-    for model_config in models:
+    for model_spec in models:
 
         forecaster = Forecaster(
-            model_config=model_config,
+            model_spec=model_spec,
             data_config_path="dummy.yaml",
             t0=pd.Timestamp.now(),
             gsp_ids=[*range(10)],
@@ -28,7 +28,7 @@ def test_model_loading():
         # Verify models loaded correctly
         assert isinstance(forecaster.model, PVNetBaseModel)
 
-        if model_config.summation.repo is None:
+        if model_spec.summation.repo is None:
             assert forecaster.summation_model is None
         else:
             assert isinstance(forecaster.summation_model, SummationBaseModel)

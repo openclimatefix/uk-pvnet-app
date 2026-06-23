@@ -1,6 +1,6 @@
 """This script updates the model summary table in the package README to the current models.
 
-It adds all models in src/pvnet_app/model_configs/all_models.py
+It adds all models in src/pvnet_app/models/catalogue.py
 """
 
 import os
@@ -8,8 +8,8 @@ from pathlib import Path
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
-from pvnet_app.config import load_yaml_config
-from pvnet_app.model_configs.pydantic_models import HuggingFaceCommit, get_all_models
+from pvnet_app.model_input_config import load_yaml_config
+from pvnet_app.models.registry import HuggingFaceCommit, get_model_specs
 
 
 def make_huffingface_link(model_commit: HuggingFaceCommit) -> str:
@@ -23,7 +23,7 @@ def make_huffingface_link(model_commit: HuggingFaceCommit) -> str:
 
 def generate_table() -> str:
     """Make a new summary table for the models descriobed in the model configs."""
-    model_configs = get_all_models()
+    model_specs = get_model_specs()
     columns = [
         "Model Name",
         "Uses satellite",
@@ -40,13 +40,13 @@ def generate_table() -> str:
     hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
 
 
-    for model_config in model_configs:
-        pvnet_link = make_huffingface_link(model_config.pvnet)
-        summation_link = make_huffingface_link(model_config.summation)
+    for model_spec in model_specs:
+        pvnet_link = make_huffingface_link(model_spec.pvnet)
+        summation_link = make_huffingface_link(model_spec.summation)
 
         data_config_path = PVNetBaseModel.get_data_config(
-            model_config.pvnet.repo,
-            revision=model_config.pvnet.commit,
+            model_spec.pvnet.repo,
+            revision=model_spec.pvnet.commit,
             token=hf_token,
         )
         data_config = load_yaml_config(data_config_path)
@@ -63,7 +63,7 @@ def generate_table() -> str:
 
         row = " | ".join(
             [
-                model_config.name,
+                model_spec.name,
                 "yes" if uses_sat else "-",
                 "yes" if uses_ukv else "-",
                 "yes" if uses_ecmwf else "-",

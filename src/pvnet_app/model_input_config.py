@@ -1,4 +1,4 @@
-"""Functions to load and save configuration files."""
+"""Functions to load, save, and modify a PVNet model's data-configuration file."""
 import yaml
 
 from pvnet_app.consts import (
@@ -31,7 +31,7 @@ def save_yaml_config(config: dict, path: str) -> None:
         yaml.dump(config, file, default_flow_style=False)
 
 
-def populate_config_with_data_data_filepaths(config: dict) -> dict:
+def populate_config_with_data_filepaths(config: dict) -> dict:
     """Populate the data source filepaths in the config.
 
     Args:
@@ -95,7 +95,7 @@ def modify_data_config_for_production(input_path: str, output_path: str) -> None
     """
     config = load_yaml_config(input_path)
 
-    config = populate_config_with_data_data_filepaths(config)
+    config = populate_config_with_data_filepaths(config)
     config = overwrite_config_dropouts(config)
 
     save_yaml_config(config, output_path)
