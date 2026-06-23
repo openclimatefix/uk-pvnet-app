@@ -9,7 +9,7 @@ import xarray as xr
 def get_gsp_locations() -> pd.DataFrame:
     """Load the GSP locations metadata."""
     return pd.read_csv(
-        files("pvnet_app.data").joinpath("uk_gsp_locations_20260209_no_shetlands.csv"), 
+        files("pvnet_app.data").joinpath("uk_gsp_locations_20260209_no_shetlands.csv"),
         index_col="gsp_id",
     )
 
