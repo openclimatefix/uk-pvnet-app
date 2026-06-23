@@ -8,7 +8,7 @@ import xarray as xr
 from ocf import dp
 
 from pvnet_app.app import run
-from pvnet_app.model_configs.pydantic_models import ModelConfig, get_all_models
+from pvnet_app.models.pydantic_models import ModelConfig, get_all_models
 from pvnet_app.save import fetch_locations
 from pvnet_app.settings import AppSettings
 

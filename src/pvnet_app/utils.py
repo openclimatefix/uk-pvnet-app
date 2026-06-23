@@ -6,7 +6,7 @@ import fsspec
 import torch
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 
-from pvnet_app.model_configs.pydantic_models import ModelConfig
+from pvnet_app.models.pydantic_models import ModelConfig
 
 logger = logging.getLogger()
 

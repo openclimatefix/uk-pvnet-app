@@ -66,7 +66,7 @@ def get_all_models(get_critical_only: bool = False) -> list[ModelConfig]:
     Args:
         get_critical_only: If only the critical models should be returned
     """
-    filename = files("pvnet_app.model_configs").joinpath("all_models.yaml")
+    filename = files("pvnet_app.model_configs").joinpath("catalogue.yaml")
 
     with fsspec.open(filename, mode="r") as stream:
         try:
@@ -76,17 +76,11 @@ def get_all_models(get_critical_only: bool = False) -> list[ModelConfig]:
             log.error(f"Error parsing model configuration: {config_error}")
             raise config_error
 
-
-    # Filter models
-    filtered_models = model_collection.models.copy()
-
     if get_critical_only:
         log.info("Filtering to critical models")
-        filtered_models = [model for model in filtered_models if model.is_critical]
-
-    # We should always have at least one model
-    if len(filtered_models) == 0:
-        raise Exception("No models found")
+        filtered_models = [model for model in model_collection.models if model.is_critical]
+    else:
+        filtered_models = model_collection.models
 
     selected_model_info = [model.name for model in filtered_models]
     log.info(f"Selected models: {selected_model_info}")

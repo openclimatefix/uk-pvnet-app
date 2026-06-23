@@ -22,7 +22,7 @@ from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
 from pvnet_app.config import modify_data_config_for_production
 from pvnet_app.data.gsp import get_gsp_locations
-from pvnet_app.model_configs.pydantic_models import ModelConfig
+from pvnet_app.models.pydantic_models import ModelConfig
 from pvnet_app.save import build_multi_forecast_creation_request
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero

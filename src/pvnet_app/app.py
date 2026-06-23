@@ -19,7 +19,7 @@ from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.forecaster import Forecaster
-from pvnet_app.model_configs.pydantic_models import get_all_models
+from pvnet_app.models.pydantic_models import get_all_models
 from pvnet_app.save import build_input_metadata, extract_location_capacities_mwp, fetch_locations
 from pvnet_app.settings import AppSettings
 from pvnet_app.utils import check_model_runs_finished, save_batch_to_s3

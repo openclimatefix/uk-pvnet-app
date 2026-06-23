@@ -1,4 +1,4 @@
-from pvnet_app.model_configs.pydantic_models import get_all_models
+from pvnet_app.models.pydantic_models import get_all_models
 
 
 def test_get_all_models():
