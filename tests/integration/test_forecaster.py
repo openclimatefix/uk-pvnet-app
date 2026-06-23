@@ -1,10 +1,10 @@
 import pandas as pd
 import torch
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
+from pvnet_app.models.pydantic_models import get_all_models
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
 from pvnet_app.forecaster import Forecaster
-from pvnet_app.models.pydantic_models import get_all_models
 
 
 def test_model_loading():
