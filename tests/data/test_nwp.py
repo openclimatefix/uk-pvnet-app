@@ -1,10 +1,17 @@
 import os
 import tempfile
 
+import pandas as pd
+import xarray as xr
+
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 
 
-def test_download_nwp(nwp_ukv_data, nwp_ecmwf_data, cloudcasting_data):
+def test_download_nwp(
+    nwp_ukv_data: xr.Dataset,
+    nwp_ecmwf_data: xr.Dataset,
+    cloudcasting_data: xr.Dataset,
+):
     temp_ukv_path = "temp_nwp_ukv.zarr"
     temp_ecmwf_path = "temp_nwp_ecmwf.zarr"
     temp_cloudcasting_path = "temp_cloudcasting.zarr"
@@ -26,7 +33,12 @@ def test_download_nwp(nwp_ukv_data, nwp_ecmwf_data, cloudcasting_data):
         cloudcasting_downloader.run()
 
 
-def test_check_model_nwp_inputs_available(config_filename, test_t0, nwp_ukv_data, nwp_ecmwf_data):
+def test_check_model_nwp_inputs_available(
+    config_filename: str,
+    test_t0: pd.Timestamp,
+    nwp_ukv_data: xr.Dataset,
+    nwp_ecmwf_data: xr.Dataset,
+):
     temp_ukv_path = "temp_nwp_ukv.zarr"
     temp_ecmwf_path = "temp_nwp_ecmwf.zarr"
 

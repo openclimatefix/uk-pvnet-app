@@ -23,7 +23,7 @@ def create_null_generation_data(t0: pd.Timestamp, capacities_mwp: dict[int, floa
     df_locs = get_gsp_locations()
 
     capacities_array = np.array(
-        [capacities_mwp[gsp_id] for gsp_id in df_locs.index.values],
+        [capacities_mwp[gsp_id] for gsp_id in df_locs.index.tolist()],
         dtype=np.float32,
     )
 

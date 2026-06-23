@@ -32,7 +32,7 @@ def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[
     return np.isin(dts, pd.to_timedelta(expected_freq_mins, unit="min")).all()
 
 
-def test_run_sat_5_data(sat_5_data, test_t0):
+def test_run_sat_5_data(sat_5_data: xr.Dataset, test_t0: pd.Timestamp):
     """Download and process only the 5 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -55,7 +55,7 @@ def test_run_sat_5_data(sat_5_data, test_t0):
         assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
 
 
-def test_run_sat_15_data(sat_15_data, test_t0):
+def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp):
     """Download and process only the 15 minute satellite data"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -78,7 +78,11 @@ def test_run_sat_15_data(sat_15_data, test_t0):
         assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
 
 
-def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0):
+def test_run_sat_delayed_5_and_15_data(
+    sat_5_data_delayed: xr.Dataset,
+    sat_15_data: xr.Dataset,
+    test_t0: pd.Timestamp,
+):
     """Download and process 5 and 15 minute satellite data. Use the 15 minute data since the
     5 minute data is too delayed
     """
@@ -105,7 +109,7 @@ def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0)
         assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
 
 
-def test_run_nan_in_sat_data(sat_15_data, test_t0):
+def test_run_nan_in_sat_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp):
     """Check that the satellite data is considered invalid if it contains too many NaNs"""
 
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -130,7 +134,7 @@ def test_run_nan_in_sat_data(sat_15_data, test_t0):
         assert not os.path.exists(sat_path)
 
 
-def test_check_model_satellite_inputs_available(config_filename):
+def test_check_model_satellite_inputs_available(config_filename: str):
     t0 = pd.Timestamp("2023-01-01 00:00")
     sat_datetime_1 = pd.date_range(
         t0 - pd.Timedelta("120min"),
@@ -157,7 +161,7 @@ def test_check_model_satellite_inputs_available(config_filename):
     assert not check_model_satellite_inputs_available(config_filename, t0, sat_datetime_5)
 
 
-def test_extend_satellite_data_with_nans(sat_5_data):
+def test_extend_satellite_data_with_nans(sat_5_data: xr.Dataset):
     limit = pd.Timedelta("3h")
     max_sat_time = pd.to_datetime(sat_5_data.time).max()
 
@@ -212,7 +216,7 @@ def test_interpolate_missing_satellite_timestamps():
     assert (ds_interp.data.values == 1).all().item()
 
 
-def test_contains_too_many_of_value(sat_5_data):
+def test_contains_too_many_of_value(sat_5_data: xr.Dataset):
     # The original data has no zeros or NaNs
     assert not contains_too_many_of_value(sat_5_data, value=0, threshold=0.0)
     assert not contains_too_many_of_value(sat_5_data, value=np.nan, threshold=0.0)

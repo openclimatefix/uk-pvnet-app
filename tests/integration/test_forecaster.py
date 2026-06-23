@@ -14,11 +14,6 @@ def test_model_loading():
     device = torch.device("cpu")
 
     for model_config in models:
-        # Extract model info
-        pvnet_repo = model_config.pvnet.repo
-        pvnet_commit = model_config.pvnet.commit
-        summation_repo = model_config.summation.repo if model_config.summation else None
-        summation_commit = model_config.summation.commit if model_config.summation else None
 
         forecaster = Forecaster(
             model_config=model_config,
@@ -30,20 +25,10 @@ def test_model_loading():
             national_capacity=1,
         )
 
-        # Load models via Forecaster
-        pvnet_model, summation_model = forecaster.load_model(
-            pvnet_repo=pvnet_repo,
-            pvnet_commit=pvnet_commit,
-            summation_repo=summation_repo,
-            summation_commit=summation_commit,
-            device=device,
-        )
-
         # Verify models loaded correctly
-        assert isinstance(pvnet_model, PVNetBaseModel)
+        assert isinstance(forecaster.model, PVNetBaseModel)
 
-        # Verify summation model if configured
-        if summation_repo is not None:
-            assert isinstance(summation_model, SummationBaseModel)
+        if model_config.summation.repo is None:
+            assert forecaster.summation_model is None
         else:
-            assert summation_model is None
+            assert isinstance(forecaster.summation_model, SummationBaseModel)

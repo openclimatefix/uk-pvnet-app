@@ -13,8 +13,7 @@ from src.pvnet_app.save import build_multi_forecast_creation_request, fetch_or_c
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_save_forecast_and_adjusted_forecast(
-    dp_client: dp.DataPlatformDataServiceStub,
-    setup_dp_locations,  # noqa: ARG001 - ensures observer exists before this test
+    dp_client_with_locations: dp.DataPlatformDataServiceStub,
 ):
     """Test saving data to the data-platform and that the adjusted forecast is calculated correctly.
 
@@ -27,6 +26,8 @@ async def test_save_forecast_and_adjusted_forecast(
     - Check that the forecast values are correct
     - Check that the adjusted forecast values are calculated and saved correctly
     """
+
+    client = dp_client_with_locations
 
     # This will be the init time for the forecast we test on
     t0 = datetime(2025, 1, 1, tzinfo=UTC)
@@ -47,7 +48,7 @@ async def test_save_forecast_and_adjusted_forecast(
         location_type: dp.LocationType,
         geometry_wkt: str,
     ):
-        return await dp_client.create_location(
+        return await client.create_location(
                 dp.CreateLocationRequest(
                 location_name=location_name,
                 energy_source=dp.EnergySource.SOLAR,
@@ -77,9 +78,9 @@ async def test_save_forecast_and_adjusted_forecast(
     )
 
     # Setup: Add forecast from same time "yesterday" so that the adjusted forecast can be calculated
-    forecaster = await fetch_or_create_forecaster(dp_client, model_tag=forecaster_name)
+    forecaster = await fetch_or_create_forecaster(client, model_tag=forecaster_name)
 
-    _ = await dp_client.create_forecast(
+    _ = await client.create_forecast(
         dp.CreateForecastRequest(
             location_uuid=locations[0].location_uuid,
             forecaster=forecaster,
@@ -102,7 +103,7 @@ async def test_save_forecast_and_adjusted_forecast(
     )
     prev_values = np.array([0.5 + 0.01 * i for i in range(n_steps)]) * capacity_watts
 
-    _ = await dp_client.create_observations(
+    _ = await client.create_observations(
         dp.CreateObservationsRequest(
             location_uuid=locations[0].location_uuid,
             energy_source=dp.EnergySource.SOLAR,
@@ -134,7 +135,7 @@ async def test_save_forecast_and_adjusted_forecast(
     requests = await build_multi_forecast_creation_request(
         forecast_normed_da=forecast_normed_da,
         locations=locations,
-        client=dp_client,
+        client=client,
         model_tag=forecaster_name,
         init_time_utc=pd.Timestamp(t0).tz_convert(None),
         metadata=Struct().from_pydict({}),
@@ -146,12 +147,12 @@ async def test_save_forecast_and_adjusted_forecast(
 
     # Test: Save the forecasts to the data platform
     _ = await asyncio.gather(
-        *(dp_client.create_forecast(req) for req in requests),
+        *(client.create_forecast(req) for req in requests),
         return_exceptions=True,
     )
 
     # Check: Read from the data platform to check it was saved
-    forecasters_resp = await dp_client.list_forecasters(
+    forecasters_resp = await client.list_forecasters(
         dp.ListForecastersRequest(
             forecaster_names_filter=[forecaster_name, f"{forecaster_name}_adjust"],
         ),
@@ -164,7 +165,7 @@ async def test_save_forecast_and_adjusted_forecast(
     assert set(forecasters_lookup) == expected_forecasters
 
     # Check: There is one forecast for GSP 1 with the non-adjusted forecaster
-    latest_forecasts_resp = await dp_client.get_latest_forecasts(
+    latest_forecasts_resp = await client.get_latest_forecasts(
         dp.GetLatestForecastsRequest(
             energy_source=dp.EnergySource.SOLAR,
             location_uuid=locations[1].location_uuid,
@@ -175,7 +176,7 @@ async def test_save_forecast_and_adjusted_forecast(
 
     # Check: There are two forecasts for GSP 0, one with the non-adjusted forecaster and one with
     # the adjusted forecaster
-    latest_forecasts_resp = await dp_client.get_latest_forecasts(
+    latest_forecasts_resp = await client.get_latest_forecasts(
         dp.GetLatestForecastsRequest(
             energy_source=dp.EnergySource.SOLAR,
             location_uuid=locations[0].location_uuid,
@@ -190,7 +191,7 @@ async def test_save_forecast_and_adjusted_forecast(
     time_window = dp.TimeWindow(start_timestamp_utc=t0, end_timestamp_utc=t0 + timedelta(days=1))
 
     # Check: The forecast values for non-adjusted forecast are as expected
-    forecast_response = await dp_client.get_forecast_as_timeseries(
+    forecast_response = await client.get_forecast_as_timeseries(
         dp.GetForecastAsTimeseriesRequest(
             energy_source=dp.EnergySource.SOLAR,
             location_uuid=locations[0].location_uuid,
@@ -202,7 +203,7 @@ async def test_save_forecast_and_adjusted_forecast(
     assert all(v.p50_value_fraction == p50_frac for v in forecast_response.values)
 
     # Check: The number of forecast values for adjuster forecast
-    forecast_response = await dp_client.get_forecast_as_timeseries(
+    forecast_response = await client.get_forecast_as_timeseries(
         dp.GetForecastAsTimeseriesRequest(
             energy_source=dp.EnergySource.SOLAR,
             location_uuid=locations[0].location_uuid,
