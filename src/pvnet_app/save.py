@@ -211,7 +211,7 @@ def build_forecast_creation_request(
     init_time_utc: pd.Timestamp,
     metadata: Struct | None,
 ) -> dp.CreateForecastRequest:
-    """Convert a DataArray for a single GSP to a list of ForecastValue objects.
+    """Build a create-forecast request from a DataArray forecast for a single location.
 
     Args:
         gsp_normed_da: Normalized DataArray for a single GSP
@@ -221,22 +221,28 @@ def build_forecast_creation_request(
         metadata: Optional metadata to include with the forecast.
     """
     gsp_id = int(gsp_normed_da.gsp_id.values)
-
-    p50s = gsp_normed_da.sel(output_label="p50").values
-    p10s = gsp_normed_da.sel(output_label="p10").values
-    p90s = gsp_normed_da.sel(output_label="p90").values
     horizons_mins = gsp_normed_da.horizon_mins.values.tolist()
+    plevels = ["p10", "p50", "p90"]
 
-    forecast_values = []
-    for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
-        if p90 > 1.1:
+    forecast_array = (
+        gsp_normed_da.transpose("valid_times_utc", "output_label")
+        .sel(output_label=plevels)
+    ).values
+
+    forecast_value_requests = []
+    for h, row in zip(horizons_mins, forecast_array, strict=False):
+
+        if (row > 1.1).any():
+            high_plevels = np.array(plevels)[row > 1.1].tolist()
             logger.warning(
-                f"p90 value {p90} exceeds 1.1 for model={forecaster.forecaster_name}, "
-                f"gsp_id={gsp_id}, horizon_mins={h}; clamping to 1.1",
+                f"p-levels={high_plevels} exceed 1.1 for model={forecaster.forecaster_name}, "
+                f"gsp_id={gsp_id}, horizon_mins={h}; clipping to 1.1",
             )
-            p90 = 1.1
+            p10, p50, p90 = row.clip(None, 1.1)
+        else:
+            p10, p50, p90 = row
 
-        forecast_values.append(
+        forecast_value_requests.append(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=h,
                 p50_fraction=p50,
@@ -249,7 +255,7 @@ def build_forecast_creation_request(
         location_uuid=location_uuid,
         energy_source=dp.EnergySource.SOLAR,
         init_time_utc=init_time_utc.tz_localize("UTC").to_pydatetime(),
-        values=forecast_values,
+        values=forecast_value_requests,
         metadata=metadata,
     )
 
