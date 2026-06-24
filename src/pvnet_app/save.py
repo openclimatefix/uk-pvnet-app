@@ -13,6 +13,8 @@ from ocf import dp
 logger = logging.getLogger(__name__)
 
 
+DATAPLATFORM_MAX_VALUE = 1.09
+
 async def fetch_locations(
     client: dp.DataPlatformDataServiceStub,
 ) -> dict[int, dp.ListLocationsResponseLocationSummary]:
@@ -232,13 +234,14 @@ def build_forecast_creation_request(
     forecast_value_requests = []
     for h, row in zip(horizons_mins, forecast_array, strict=False):
 
-        if (row > 1.1).any():
-            high_plevels = np.array(plevels)[row > 1.1].tolist()
+        if (row > DATAPLATFORM_MAX_VALUE).any():
+            high_plevels = np.array(plevels)[row > DATAPLATFORM_MAX_VALUE].tolist()
             logger.warning(
-                f"p-levels={high_plevels} exceed 1.1 for model={forecaster.forecaster_name}, "
-                f"gsp_id={gsp_id}, horizon_mins={h}; clipping to 1.1",
+                f"p-levels={high_plevels} exceed {DATAPLATFORM_MAX_VALUE} for model="
+                f"{forecaster.forecaster_name}, gsp_id={gsp_id}, horizon_mins={h}; clipping to "
+                f"{DATAPLATFORM_MAX_VALUE}",
             )
-            p10, p50, p90 = row.clip(None, 1.1)
+            p10, p50, p90 = row.clip(None, DATAPLATFORM_MAX_VALUE)
         else:
             p10, p50, p90 = row
 
