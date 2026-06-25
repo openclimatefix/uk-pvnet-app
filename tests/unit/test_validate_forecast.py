@@ -31,8 +31,8 @@ def test_validate_forecast_ok():
     )
 
     assert check_forecast_fluctuations(
-        national_forecast=national_forecast,
-        warning_threshold=zig_zag_warning_threshold,
+        normed_national_forecast=national_forecast,
+        warning_threshold_mw=zig_zag_warning_threshold,
         error_threshold=zig_zag_error_threshold,
         model_name="test_model",
     )

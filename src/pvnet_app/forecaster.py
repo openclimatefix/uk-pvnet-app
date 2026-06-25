@@ -6,8 +6,7 @@ import pandas as pd
 import torch
 import xarray as xr
 import yaml
-from betterproto.lib.google.protobuf import Struct
-from ocf import dp
+
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.pvnet_dataset import PVNetConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
@@ -22,7 +21,6 @@ from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 from pvnet_app.data.gsp import get_gsp_locations
 from pvnet_app.model_input_config import modify_data_config_for_production
 from pvnet_app.models.registry import ModelSpec
-from pvnet_app.save import build_multi_forecast_creation_request
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
 MIN_DAY_ELEVATION = 0
@@ -104,10 +102,6 @@ class Forecaster:
         # Get the UK centroid coordinates
         self.longitude, self.latitude = get_uk_centroid_coords()
 
-        # Values
-        self.da_abs_all: xr.DataArray
-        self.da_normed_all: xr.DataArray
-
         # These are the valid times this forecast will predict for
         self.horizon_mins = np.arange(1, self.model.forecast_len+1) * 30
         self.valid_times = self.t0 + pd.to_timedelta(self.horizon_mins, unit="m")
@@ -180,8 +174,8 @@ class Forecaster:
         return dataset.get_sample(self.t0)
 
     @torch.inference_mode()
-    def predict(self, batch: NumpyBatch) -> None:
-        """Make predictions for the batch and store results internally."""
+    def predict(self, batch: NumpyBatch) -> xr.DataArray:
+        """Make predictions for the batch."""
         self.logger.debug(f"Predicting for model: {self.model_tag}")
 
         gsp_ids = batch["location_id"]
@@ -218,16 +212,12 @@ class Forecaster:
         )
         da_normed = da_normed.where(~da_sundown_mask).fillna(0.0)
 
-        self.logger.debug("Converting to absolute MW")
-        da_abs = da_normed * self.gsp_capacities[:, None, None]
-
-        max_preds = da_abs.sel(output_label="p50").max(dim="valid_times_utc")
-        self.logger.debug(f"Maximum predictions: {max_preds}")
 
         if self.summation_model is None:
             self.logger.debug("Summing across GSPs to produce national forecast")
-            da_abs_national = (
-                da_abs.sum(dim="gsp_id").expand_dims(dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
+            da_normed_national = (
+                (da_normed * self.gsp_capacities[:, None, None] / self.national_capacity)
+                .sum(dim="gsp_id").expand_dims(dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
             )
         else:
             self.logger.debug("Using summation model to produce national forecast")
@@ -265,16 +255,7 @@ class Forecaster:
                 .fillna(0.0)
             )
 
-            # Convert to absolute MW
-            da_abs_national = da_normed_national * self.national_capacity
-
-        self.logger.debug(
-            f"National forecast is {da_abs_national.sel(output_label='p50').values}",
-        )
-
-        # Store the compiled predictions internally
-        self.da_abs_all = xr.concat([da_abs_national, da_abs], dim="gsp_id")
-        self.da_normed_all = xr.concat([da_normed_national, da_normed], dim="gsp_id")
+        return xr.concat([da_normed_national, da_normed], dim="gsp_id")
 
     def preds_to_dataarray(
         self,
@@ -300,19 +281,3 @@ class Forecaster:
             },
         )
         return da
-
-    async def create_write_requests(
-        self,
-        client: dp.DataPlatformDataServiceStub,
-        locations: dict[int, dp.ListLocationsResponseLocationSummary],
-        metadata: Struct | None,
-    ) -> list[dp.CreateForecastRequest]:
-        """Save the compiled forecast to the data platform."""
-        return await build_multi_forecast_creation_request(
-            forecast_normed_da=self.da_normed_all,
-            locations=locations,
-            model_tag=self.model_tag,
-            init_time_utc=self.t0,
-            client=client,
-            metadata=metadata,
-    )
