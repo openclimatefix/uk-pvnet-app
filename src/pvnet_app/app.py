@@ -32,10 +32,9 @@ from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_input_config import load_yaml_config
 from pvnet_app.models.registry import get_model_specs
 from pvnet_app.save import (
-    build_input_metadata,
-    build_multi_forecast_creation_request,
     extract_location_capacities_mwp,
     fetch_locations,
+    write_forecasts_to_data_platform,
 )
 from pvnet_app.settings import AppSettings
 from pvnet_app.utils import check_model_runs_finished, save_batch_to_s3
@@ -294,7 +293,6 @@ async def _run_forecast_pipeline(
             save_batch_to_s3(batch, model_name, settings.save_batches_dir)
 
 
-
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
 
@@ -334,10 +332,12 @@ async def _run_forecast_pipeline(
     async with Channel(settings.data_platform_host, settings.data_platform_port) as dp_channel:
         dp_client = dp.DataPlatformDataServiceStub(dp_channel)
 
-        input_metadata = await build_input_metadata(
+        await write_forecasts_to_data_platform(
             client=dp_client,
-            location_uuid=locations[0].location_uuid,
-            input_s3_paths = {
+            forecasts=forecasts,
+            locations=locations,
+            t0=t0,
+            input_s3_paths={
                 "nwp_ecmwf": settings.nwp_ecmwf_zarr_path,
                 "nwp_ukv": settings.nwp_ukv_zarr_path,
                 "satellite": settings.satellite_icechunk_path_5,
@@ -345,28 +345,6 @@ async def _run_forecast_pipeline(
             },
             app_version=__version__,
         )
-
-        all_requests: list[list[dp.CreateForecastRequest]] = await asyncio.gather(
-            *(
-                build_multi_forecast_creation_request(
-                    forecast_normed_da=da_normed_forecast,
-                    locations=locations,
-                    model_tag=model_name,
-                    init_time_utc=t0,
-                    client=dp_client,
-                    metadata=input_metadata,
-                )
-                for model_name, da_normed_forecast in forecasts.items()
-            ),
-        )
-
-        write_results = await asyncio.gather(
-            *(dp_client.create_forecast(req) for reqs in all_requests for req in reqs),
-            return_exceptions=True,
-        )
-
-    for exc in filter(lambda x: isinstance(x, Exception), write_results):
-        raise exc
 
     logger.info("Finished forecast")
 

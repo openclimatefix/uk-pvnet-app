@@ -19,7 +19,7 @@ async def fetch_locations(
     client: dp.DataPlatformDataServiceStub,
 ) -> dict[int, dp.ListLocationsResponseLocationSummary]:
     """Fetch all UK locations from data platform."""
-    # Get the UK nation location
+    # Get the UK national location
     national_locations = (
         await client.list_locations(
             dp.ListLocationsRequest(
@@ -262,7 +262,6 @@ def build_forecast_creation_request(
         metadata=metadata,
     )
 
-
 async def fetch_adjuster_values(
     client: dp.DataPlatformDataServiceStub,
     location_uuid: str,
@@ -341,3 +340,59 @@ async def calculate_adjusted_forecast(
     )
 
     return da_adjusted_forecast
+
+
+async def write_forecasts_to_data_platform(
+    client: dp.DataPlatformDataServiceStub,
+    forecasts: dict[str, "xr.DataArray"],
+    locations: dict[int, dp.ListLocationsResponseLocationSummary],
+    t0: pd.Timestamp,
+    input_s3_paths: dict[str, str],
+    app_version: str,
+) -> None:
+    """Build requests and write all model forecasts to the data platform.
+
+    Builds the input metadata once, then builds and writes a forecast request for
+    every model and location. All writes are issued concurrently; if any fail, the
+    rest still complete and the failures are raised together as an ExceptionGroup.
+
+    Args:
+        client: A connected data-platform service client
+        forecasts: Normed national + regional forecasts keyed by model name
+        locations: Mapping of GSP ID to location summary, including national (0)
+        t0: The forecast init-time, as a naive-UTC timestamp
+        input_s3_paths: Source data S3 paths, keyed by source name, for metadata
+        app_version: The app version to record against the forecasts
+
+    Raises:
+        ExceptionGroup: If one or more forecast writes fail
+    """
+    input_metadata = await build_input_metadata(
+        client=client,
+        location_uuid=locations[0].location_uuid,
+        input_s3_paths=input_s3_paths,
+        app_version=app_version,
+    )
+
+    all_requests: list[list[dp.CreateForecastRequest]] = await asyncio.gather(
+        *(
+            build_multi_forecast_creation_request(
+                forecast_normed_da=da_normed_forecast,
+                locations=locations,
+                model_tag=model_name,
+                init_time_utc=t0,
+                client=client,
+                metadata=input_metadata,
+            )
+            for model_name, da_normed_forecast in forecasts.items()
+        ),
+    )
+
+    write_results = await asyncio.gather(
+        *(client.create_forecast(req) for reqs in all_requests for req in reqs),
+        return_exceptions=True,
+    )
+
+    errors = [r for r in write_results if isinstance(r, Exception)]
+    if errors:
+        raise ExceptionGroup("Failed writing forecasts to data platform", errors)
