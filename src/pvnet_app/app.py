@@ -159,7 +159,7 @@ async def _run_forecast_pipeline(
         data_configs.append(load_yaml_config(data_config_path))
 
     # ---------------------------------------------------------------------------
-    #  Prepare data sources
+    # Prepare data sources
 
     # --- Get locations metadata from the data platform
     logger.info("Loading locations")
@@ -350,7 +350,7 @@ async def _run_forecast_pipeline(
 
     if settings.raise_model_failure in ["any", "critical"]:
         check_model_runs_finished(
-            completed_forecasts=list(forecasters.keys()),
+            completed_forecasts=list(forecasts.keys()),
             model_specs=model_specs,
             raise_if_missing=settings.raise_model_failure,
         )
