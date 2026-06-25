@@ -77,7 +77,6 @@ def check_forecast_fluctuations(
         error_threshold_mw: The threshold in MW where the forecast is considered to be in error
         model_name: The name of the model that generated the forecast
     """
-
     diff = np.diff(national_forecast_mw.values)
 
     def zig_zag_over_threshold(threshold: float) -> bool:
@@ -95,7 +94,7 @@ def check_forecast_fluctuations(
 
     if has_critical_jumps:
         logger.warning(
-            f"{model_name}: Forecast has critical fluctuations (>{error_threshold_mw} MW)"
+            f"{model_name}: Forecast has critical fluctuations (>{error_threshold_mw} MW)",
         )
 
     return not has_critical_jumps
@@ -113,7 +112,6 @@ def check_forecast_positive_during_daylight(
         sun_elevation_lower_limit: The lower limit for the sun elevation (in degrees)
         model_name: The name of the model that generated the forecast
     """
-    
     # Calculate the solar position throughout the forecast
     solpos = pvlib.solarposition.get_solarposition(
         time=national_forecast_mw.index,  # The index is expect to be the valid times
@@ -161,7 +159,6 @@ def validate_forecast(
             values must be positive when the sun is above this angle.
         model_name: The name of the model that generated the forecast.
     """
-
     national_forecast_mw = normed_national_forecast * national_capacity_mw
 
     forecast_max_okay = check_forecast_max(

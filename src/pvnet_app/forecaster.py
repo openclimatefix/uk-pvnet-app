@@ -6,15 +6,13 @@ import pandas as pd
 import torch
 import xarray as xr
 import yaml
-
-from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
+from ocf_data_sampler.numpy_sample.common_types import NumpyBatch, TensorBatch
 from ocf_data_sampler.torch_datasets.pvnet_dataset import PVNetConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
     batch_to_tensor,
     copy_batch_to_device,
 )
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
-from pvnet.utils import validate_batch_against_config
 from pvnet_summation.data.datamodule import construct_sample as construct_sum_sample
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
@@ -23,7 +21,7 @@ from pvnet_app.model_input_config import modify_data_config_for_production
 from pvnet_app.models.registry import ModelSpec
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
-MIN_DAY_ELEVATION = 0
+MIN_DAY_ELEVATION_DEGREES = 0
 
 
 _model_mismatch_msg = (
@@ -44,6 +42,32 @@ def get_uk_centroid_coords() -> tuple[float, float]:
     return longitude, latitude
 
 
+def preds_to_dataarray(
+    preds: np.ndarray,
+    gsp_ids: list[int],
+    output_quantiles: list[float] | None,
+    valid_times_utc: pd.DatetimeIndex,
+    horizon_mins: np.ndarray,
+) -> xr.DataArray:
+    """Put numpy array of predictions into a dataarray."""
+    if output_quantiles is not None:
+        output_labels = [f"p{int(q * 100):02}" for q in output_quantiles]
+    else:
+        output_labels = ["p50"]
+        preds = preds[..., np.newaxis]
+
+    return xr.DataArray(
+        data=preds,
+        dims=["gsp_id", "valid_times_utc", "output_label"],
+        coords={
+            "gsp_id": gsp_ids,
+            "output_label": output_labels,
+            "valid_times_utc": valid_times_utc,
+            "horizon_mins": ("valid_times_utc", horizon_mins),
+        },
+    )
+
+
 class Forecaster:
     """Class for making and compiling solar forecasts from for all GB GSPs and national total."""
 
@@ -53,7 +77,6 @@ class Forecaster:
         data_config_path: str,
         run_data_dir: str,
         t0: pd.Timestamp,
-        gsp_ids: list[int],
         device: torch.device,
         gsp_capacities: xr.DataArray,
         national_capacity: float,
@@ -67,12 +90,10 @@ class Forecaster:
             data_config_path: The path to the model data config
             run_data_dir: The directory where the downloaded input data is stored
             t0: The forecast init-time
-            gsp_ids: List of gsp_ids to make predictions for
             device: Device to run the model on
             gsp_capacities: DataArray of the solar capacities for all regional GSPs at t0
             national_capacity: The national solar capacity at t0
-            hf_token:
-                HF authentication token. If True, the token is read from the HF config folder.
+            hf_token: HF authentication token. If True, the token is read from the HF config folder.
                 If string, it is used as the authentication token.
         """
         self.logger = logging.getLogger(model_spec.name)
@@ -84,7 +105,6 @@ class Forecaster:
         self.data_config_path = data_config_path
         self.run_data_dir = run_data_dir
         self.t0 = t0
-        self.gsp_ids = gsp_ids
         self.device = device
         self.gsp_capacities = gsp_capacities
         self.national_capacity = national_capacity
@@ -181,103 +201,134 @@ class Forecaster:
         gsp_ids = batch["location_id"]
         self.logger.debug(f"GSPs: {gsp_ids}")
 
-        batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
+        tensor_batch: TensorBatch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
-        # Validate and then run batch through model
-        validate_batch_against_config(batch=batch, model=self.model)
-        normed_preds = self.model(batch).detach().cpu().numpy()
-
-        # Convert GSP results to xarray DataArray
-        da_normed = self.preds_to_dataarray(
-            normed_preds,
-            self.model.output_quantiles,
-            gsp_ids,
-        )
-
-        self.logger.debug("Clipping negatives, applying sundown mask")
-        da_normed = da_normed.clip(0, None)
-
-        # Calculate and apply sundown mask from solar elevation
-        # - In the batch the solar elevation angle is scaled to the range [0, 1]
-        elevation = (batch["solar_elevation"] - 0.5) * 180
-        # - We only need elevation mask for forecasted values, not history
-        elevation = elevation[:, -normed_preds.shape[1]:]
-        da_sundown_mask = xr.DataArray(
-            data=elevation < MIN_DAY_ELEVATION,
-            dims=["gsp_id", "valid_times_utc"],
-            coords={
-                "gsp_id": gsp_ids,
-                "valid_times_utc": self.valid_times,
-            },
-        )
-        da_normed = da_normed.where(~da_sundown_mask).fillna(0.0)
-
-
+        # Convert regional and national predictions to DataArrays separately since they may have
+        # different output quantiles. We will concatenate them later after all the processing is
+        # done. Else we might accidentally infill missing quantiles with zeros when concatenating.
         if self.summation_model is None:
             self.logger.debug("Summing across GSPs to produce national forecast")
-            da_normed_national = (
-                (da_normed * self.gsp_capacities[:, None, None] / self.national_capacity)
-                .sum(dim="gsp_id").expand_dims(dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
-            )
+            da_preds = self.predict_with_regional_sum(tensor_batch)
+
         else:
             self.logger.debug("Using summation model to produce national forecast")
+            da_preds = self.predict_with_summation_model(tensor_batch)
 
-            # Make national predictions using summation model
-            inputs = construct_sum_sample(
-                pvnet_inputs=None,
-                valid_times=self.valid_times,
-                relative_capacities=self.gsp_capacities / self.national_capacity,
-                longitude=self.longitude,
-                latitude=self.latitude,
-                target=None,
-            )
-            inputs["pvnet_outputs"] = normed_preds
-            del inputs["pvnet_inputs"]
+        return da_preds
 
-            # Expand for batch dimension and convert to tensors
-            inputs = {k: torch.from_numpy(v[None, ...]).to(self.device) for k, v in inputs.items()}
+    def predict_with_summation_model(self, batch: TensorBatch) -> xr.DataArray:
+        """Make predictions for the batch using regional and summation models."""
+        # Make regional predictions using the GSP model
+        regional_preds = self.model(batch).detach().cpu().numpy()
 
-            normed_national = self.summation_model(inputs).detach().squeeze().cpu().numpy()
+        # Make national predictions using summation model
+        summation_batch = construct_sum_sample(
+            pvnet_inputs=None,
+            valid_times=self.valid_times,
+            relative_capacities=self.gsp_capacities / self.national_capacity,
+            longitude=self.longitude,
+            latitude=self.latitude,
+            target=None,
+        )
+        summation_batch["pvnet_outputs"] = regional_preds
+        del summation_batch["pvnet_inputs"]
 
-            # Convert national predictions to DataArray
-            da_normed_national = self.preds_to_dataarray(
-                normed_national[np.newaxis],
-                self.summation_model.output_quantiles,
-                gsp_ids=[0],
-            )
+        # Expand for batch dimension and convert to tensors
+        summation_batch = {
+            k: torch.from_numpy(v[None, ...]).to(self.device) for k, v in summation_batch.items()
+        }
 
-            # Clip negatives, apply sundown mask
-            # All GSPs must be masked to mask national
-            da_normed_national = (
-                da_normed_national
-                .clip(0, None)
-                .where(~da_sundown_mask.all(dim="gsp_id"))
-                .fillna(0.0)
-            )
+        normed_national = self.summation_model(summation_batch).detach().squeeze().cpu().numpy()
 
-        return xr.concat([da_normed_national, da_normed], dim="gsp_id")
+        da_regional_preds = preds_to_dataarray(
+            preds=regional_preds,
+            output_quantiles=self.model.output_quantiles,
+            gsp_ids=batch["location_id"].cpu().numpy(),
+            valid_times_utc=self.valid_times,
+            horizon_mins=self.horizon_mins,
+        )
 
-    def preds_to_dataarray(
-        self,
-        preds: np.ndarray,
-        output_quantiles: list[float] | None,
-        gsp_ids: list[int],
-    ) -> xr.DataArray:
-        """Put numpy array of predictions into a dataarray."""
-        if output_quantiles is not None:
-            output_labels = [f"p{int(q * 100):02}" for q in output_quantiles]
-        else:
-            output_labels = ["p50"]
-            preds = preds[..., np.newaxis]
+        da_national_preds = preds_to_dataarray(
+            preds=normed_national[np.newaxis],
+            output_quantiles=self.summation_model.output_quantiles,
+            gsp_ids=[0],
+            valid_times_utc=self.valid_times,
+            horizon_mins=self.horizon_mins,
+        )
 
-        da = xr.DataArray(
-            data=preds,
-            dims=["gsp_id", "valid_times_utc", "output_label"],
+        # Make sundown masks so we can set predictions to zero when the sun is down
+        da_regional_sundown_mask, da_national_sundown_mask = self._make_sundown_masks(batch)
+
+        da_regional_preds = (
+            # Set regional predictions to zero when sun is down
+            da_regional_preds.where(~da_regional_sundown_mask, other=0)
+            # Also clip negative predictions to zero
+            .clip(0, None)
+        )
+
+        da_national_preds = (
+            # Set national predictions to zero when sun is down
+            da_national_preds.where(~da_national_sundown_mask, other=0)
+            # Also clip negative predictions to zero
+            .clip(0, None)
+        )
+
+        return xr.concat([da_national_preds, da_regional_preds], dim="gsp_id")
+
+    def predict_with_regional_sum(self, batch: TensorBatch) -> xr.DataArray:
+        """Make predictions for the batch using regional model and regional sum."""
+        # Make regional predictions using the GSP model
+        regional_preds = self.model(batch).detach().cpu().numpy()
+
+        gsp_ids = batch["location_id"].cpu().numpy()
+
+        da_regional_preds = preds_to_dataarray(
+            preds=regional_preds,
+            output_quantiles=self.model.output_quantiles,
+            gsp_ids=gsp_ids,
+            valid_times_utc=self.valid_times,
+            horizon_mins=self.horizon_mins,
+        )
+
+        # Make sundown masks so we can set predictions to zero when the sun is down
+        da_regional_sundown_mask, _ = self._make_sundown_masks(batch)
+
+        # Postprocess the regional predictions
+        da_regional_preds = (
+            # Set regional predictions to zero when sun is down
+            da_regional_preds.where(~da_regional_sundown_mask, other=0)
+            # Also clip negative predictions to zero
+            .clip(0, None)
+        )
+
+        # Make national predictions by summing the regional predictions weighted by the capacities
+        # The national predictions inherit the sundown masking and clipping from the regional
+        # predictions since they are derived from them
+        da_national_preds = (
+            (da_regional_preds * self.gsp_capacities[:, None, None] / self.national_capacity)
+            .sum(dim="gsp_id").expand_dims(dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
+        )
+
+        return xr.concat([da_national_preds, da_regional_preds], dim="gsp_id")
+
+    def _make_sundown_masks(self, batch: TensorBatch) -> tuple[xr.DataArray, xr.DataArray]:
+        """Make a sundown mask for the batch."""
+        regional_sundown_mask = (
+            # In the batch the solar elevation angle is scaled to the range [0, 1]
+            ((batch["solar_elevation"].cpu().numpy() - 0.5) * 180 < MIN_DAY_ELEVATION_DEGREES)
+            # We only need sundown mask for forecasted values, not model input history
+            [:, -len(self.valid_times):]
+        )
+        da_regional_sundown_mask = xr.DataArray(
+            data=regional_sundown_mask,
+            dims=["gsp_id", "valid_times_utc"],
             coords={
-                "gsp_id": gsp_ids,
-                "output_label": output_labels,
+                "gsp_id": batch["location_id"].cpu().numpy(),
                 "valid_times_utc": self.valid_times,
-                "horizon_mins": ("valid_times_utc", self.horizon_mins),
             },
         )
-        return da
+
+        # All GSPs must be masked to mask national
+        da_national_sundown_mask = da_regional_sundown_mask.all(dim="gsp_id")
+
+        return da_regional_sundown_mask, da_national_sundown_mask

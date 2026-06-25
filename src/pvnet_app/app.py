@@ -7,14 +7,15 @@ import logging
 import os
 import tempfile
 from importlib.metadata import version
+from typing import TYPE_CHECKING
 
-import xarray as xr
 import pandas as pd
 import sentry_sdk
 import torch
 from grpclib.client import Channel
 from ocf import dp
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
+from pvnet.utils import validate_batch_against_config
 
 from pvnet_app.consts import (
     generation_path,
@@ -31,14 +32,17 @@ from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_input_config import load_yaml_config
 from pvnet_app.models.registry import get_model_specs
 from pvnet_app.save import (
-    build_input_metadata, 
+    build_input_metadata,
     build_multi_forecast_creation_request,
-    extract_location_capacities_mwp, 
+    extract_location_capacities_mwp,
     fetch_locations,
 )
 from pvnet_app.settings import AppSettings
 from pvnet_app.utils import check_model_runs_finished, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
+
+if TYPE_CHECKING:
+    import xarray as xr
 
 __version__ = version("pvnet-app")
 
@@ -173,7 +177,6 @@ async def _run_forecast_pipeline(
 
     national_capacity = ds_gen.sel(time_utc=t0, location_id=0).capacity_mwp.item()
     gsp_capacities = ds_gen.sel(time_utc=t0, location_id=slice(1, None)).capacity_mwp.values
-    gsp_ids = ds_gen.location_id.values
 
     data_downloaders = []
 
@@ -254,7 +257,6 @@ async def _run_forecast_pipeline(
                 data_config_path=data_config_path,
                 run_data_dir=scratch_dir,
                 t0=t0,
-                gsp_ids=gsp_ids,
                 device=device,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
@@ -278,13 +280,20 @@ async def _run_forecast_pipeline(
         batch = forecaster.make_batch()
 
         # Do basic validation of the batch: Will raise error if the batch fails the checks
-        check_batch(batch)
+        try:
+            check_batch(batch)
+            validate_batch_against_config(batch=batch, model=forecaster.model)
+        except Exception as e:
+            logger.error(f"Batch validation failed for model {model_name}: {e}")
+            continue
+
+        forecasts[model_name] = forecaster.predict(batch)
 
         if (settings.save_batches_dir is not None) and i == 0:
             # Save the batch under the name of the first model
             save_batch_to_s3(batch, model_name, settings.save_batches_dir)
 
-        forecasts[model_name] = forecaster.predict(batch)
+
 
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
