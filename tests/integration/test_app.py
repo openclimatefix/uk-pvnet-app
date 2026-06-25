@@ -1,5 +1,4 @@
-import os
-import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
@@ -7,7 +6,7 @@ import pytest
 import xarray as xr
 from ocf import dp
 
-from pvnet_app.app import run
+from pvnet_app.app import run_app
 from pvnet_app.models.registry import ModelSpec, get_model_specs
 from pvnet_app.save import fetch_locations
 from pvnet_app.settings import AppSettings
@@ -95,44 +94,42 @@ async def test_app(
     sat_5_data_zero_delay: xr.Dataset,
     cloudcasting_data: xr.Dataset,
     gsp_ids: list[int],
+    tmp_path: Path,
 ):
     """Test the app running the intraday models"""
 
     host, port = dp_host_and_port
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    # The app loads sat and NWP data from environment variable
+    # Save out data, and set paths as environmental variables
+    ukv_path = f"{tmp_path}/temp_nwp_ukv.zarr"
+    nwp_ukv_data.to_zarr(ukv_path)
 
-        # The app loads sat and NWP data from environment variable
-        # Save out data, and set paths as environmental variables
-        ukv_path = "temp_nwp_ukv.zarr"
-        nwp_ukv_data.to_zarr(ukv_path)
+    ecmwf_path = f"{tmp_path}/temp_nwp_ecmwf.zarr"
+    nwp_ecmwf_data.to_zarr(ecmwf_path)
 
-        ecmwf_path = "temp_nwp_ecmwf.zarr"
-        nwp_ecmwf_data.to_zarr(ecmwf_path)
+    cloudcasting_path = f"{tmp_path}/temp_cloudcasting.zarr"
+    cloudcasting_data.to_zarr(cloudcasting_path)
 
-        cloudcasting_path = "temp_cloudcasting.zarr"
-        cloudcasting_data.to_zarr(cloudcasting_path)
+    settings = AppSettings(
+        nwp_ukv_zarr_path=ukv_path,
+        nwp_ecmwf_zarr_path=ecmwf_path,
+        cloudcasting_zarr_path=cloudcasting_path,
+        # Satellite data will be mocked
+        satellite_icechunk_path_5="s3://fake/sat5",
+        run_critical_models_only=False,
+        forecast_validate_zig_zag_error_threshold=100000,
+        forecast_validate_sun_elevation_lower_limit=90,
+        data_platform_host=host,
+        data_platform_port=port,
+    )
 
-        settings = AppSettings(
-            nwp_ukv_zarr_path=ukv_path,
-            nwp_ecmwf_zarr_path=ecmwf_path,
-            cloudcasting_zarr_path=cloudcasting_path,
-            # Satellite data will be mocked
-            satellite_icechunk_path_5="s3://fake/sat5",
-            run_critical_models_only=False,
-            forecast_validate_zig_zag_error_threshold=100000,
-            forecast_validate_sun_elevation_lower_limit=90,
-            data_platform_host=host,
-            data_platform_port=port,
-        )
-
-        with patch(
-            "pvnet_app.data.satellite.open_satellite_data",
-            side_effect=[sat_5_data_zero_delay, None],
-        ):
-            # Run prediction
-            await run(settings=settings, t0=test_t0)
+    with patch(
+        "pvnet_app.data.satellite.open_satellite_data",
+        side_effect=[sat_5_data_zero_delay, None],
+    ):
+        # Run prediction
+        await run_app(settings=settings, t0=test_t0)
 
     model_specs = get_model_specs(get_critical_only=False)
     await check_number_of_forecasts(dp_client_with_locations, model_specs, test_t0, gsp_ids)
@@ -146,6 +143,7 @@ async def test_app_no_sat(
     nwp_ukv_data: xr.Dataset,
     nwp_ecmwf_data: xr.Dataset,
     gsp_ids: list[int],
+    tmp_path: Path,
 ):
     """Test the app for the case when no satellite data is available"""
 
@@ -155,31 +153,28 @@ async def test_app_no_sat(
     # different time than the previous test
     t0 = test_t0 - pd.Timedelta("30min")
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
-        # The app loads sat and NWP data from environment variable
-        # Save out data, and set paths as environmental variables
-        ukv_path = "temp_nwp_ukv.zarr"
-        nwp_ukv_data.to_zarr(ukv_path)
+    # The app loads sat and NWP data from environment variable
+    # Save out data, and set paths as environmental variables
+    ukv_path = f"{tmp_path}/temp_nwp_ukv.zarr"
+    nwp_ukv_data.to_zarr(ukv_path)
 
-        ecmwf_path = "temp_nwp_ecmwf.zarr"
-        nwp_ecmwf_data.to_zarr(ecmwf_path)
+    ecmwf_path = f"{tmp_path}/temp_nwp_ecmwf.zarr"
+    nwp_ecmwf_data.to_zarr(ecmwf_path)
 
-        settings = AppSettings(
-            nwp_ukv_zarr_path=ukv_path,
-            nwp_ecmwf_zarr_path=ecmwf_path,
-            # Satellite data will be mocked as unavailable
-            satellite_icechunk_path_5="s3://fake/sat5",
-            run_critical_models_only=False,
-            forecast_validate_zig_zag_error_threshold=100000,
-            forecast_validate_sun_elevation_lower_limit=90,
-            data_platform_host=host,
-            data_platform_port=port,
-        )
+    settings = AppSettings(
+        nwp_ukv_zarr_path=ukv_path,
+        nwp_ecmwf_zarr_path=ecmwf_path,
+        # Satellite data will be mocked as unavailable
+        satellite_icechunk_path_5="s3://fake/sat5",
+        run_critical_models_only=False,
+        forecast_validate_zig_zag_error_threshold=100000,
+        forecast_validate_sun_elevation_lower_limit=90,
+        data_platform_host=host,
+        data_platform_port=port,
+    )
 
-
-        with patch("pvnet_app.data.satellite.open_satellite_data", return_value=None):
-            await run(settings=settings, t0=t0)
+    with patch("pvnet_app.data.satellite.open_satellite_data", return_value=None):
+        await run_app(settings=settings, t0=t0)
 
     # Only the models which don't use satellite will be run in this case
     model_specs = get_model_specs()

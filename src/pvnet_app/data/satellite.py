@@ -12,7 +12,6 @@ from ocf_data_sampler.select.geospatial import convert_coordinates
 from ocf_data_sampler.select.location import Location
 from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels_multiple
 
-from pvnet_app.consts import sat_path
 from pvnet_app.data.gsp import get_gsp_locations
 
 logger = logging.getLogger(__name__)
@@ -325,7 +324,6 @@ def contains_too_many_of_value(ds: xr.Dataset, value: float, threshold: float) -
 
 class SatelliteDownloader:
     """Class to download and process satellite data."""
-    destination_path: str = sat_path
 
     def __init__(
         self,
@@ -333,6 +331,7 @@ class SatelliteDownloader:
         source_path_5: str | None,
         source_path_15: str | None,
         s3_region: str,
+        destination_path: str,
     ) -> None:
         """Class to download and process satellite data."""
         self.t0 = t0
@@ -342,7 +341,7 @@ class SatelliteDownloader:
         self.time_window = pd.Timedelta("1h")
         self.valid_times = None
         self.sat_choice = None
-
+        self.destination_path = destination_path
 
     @staticmethod
     def data_is_okay(ds: xr.Dataset) -> bool:
@@ -470,6 +469,3 @@ class SatelliteDownloader:
             sat_datetimes=self.valid_times,
         )
 
-    def clean_up(self) -> None:
-        """Remove the downloaded data."""
-        shutil.rmtree(self.destination_path, ignore_errors=True)

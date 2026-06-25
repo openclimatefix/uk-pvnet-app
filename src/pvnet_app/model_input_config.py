@@ -31,24 +31,25 @@ def save_yaml_config(config: dict, path: str) -> None:
         yaml.dump(config, file, default_flow_style=False)
 
 
-def populate_config_with_data_filepaths(config: dict) -> dict:
+def populate_config_with_data_filepaths(config: dict, run_data_dir: str) -> dict:
     """Populate the data source filepaths in the config.
 
     Args:
         config: The data config
+        run_data_dir: The directory where the downloaded input data is stored
     """
     nwp_paths = {
-        "ukv": nwp_ukv_path,
-        "ecmwf": nwp_ecmwf_path,
-        "cloudcasting": nwp_cloudcasting_path,
+        "ukv": f"{run_data_dir}/{nwp_ukv_path}",
+        "ecmwf": f"{run_data_dir}/{nwp_ecmwf_path}",
+        "cloudcasting": f"{run_data_dir}/{nwp_cloudcasting_path}",
     }
 
     # Set the GSP input path
-    config["input_data"]["generation"]["zarr_path"] = generation_path
+    config["input_data"]["generation"]["zarr_path"] = f"{run_data_dir}/{generation_path}"
 
     # Replace satellite data path
     if "satellite" in config["input_data"]:
-        config["input_data"]["satellite"]["zarr_path"] = sat_path
+        config["input_data"]["satellite"]["zarr_path"] = f"{run_data_dir}/{sat_path}"
 
     # NWP is nested so much be treated separately
     if "nwp" in config["input_data"]:
@@ -85,17 +86,17 @@ def overwrite_config_dropouts(config: dict) -> dict:
     return config
 
 
-def modify_data_config_for_production(input_path: str, output_path: str) -> None:
+def modify_data_config_for_production(input_path: str, output_path: str, run_data_dir: str) -> None:
     """Resave the data config with the data source filepaths and dropouts overwritten.
 
     Args:
         input_path: Path to input configuration file
         output_path: Location to save the output configuration file
-        reformat_config: Reformat config to new format
+        run_data_dir: The directory where the downloaded input data is stored
     """
     config = load_yaml_config(input_path)
 
-    config = populate_config_with_data_filepaths(config)
+    config = populate_config_with_data_filepaths(config, run_data_dir=run_data_dir)
     config = overwrite_config_dropouts(config)
 
     save_yaml_config(config, output_path)

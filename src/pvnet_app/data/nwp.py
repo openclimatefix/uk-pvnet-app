@@ -13,8 +13,6 @@ import xarray as xr
 import xesmf as xe
 from ocf_data_sampler.config.load import load_yaml_configuration
 
-from pvnet_app.consts import nwp_cloudcasting_path, nwp_ecmwf_path, nwp_ukv_path
-
 logger = logging.getLogger(__name__)
 
 
@@ -133,13 +131,13 @@ def check_model_nwp_inputs_available(
 
 class NWPDownloader(ABC):
     """Abstract base class to download and process NWP data."""
-    destination_path: str = None
     nwp_source: str = None
     save_chunk_dict: dict = None
 
-    def __init__(self, source_path: str | None) -> None:
+    def __init__(self, source_path: str | None, destination_path: str) -> None:
         """Initialise the NWP downloader."""
         self.source_path = source_path
+        self.destination_path = destination_path
         # Initially no valid times are available. This will only change is the data can be
         # downloaded, processed, and saved successfully
         self.valid_times = None
@@ -210,10 +208,6 @@ class NWPDownloader(ABC):
         # quality checked, and processed. Else valid_times will be None
         self.valid_times = valid_times
 
-    def clean_up(self) -> None:
-        """Remove the downloaded data."""
-        shutil.rmtree(self.destination_path, ignore_errors=True)
-
     def check_model_inputs_available(
         self,
         data_config_filename: str,
@@ -235,7 +229,6 @@ class NWPDownloader(ABC):
 
 class ECMWFDownloader(NWPDownloader):
     """Class to download and process the ECMWF data."""
-    destination_path = nwp_ecmwf_path
     nwp_source = "ecmwf"
     save_chunk_dict = { # noqa: RUF012
         "step": 10,
@@ -255,7 +248,6 @@ class ECMWFDownloader(NWPDownloader):
 
 class UKVDownloader(NWPDownloader):
     """Class to download and process the UKV data."""
-    destination_path = nwp_ukv_path
     nwp_source = "ukv"
     save_chunk_dict = { # noqa: RUF012
         "step": 10,
@@ -338,7 +330,6 @@ class UKVDownloader(NWPDownloader):
 
 class CloudcastingDownloader(NWPDownloader):
     """Class to download and process the cloudcasting data."""
-    destination_path = nwp_cloudcasting_path
     nwp_source = "cloudcasting"
     save_chunk_dict: dict[str, int] = { # noqa: RUF012
         "step": -1,
