@@ -1,12 +1,11 @@
 import os
-import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from pvnet_app.consts import sat_path
 from pvnet_app.data.satellite import (
     SatelliteDownloader,
     check_model_satellite_inputs_available,
@@ -32,106 +31,108 @@ def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[
     return np.isin(dts, pd.to_timedelta(expected_freq_mins, unit="min")).all()
 
 
-def test_run_sat_5_data(sat_5_data: xr.Dataset, test_t0: pd.Timestamp):
+def test_run_sat_5_data(sat_5_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path: Path):
     """Download and process only the 5 minute satellite data"""
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    dst_path = f"{tmp_path}/sat.zarr"
 
-        with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[sat_5_data]):
+    with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[sat_5_data]):
 
-            sat_downloader = SatelliteDownloader(
-                t0=test_t0,
-                source_path_5="s3://fake/sat5",
-                source_path_15=None,
-                s3_region="fake-region",
-            )
-            sat_downloader.run()
-
-        assert os.path.exists(sat_path)
-        assert sat_downloader.sat_choice == "5-min"
-
-        # Check the satellite data is 5-minutely and is saved in the correct place
-        assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
+        sat_downloader = SatelliteDownloader(
+            t0=test_t0,
+            source_path_5="s3://fake/sat5",
+            source_path_15=None,
+            s3_region="fake-region",
+            destination_path=dst_path,
+        )
+        sat_downloader.run()
 
 
-def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp):
+    assert os.path.exists(dst_path)
+    assert sat_downloader.sat_choice == "5-min"
+
+    # Check the satellite data is 5-minutely and is saved in the correct place
+    assert timesteps_match_expected_freq(dst_path, expected_freq_mins=5)
+
+
+def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path: Path):
     """Download and process only the 15 minute satellite data"""
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    dst_path = f"{tmp_path}/sat.zarr"
 
-        with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[sat_15_data]):
+    with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[sat_15_data]):
 
-            sat_downloader = SatelliteDownloader(
-                t0=test_t0,
-                source_path_5=None,
-                source_path_15="s3://fake/sat15",
-                s3_region="fake-region",
-            )
-            sat_downloader.run()
+        sat_downloader = SatelliteDownloader(
+            t0=test_t0,
+            source_path_5=None,
+            source_path_15="s3://fake/sat15",
+            s3_region="fake-region",
+            destination_path=dst_path,
+        )
+        sat_downloader.run()
 
-        assert os.path.exists(sat_path)
-        assert sat_downloader.sat_choice == "15-min"
+    assert os.path.exists(dst_path)
+    assert sat_downloader.sat_choice == "15-min"
 
-        # We infill the satellite data to 5 minutes in the process step
-        assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
+    # We infill the satellite data to 5 minutes in the process step
+    assert timesteps_match_expected_freq(dst_path, expected_freq_mins=5)
 
 
 def test_run_sat_delayed_5_and_15_data(
     sat_5_data_delayed: xr.Dataset,
     sat_15_data: xr.Dataset,
     test_t0: pd.Timestamp,
+    tmp_path: Path,
 ):
     """Download and process 5 and 15 minute satellite data. Use the 15 minute data since the
     5 minute data is too delayed
     """
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    dst_path = f"{tmp_path}/sat.zarr"
 
-        with patch(
-            "pvnet_app.data.satellite.open_satellite_data",
-            side_effect=[sat_5_data_delayed, sat_15_data],
-        ):
-            sat_downloader = SatelliteDownloader(
-                t0=test_t0,
-                source_path_5="s3://fake/sat5",
-                source_path_15="s3://fake/sat15",
-                s3_region="fake-region",
-            )
-            sat_downloader.run()
+    with patch(
+        "pvnet_app.data.satellite.open_satellite_data",
+        side_effect=[sat_5_data_delayed, sat_15_data],
+    ):
+        sat_downloader = SatelliteDownloader(
+            t0=test_t0,
+            source_path_5="s3://fake/sat5",
+            source_path_15="s3://fake/sat15",
+            s3_region="fake-region",
+            destination_path=dst_path,
+        )
+        sat_downloader.run()
 
-        assert os.path.exists(sat_path)
-        assert sat_downloader.sat_choice == "15-min"
+    assert os.path.exists(dst_path)
+    assert sat_downloader.sat_choice == "15-min"
 
-        # We infill the satellite data to 5 minutes in the process step
-        assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
+    # We infill the satellite data to 5 minutes in the process step
+    assert timesteps_match_expected_freq(dst_path, expected_freq_mins=5)
 
 
-def test_run_nan_in_sat_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp):
+def test_run_nan_in_sat_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path: Path):
     """Check that the satellite data is considered invalid if it contains too many NaNs"""
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    dst_path = f"{tmp_path}/sat.zarr"
 
-        # Make half the values zeros
-        ds = sat_15_data.copy(deep=True)
-        ds.data[::2] = np.nan
+    # Make half the values zeros
+    ds = sat_15_data.copy(deep=True)
+    ds.data[::2] = np.nan
 
-        with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[ds]):
-            sat_downloader = SatelliteDownloader(
-                t0=test_t0,
-                source_path_5=None,
-                source_path_15="s3://fake/sat15",
-                s3_region="fake-region",
-            )
-            sat_downloader.run()
+    with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[ds]):
+        sat_downloader = SatelliteDownloader(
+            t0=test_t0,
+            source_path_5=None,
+            source_path_15="s3://fake/sat15",
+            s3_region="fake-region",
+            destination_path=dst_path,
+        )
+        sat_downloader.run()
 
-        # If the satellite data is invalid the valid_times attribute should be None and the
-        # satellite data should not be saved
-        assert sat_downloader.valid_times is None
-        assert not os.path.exists(sat_path)
+    # If the satellite data is invalid the valid_times attribute should be None and the
+    # satellite data should not be saved
+    assert sat_downloader.valid_times is None
+    assert not os.path.exists(dst_path)
 
 
 def test_check_model_satellite_inputs_available(config_filename: str):

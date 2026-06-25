@@ -1,6 +1,5 @@
 """Functions to run the forecaster."""
 import logging
-import tempfile
 
 import numpy as np
 import pandas as pd
@@ -54,18 +53,21 @@ class Forecaster:
         self,
         model_spec: ModelSpec,
         data_config_path: str,
+        run_data_dir: str,
         t0: pd.Timestamp,
         gsp_ids: list[int],
         device: torch.device,
         gsp_capacities: xr.DataArray,
         national_capacity: float,
         hf_token: bool | str | None = None,
+
     ) -> None:
         """Class for making and compiling solar forecasts from for all GB GSPs and national total.
 
         Args:
             model_spec: The configuration for the model
             data_config_path: The path to the model data config
+            run_data_dir: The directory where the downloaded input data is stored
             t0: The forecast init-time
             gsp_ids: List of gsp_ids to make predictions for
             device: Device to run the model on
@@ -82,6 +84,7 @@ class Forecaster:
         # Store settings
         self.model_tag = model_spec.name
         self.data_config_path = data_config_path
+        self.run_data_dir = run_data_dir
         self.t0 = t0
         self.gsp_ids = gsp_ids
         self.device = device
@@ -164,15 +167,15 @@ class Forecaster:
 
     def make_batch(self) -> NumpyBatch:
         """Create the batch required to run this model."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml") as tmp:
-            temp_path = tmp.name
+        runtime_data_config_filepath = f"{self.run_data_dir}/{self.model_tag}_data_config.yaml"
 
-            modify_data_config_for_production(
-                input_path=self.data_config_path,
-                output_path=temp_path,
-            )
+        modify_data_config_for_production(
+            input_path=self.data_config_path,
+            output_path=runtime_data_config_filepath,
+            run_data_dir=self.run_data_dir,
+        )
 
-            dataset = PVNetConcurrentDataset(config_filename=temp_path)
+        dataset = PVNetConcurrentDataset(config_filename=runtime_data_config_filepath)
 
         return dataset.get_sample(self.t0)
 

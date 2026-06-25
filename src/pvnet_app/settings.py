@@ -40,6 +40,8 @@ class AppSettings(BaseSettings):
         - HUGGINGFACE_TOKEN: Huggingface token, required if any of the models being run are in
           private repositories.
         - SAVE_BATCHES_DIR: If set, the batches will be saved to this path.
+        - SCRATCH_DIR: If set, the scratch directory will be used for temporary files. Else, the
+          system temp directory will be used.
     """
 
     # Input data paths
@@ -66,3 +68,4 @@ class AppSettings(BaseSettings):
     data_platform_port: int = 50051
     huggingface_token: str | None = None
     save_batches_dir: str | None = None
+    scratch_dir: str | None = None

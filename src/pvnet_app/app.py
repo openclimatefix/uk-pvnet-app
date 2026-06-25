@@ -1,8 +1,11 @@
-"""Application to run inference for PVNet multiple models."""
+"""Application to run forecasts with a collection of PVNet models."""
+
 
 import asyncio
+import contextlib
 import logging
 import os
+import tempfile
 from importlib.metadata import version
 
 import pandas as pd
@@ -12,7 +15,13 @@ from grpclib.client import Channel
 from ocf import dp
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
-from pvnet_app.consts import generation_path
+from pvnet_app.consts import (
+    generation_path,
+    nwp_cloudcasting_path,
+    nwp_ecmwf_path,
+    nwp_ukv_path,
+    sat_path,
+)
 from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
@@ -49,23 +58,23 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ---------------------------------------------------------------------------
 # APP MAIN
 
-async def run(
+async def run_app(
     settings: AppSettings,
     t0: str | None = None,
     write_predictions: bool = True,
-) -> None:
-    """Inference function to run PVNet.
+) -> None | dict:
+    """Set up the app environment and run a forecast.
+
+    Handles Sentry, init-time resolution, and the scratch directory, then
+    delegates to the forecast pipeline.
 
     Args:
         settings: The application settings
-        t0 (str): Datetime at which forecast is made
-        write_predictions (bool): Whether to write prediction to the database. Else returns as
-            DataArray for local testing.
+        t0: The forecast init-time. If None, the current time is used. Floored
+            to the previous 30-minute mark and made naive-UTC before running
+        write_predictions: If True, write forecasts to the data platform. If
+            False, skip the write and return the forecasters for local testing
     """
-    # ---------------------------------------------------------------------------
-    # Basic set up
-
-    # -- Initialize Sentry
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
         environment=settings.environment,
@@ -76,15 +85,50 @@ async def run(
 
     # If inference datetime is None, set to now
     t0 = pd.Timestamp.now(tz="UTC") if t0 is None else pd.Timestamp(t0).tz_localize("UTC")
-    # Round down to last 30 minutes
     t0 = t0.replace(tzinfo=None).floor("30min")
 
-    # --- Log version and variables
-    pvnet_version = version("pvnet")
-    logger.info(f"Using `pvnet` library version: {pvnet_version}")
+    logger.info(f"Using `pvnet` library version: {version('pvnet')}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Making forecast for init time: {t0}")
     logger.info(f"Running critical models only: {settings.run_critical_models_only}")
+
+    # If a scratch directory is configured, use it. Otherwise, create a temporary directory which
+    # will be deleted after the forecast is complete.
+    if settings.scratch_dir is not None:
+        logger.info(f"Using configured scratch directory: {settings.scratch_dir}")
+        # Create the scratch directory if it doesn't exist. If it does exist, raise an error to
+        # avoid clashing with data from a previous run.
+        os.makedirs(settings.scratch_dir, exist_ok=False)
+        dir_context = contextlib.nullcontext(settings.scratch_dir)
+    else:
+        logger.info("No scratch directory configured. Creating a temporary scratch directory.")
+        dir_context = tempfile.TemporaryDirectory(prefix="pvnet-app-")
+
+    with dir_context as scratch_dir:
+        logger.info(f"Using scratch directory: {scratch_dir}")
+        return await _run_forecast_pipeline(settings, t0, scratch_dir, write_predictions)
+
+
+async def _run_forecast_pipeline(
+    settings: AppSettings,
+    t0: pd.Timestamp,
+    scratch_dir: str,
+    write_predictions: bool,
+) -> dict | None:
+    """Run the forecast pipeline for all configured models.
+
+    Prepares inputs, runs each model whose data is available, validates the
+    forecasts, and writes them to the data platform.
+
+    Args:
+        settings: The application settings
+        t0: The forecast init-time. Must be in naive-UTC and floored to 30 minutes
+        scratch_dir: Directory for downloaded inputs and temporary files
+        write_predictions: If True, write forecasts to the data platform. If
+            False, skip the write and return the forecasters for local testing
+    """
+    # ---------------------------------------------------------------------------
+    # Basic set up
 
     # --- Get the model configurations
     model_specs = get_model_specs(get_critical_only=settings.run_critical_models_only)
@@ -92,7 +136,7 @@ async def run(
     if len(model_specs) == 0:
         raise Exception("No models found after filtering")
 
-    # Get Model configs
+    # Fetch the model's data configs
     data_config_paths: dict[str, str] = {}
     data_configs: list[dict] = []
     for model_spec in model_specs:
@@ -119,7 +163,7 @@ async def run(
         capacities_mwp=extract_location_capacities_mwp(locations),
     )
 
-    ds_gen.to_zarr(generation_path)
+    ds_gen.to_zarr(f"{scratch_dir}/{generation_path}")
 
     national_capacity = ds_gen.sel(time_utc=t0, location_id=0).capacity_mwp.item()
     gsp_capacities = ds_gen.sel(time_utc=t0, location_id=slice(1, None)).capacity_mwp.values
@@ -136,6 +180,7 @@ async def run(
             source_path_5=settings.satellite_icechunk_path_5,
             source_path_15=settings.satellite_icechunk_path_15,
             s3_region=settings.satellite_s3_region,
+            destination_path=f"{scratch_dir}/{sat_path}",
         )
         sat_downloader.run()
 
@@ -153,13 +198,19 @@ async def run(
                     required_providers.add(source["provider"])
 
         if "ukv" in required_providers:
-            ukv_downloader = UKVDownloader(source_path=settings.nwp_ukv_zarr_path)
+            ukv_downloader = UKVDownloader(
+                source_path=settings.nwp_ukv_zarr_path,
+                destination_path=f"{scratch_dir}/{nwp_ukv_path}",
+            )
             ukv_downloader.run()
 
             data_downloaders.append(ukv_downloader)
 
         if "ecmwf" in required_providers:
-            ecmwf_downloader = ECMWFDownloader(source_path=settings.nwp_ecmwf_zarr_path)
+            ecmwf_downloader = ECMWFDownloader(
+                source_path=settings.nwp_ecmwf_zarr_path,
+                destination_path=f"{scratch_dir}/{nwp_ecmwf_path}",
+            )
             ecmwf_downloader.run()
 
             data_downloaders.append(ecmwf_downloader)
@@ -167,6 +218,7 @@ async def run(
         if "cloudcasting" in required_providers:
             cloudcasting_downloader = CloudcastingDownloader(
                 source_path=settings.cloudcasting_zarr_path,
+                destination_path=f"{scratch_dir}/{nwp_cloudcasting_path}",
             )
             cloudcasting_downloader.run()
 
@@ -194,6 +246,7 @@ async def run(
             forecasters[model_spec.name] = Forecaster(
                 model_spec=model_spec,
                 data_config_path=data_config_path,
+                run_data_dir=scratch_dir,
                 t0=t0,
                 gsp_ids=gsp_ids,
                 device=device,
@@ -224,10 +277,6 @@ async def run(
             save_batch_to_s3(batch, model_name, settings.save_batches_dir)
 
         forecaster.predict(batch)
-
-    # Delete the downloaded data
-    for downloader in data_downloaders:
-        downloader.clean_up()
 
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
@@ -312,4 +361,4 @@ async def run(
 def main() -> None:
     """Main entrypoint to the inference app."""
     settings = AppSettings()
-    asyncio.run(run(settings=settings))
+    asyncio.run(run_app(settings=settings))

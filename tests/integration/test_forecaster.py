@@ -18,6 +18,7 @@ def test_model_loading():
         forecaster = Forecaster(
             model_spec=model_spec,
             data_config_path="dummy.yaml",
+            run_data_dir="dummy_dir",
             t0=pd.Timestamp.now(),
             gsp_ids=[*range(10)],
             device=device,
