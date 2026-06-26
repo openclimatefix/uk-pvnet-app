@@ -27,6 +27,11 @@ from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader
+from pvnet_app.data_platform import (
+    extract_location_capacities_mwp,
+    fetch_locations,
+    write_forecasts_to_data_platform,
+)
 from pvnet_app.forecaster import PVNetForecaster
 from pvnet_app.model_input_config import (
     fetch_model_data_config_paths,
@@ -34,11 +39,6 @@ from pvnet_app.model_input_config import (
     load_yaml_config,
 )
 from pvnet_app.models.registry import get_model_specs
-from pvnet_app.data_platform import (
-    extract_location_capacities_mwp,
-    fetch_locations,
-    write_forecasts_to_data_platform,
-)
 from pvnet_app.settings import AppSettings
 from pvnet_app.utils import check_model_runs_finished, resolve_t0, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast

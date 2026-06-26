@@ -243,8 +243,8 @@ def build_forecast_creation_request(
             high_plevels = np.array(plevels)[row > DATAPLATFORM_MAX_VALUE].tolist()
             logger.warning(
                 f"p-levels={high_plevels} exceed {DATAPLATFORM_MAX_VALUE} for model="
-                f"{forecaster.forecaster_name}, location_id={location_id}, horizon_mins={h}; clipping to "
-                f"{DATAPLATFORM_MAX_VALUE}",
+                f"{forecaster.forecaster_name}, location_id={location_id}, horizon_mins={h}; "
+                f"clipping to {DATAPLATFORM_MAX_VALUE}",
             )
             p10, p50, p90 = row.clip(None, DATAPLATFORM_MAX_VALUE)
         else:

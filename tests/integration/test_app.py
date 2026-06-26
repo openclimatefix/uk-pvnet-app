@@ -7,8 +7,8 @@ import xarray as xr
 from ocf import dp
 
 from pvnet_app.app import run_app
-from pvnet_app.models.registry import ModelSpec, get_model_specs
 from pvnet_app.data_platform import fetch_locations
+from pvnet_app.models.registry import ModelSpec, get_model_specs
 from pvnet_app.settings import AppSettings
 
 

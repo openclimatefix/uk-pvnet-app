@@ -9,7 +9,8 @@ from betterproto.lib.google.protobuf import Struct, Value
 from ocf import dp
 
 from src.pvnet_app.data_platform import (
-    build_multi_forecast_creation_request, fetch_or_create_forecaster
+    build_multi_forecast_creation_request,
+    fetch_or_create_forecaster,
 )
 
 
