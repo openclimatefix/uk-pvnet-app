@@ -72,8 +72,11 @@ def check_model_runs_finished(
         )
 
 
-def normalise_t0(t0: str | datetime | pd.Timestamp | None) -> pd.Timestamp:
-    """Parse input t0 time to return a tz-naive timestamp representing UTC, floored to 30 minutes.
+def resolve_t0(t0: str | datetime | pd.Timestamp | None) -> pd.Timestamp:
+    """Resolve any accepted t0 input to a timezone-naive UTC timestamp floored to 30 minutes.
+
+    Naive inputs are assumed to already be in UTC; timezone-aware inputs are converted to UTC before
+    the zone is dropped.
 
     Args:
         t0: The input timestamp. If None, the current time is used.

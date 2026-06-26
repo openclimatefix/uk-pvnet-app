@@ -32,7 +32,7 @@ from pvnet_app.model_input_config import load_yaml_config
 from pvnet_app.models.registry import get_model_specs
 from pvnet_app.save import build_input_metadata, extract_location_capacities_mwp, fetch_locations
 from pvnet_app.settings import AppSettings
-from pvnet_app.utils import check_model_runs_finished, normalise_t0, save_batch_to_s3
+from pvnet_app.utils import check_model_runs_finished, resolve_t0, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
 __version__ = version("pvnet-app")
@@ -84,7 +84,7 @@ async def run_app(
     sentry_sdk.set_tag("app_name", "pvnet_app")
     sentry_sdk.set_tag("version", __version__)
 
-    t0 = normalise_t0(t0)
+    t0 = resolve_t0(t0)
 
     logger.info(f"Using `pvnet` library version: {version('pvnet')}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")

@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 DATAPLATFORM_MAX_VALUE = 1.09
 
 
-def to_data_platform_datetime(ts: pd.Timestamp) -> datetime:
+def convert_to_utc_datetime(ts: pd.Timestamp) -> datetime:
     """Converts internal naive UTC timestamp to aware UTC datetime."""
     return ts.tz_localize("UTC").to_pydatetime()
 
@@ -264,7 +264,7 @@ def build_forecast_creation_request(
         forecaster=forecaster,
         location_uuid=location_uuid,
         energy_source=dp.EnergySource.SOLAR,
-        init_time_utc=to_data_platform_datetime(init_time_utc),
+        init_time_utc=convert_to_utc_datetime(init_time_utc),
         values=forecast_value_requests,
         metadata=metadata,
     )
@@ -282,7 +282,7 @@ async def fetch_adjuster_values(
             dp.GetWeekAverageDeltasRequest(
                 location_uuid=location_uuid,
                 energy_source=dp.EnergySource.SOLAR,
-                pivot_timestamp_utc=to_data_platform_datetime(init_time_utc),
+                pivot_timestamp_utc=convert_to_utc_datetime(init_time_utc),
                 forecaster=forecaster,
                 observer_name="pvlive_day_after",
             ),
