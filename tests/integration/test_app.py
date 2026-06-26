@@ -8,7 +8,7 @@ from ocf import dp
 
 from pvnet_app.app import run_app
 from pvnet_app.models.registry import ModelSpec, get_model_specs
-from pvnet_app.save import fetch_locations
+from pvnet_app.data_platform import fetch_locations
 from pvnet_app.settings import AppSettings
 
 
@@ -16,7 +16,7 @@ async def check_number_of_forecasts(
     client: dp.DataPlatformDataServiceStub,
     model_specs: list[ModelSpec],
     test_t0: pd.Timestamp,
-    expected_gsp_ids: list[int],
+    expected_location_ids: list[int],
 ) -> None:
     """Check that the expected number of forecasts have been saved to the Data Platform."""
     locations_dict = await fetch_locations(client=client)
@@ -48,7 +48,7 @@ async def check_number_of_forecasts(
             )
         ).values
 
-        assert len(forecast_at_first_timestamp) == len(expected_gsp_ids)
+        assert len(forecast_at_first_timestamp) == len(expected_location_ids)
 
         for forecaster_name in [model_name, model_adjust]:
             # Check the model and adjusted model produce forecasts for all expected valid times
@@ -93,7 +93,7 @@ async def test_app(
     nwp_ecmwf_data: xr.Dataset,
     sat_5_data_zero_delay: xr.Dataset,
     cloudcasting_data: xr.Dataset,
-    gsp_ids: list[int],
+    location_ids: list[int],
     tmp_path: Path,
 ):
     """Test the app running the intraday models"""
@@ -132,7 +132,7 @@ async def test_app(
         await run_app(settings=settings, t0=test_t0)
 
     model_specs = get_model_specs(get_critical_only=False)
-    await check_number_of_forecasts(dp_client_with_locations, model_specs, test_t0, gsp_ids)
+    await check_number_of_forecasts(dp_client_with_locations, model_specs, test_t0, location_ids)
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -142,7 +142,7 @@ async def test_app_no_sat(
     test_t0: pd.Timestamp,
     nwp_ukv_data: xr.Dataset,
     nwp_ecmwf_data: xr.Dataset,
-    gsp_ids: list[int],
+    location_ids: list[int],
     tmp_path: Path,
 ):
     """Test the app for the case when no satellite data is available"""
@@ -180,4 +180,4 @@ async def test_app_no_sat(
     model_specs = get_model_specs()
     model_specs = [model for model in model_specs if not model.uses_satellite_data]
 
-    await check_number_of_forecasts(dp_client_with_locations, model_specs, test_t0, gsp_ids)
+    await check_number_of_forecasts(dp_client_with_locations, model_specs, test_t0, location_ids)

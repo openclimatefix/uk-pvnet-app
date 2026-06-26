@@ -34,7 +34,7 @@ from pvnet_app.model_input_config import (
     load_yaml_config,
 )
 from pvnet_app.models.registry import get_model_specs
-from pvnet_app.save import (
+from pvnet_app.data_platform import (
     extract_location_capacities_mwp,
     fetch_locations,
     write_forecasts_to_data_platform,
@@ -280,7 +280,7 @@ async def _run_forecast_pipeline(
     # Run validation checks on the forecast values
 
     logger.info("Validating forecasts")
-    for model_name, da_forecast in forecasts.items():
+    for model_name, da_forecast in list(forecasts.items()):
 
         forecast_okay = validate_forecast(
             da_forecast=da_forecast,

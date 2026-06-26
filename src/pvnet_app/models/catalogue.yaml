@@ -1,18 +1,4 @@
-# Here we define all the models that are available in the app
-# Batches are prepared only once, and it is assumed that all of the models configs can be unified
-# by the pvnet_app.config.get_union_of_configs function
-
-# These are the default arguments if not specified:
-#    is_critical: False
-#    is_day_ahead: False
-#    verbose_logging: False
-#    uses_satellite_data: True
-
-
 models:
-  # ------------------------------------------------------
-  # These are the new models trained with ocf-data-sampler
-  # ------------------------------------------------------
   
   # Currently this model uses a 30 minute satellite delay
   - name: pvnet_intra_allbells30

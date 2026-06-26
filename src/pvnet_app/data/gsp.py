@@ -10,7 +10,7 @@ def get_gsp_locations() -> pd.DataFrame:
     """Load the GSP locations metadata."""
     return pd.read_csv(
         files("pvnet_app.data").joinpath("uk_gsp_locations_20260209_no_shetlands.csv"),
-        index_col="gsp_id",
+        index_col="location_id",
     )
 
 
@@ -25,7 +25,7 @@ def create_null_generation_data(t0: pd.Timestamp, capacities_mwp: dict[int, floa
     df_locs = get_gsp_locations()
 
     capacities_array = np.array(
-        [capacities_mwp[gsp_id] for gsp_id in df_locs.index.tolist()],
+        [capacities_mwp[loc_id] for loc_id in df_locs.index.tolist()],
         dtype=np.float32,
     )
 

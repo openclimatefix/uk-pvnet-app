@@ -1,4 +1,4 @@
-"""Functions to save forecasts to the data platform."""
+"""Functions to load and save from data-platform."""
 
 import asyncio
 import logging
@@ -41,7 +41,7 @@ async def fetch_locations(
     national_location = national_locations[0]
 
     # Get all GSPs within the UK nation
-    gsp_locations = (
+    locations = (
         await client.list_locations(
             dp.ListLocationsRequest(
                 location_type_filter=dp.LocationType.GSP,
@@ -54,11 +54,11 @@ async def fetch_locations(
     ).locations
 
     locations_lookup = {0: national_location}
-    for loc in gsp_locations:
-        gsp_id = int(loc.metadata.fields["gsp_id"].number_value)
-        if gsp_id in locations_lookup:
-            raise ValueError(f"Duplicate GSP ID {gsp_id} found in locations")
-        locations_lookup[gsp_id] = loc
+    for loc in locations:
+        location_id = int(loc.metadata.fields["gsp_id"].number_value)
+        if location_id in locations_lookup:
+            raise ValueError(f"Duplicate GSP ID {location_id} found in locations")
+        locations_lookup[location_id] = loc
 
     return locations_lookup
 
@@ -67,7 +67,7 @@ def extract_location_capacities_mwp(
     locations: dict[int, dp.ListLocationsResponseLocationSummary],
 ) -> dict[int, float]:
     """Extract capacities in MW from location summaries."""
-    return {gsp_id: loc.effective_capacity_watts / 1e6 for gsp_id, loc in locations.items()}
+    return {loc_id: loc.effective_capacity_watts / 1e6 for loc_id, loc in locations.items()}
 
 
 async def fetch_or_create_forecaster(
@@ -141,15 +141,18 @@ async def build_input_metadata(
                     modified_date = fs.modified(f"{s3_path}/.zattrs")
                 elif s3_path.endswith(".icechunk"):
                     modified_date = fs.modified(f"{s3_path}/refs/branch.main")
+                else:
+                    logger.warning(f"Unknown file type for {name}: {s3_path}; skipping")
+                    continue
                 metadata[f"{name}_last_modified"] = Value(string_value=modified_date.isoformat())
             except Exception as e:
-                logger.debug(f"Could not get metadata for {name}: {e}")
+                logger.warning(f"Could not get metadata for {name}: {e}")
 
     return Struct(fields=metadata)
 
 
 async def build_multi_forecast_creation_request(
-    forecast_normed_da: xr.DataArray,
+    da_forecast: xr.DataArray,
     locations: dict[int, dp.ListLocationsResponseLocationSummary],
     model_tag: str,
     init_time_utc: pd.Timestamp,
@@ -159,8 +162,8 @@ async def build_multi_forecast_creation_request(
     """Build a list of create-forecast requests for all forecasted locations.
 
     Args:
-        forecast_normed_da: DataArray of normalized forecasts for all GSPs
-        locations: Mapping of GSP IDs to location summaries
+        da_forecast: DataArray of normalized forecasts for all locations
+        locations: Mapping of location IDs to location summaries
         model_tag: The name of the model to saved to the database
         init_time_utc: Forecast initialization time
         client: A connected data-platform service client
@@ -174,10 +177,10 @@ async def build_multi_forecast_creation_request(
 
     forecast_requests: list[dp.CreateForecastRequest] = []
 
-    for loc_id in forecast_normed_da.gsp_id.values.tolist():
+    for loc_id in da_forecast.location_id.values.tolist():
 
         request = build_forecast_creation_request(
-            forecast_normed_da.sel(gsp_id=loc_id),
+            da_forecast.sel(location_id=loc_id),
             forecaster=forecaster,
             location_uuid=locations[loc_id].location_uuid,
             init_time_utc=init_time_utc,
@@ -191,7 +194,7 @@ async def build_multi_forecast_creation_request(
         client=client,
         location=locations[0],
         init_time_utc=init_time_utc,
-        da_forecast=forecast_normed_da.sel(gsp_id=0),
+        da_forecast=da_forecast.sel(location_id=0),
         forecaster=forecaster, # We get the adjuster values for the original forecaster
     )
 
@@ -224,7 +227,7 @@ def build_forecast_creation_request(
         init_time_utc: Forecast initialization time
         metadata: Optional metadata to assign to the forecast
     """
-    gsp_id = int(da_forecast.gsp_id.values)
+    location_id = int(da_forecast.location_id.values)
     horizons_mins = da_forecast.horizon_mins.values.tolist()
     plevels = ["p10", "p50", "p90"]
 
@@ -240,7 +243,7 @@ def build_forecast_creation_request(
             high_plevels = np.array(plevels)[row > DATAPLATFORM_MAX_VALUE].tolist()
             logger.warning(
                 f"p-levels={high_plevels} exceed {DATAPLATFORM_MAX_VALUE} for model="
-                f"{forecaster.forecaster_name}, gsp_id={gsp_id}, horizon_mins={h}; clipping to "
+                f"{forecaster.forecaster_name}, location_id={location_id}, horizon_mins={h}; clipping to "
                 f"{DATAPLATFORM_MAX_VALUE}",
             )
             p10, p50, p90 = row.clip(None, DATAPLATFORM_MAX_VALUE)
@@ -300,7 +303,7 @@ async def write_forecasts_to_data_platform(
     all_requests: list[list[dp.CreateForecastRequest]] = await asyncio.gather(
         *(
             build_multi_forecast_creation_request(
-                forecast_normed_da=da_normed_forecast,
+                da_forecast=da_normed_forecast,
                 locations=locations,
                 model_tag=model_name,
                 init_time_utc=t0,
