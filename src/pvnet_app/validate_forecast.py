@@ -4,8 +4,8 @@ import logging
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 import pvlib
+import xarray as xr
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +160,6 @@ def validate_forecast(
             values must be positive when the sun is above this angle.
         model_name: The name of the model that generated the forecast.
     """
-
     # Compute the national forecast in MW from the normalised forecast
     # Validation is only performed on the national forecast
     national_forecast_mw = (

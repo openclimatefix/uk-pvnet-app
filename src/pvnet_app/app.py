@@ -29,7 +29,9 @@ from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownl
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.forecaster import PVNetForecaster
 from pvnet_app.model_input_config import (
-    fetch_model_data_config_paths, load_yaml_config, get_required_nwp_providers
+    fetch_model_data_config_paths,
+    get_required_nwp_providers,
+    load_yaml_config,
 )
 from pvnet_app.models.registry import get_model_specs
 from pvnet_app.save import (
@@ -158,7 +160,7 @@ async def _run_forecast_pipeline(
     capacities_mwp = extract_location_capacities_mwp(locations)
 
     # Save out a dummy generation dataset to the scratch directory
-    # The models don't actually use this data, but the current ocf-data-sampler version requires it
+    # The models don't actually use this data, but the current ocf-data-sampler version requires it
     ds_gen = create_null_generation_data(t0=t0, capacities_mwp=capacities_mwp)
     ds_gen.to_zarr(f"{scratch_dir}/{generation_path}")
 
@@ -222,7 +224,7 @@ async def _run_forecast_pipeline(
 
         # Check if the data available will allow the model to run
         data_config_path = data_config_paths[model_spec.name]
-        
+
         logger.info(f"Checking that the input data for model '{model_spec.name}' exists")
 
         model_can_run = all(

@@ -20,9 +20,9 @@ def make_forecast_dataarray(
     return xr.DataArray(
         np.array(forecast_values)[None, :, None],  # MW
         coords={
-            "gsp_id": [0], 
-            "valid_times_utc": valid_times, 
-            "output_label": ["p50"]
+            "gsp_id": [0],
+            "valid_times_utc": valid_times,
+            "output_label": ["p50"],
         },
         dims=["gsp_id", "valid_times_utc", "output_label"],
     )
@@ -30,7 +30,7 @@ def make_forecast_dataarray(
 
 def test_validate_forecast_ok():
     """Test that validate_forecast passes when forecast is valid"""
-    
+
 
     national_capacity_mw = 50
     zig_zag_warning_threshold_mw = 500

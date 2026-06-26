@@ -213,8 +213,8 @@ class PVNetForecaster:
         return da_preds
 
     def predict_with_summation_model(
-        self, 
-        batch: TensorBatch, 
+        self,
+        batch: TensorBatch,
         relative_capacities: np.ndarray,
     ) -> xr.DataArray:
         """Make predictions for the batch using regional and summation models."""
@@ -279,8 +279,8 @@ class PVNetForecaster:
         return xr.concat([da_national_preds, da_regional_preds], dim="gsp_id")
 
     def predict_with_regional_sum(
-        self, 
-        batch: TensorBatch, 
+        self,
+        batch: TensorBatch,
         relative_capacities: np.ndarray,
     ) -> xr.DataArray:
         """Make predictions for the batch using regional model and regional sum."""
@@ -339,7 +339,7 @@ class PVNetForecaster:
         da_national_sundown_mask = da_regional_sundown_mask.all(dim="gsp_id")
 
         return da_regional_sundown_mask, da_national_sundown_mask
-    
+
     def get_relative_capacities(self, gsp_ids: list[int]) -> np.ndarray:
         """Get the relative capacities for the given GSP IDs."""
         return np.array(

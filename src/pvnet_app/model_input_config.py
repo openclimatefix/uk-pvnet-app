@@ -1,6 +1,5 @@
 """Functions to load, save, and modify a PVNet model's data-configuration file."""
 import yaml
-
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.consts import (
@@ -11,8 +10,6 @@ from pvnet_app.consts import (
     sat_path,
 )
 from pvnet_app.models.registry import ModelSpec
-
-
 
 
 def load_yaml_config(path: str) -> dict:

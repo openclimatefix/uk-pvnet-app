@@ -1,6 +1,5 @@
 """General utility functions for pvnet_app."""
 import logging
-import os
 from datetime import datetime
 
 import fsspec
@@ -15,10 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 def save_batch_to_s3(
-    batch: NumpyBatch, 
+    batch: NumpyBatch,
     model_name: str,
-    s3_directory: str, 
-    scratch_dir: str
+    s3_directory: str,
+    scratch_dir: str,
 ) -> None:
     """Saves a batch to a local file and uploads it to S3.
 
