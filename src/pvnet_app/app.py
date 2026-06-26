@@ -7,6 +7,7 @@ import logging
 import os
 import tempfile
 from importlib.metadata import version
+from typing import TYPE_CHECKING
 
 import pandas as pd
 import sentry_sdk
@@ -14,6 +15,7 @@ import torch
 from grpclib.client import Channel
 from ocf import dp
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
+from pvnet.utils import validate_batch_against_config
 
 from pvnet_app.consts import (
     generation_path,
@@ -29,10 +31,17 @@ from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.forecaster import Forecaster
 from pvnet_app.model_input_config import load_yaml_config
 from pvnet_app.models.registry import get_model_specs
-from pvnet_app.save import build_input_metadata, extract_location_capacities_mwp, fetch_locations
+from pvnet_app.save import (
+    extract_location_capacities_mwp,
+    fetch_locations,
+    write_forecasts_to_data_platform,
+)
 from pvnet_app.settings import AppSettings
 from pvnet_app.utils import check_model_runs_finished, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
+
+if TYPE_CHECKING:
+    import xarray as xr
 
 __version__ = version("pvnet-app")
 
@@ -150,7 +159,7 @@ async def _run_forecast_pipeline(
         data_configs.append(load_yaml_config(data_config_path))
 
     # ---------------------------------------------------------------------------
-    #  Prepare data sources
+    # Prepare data sources
 
     # --- Get locations metadata from the data platform
     logger.info("Loading locations")
@@ -167,7 +176,6 @@ async def _run_forecast_pipeline(
 
     national_capacity = ds_gen.sel(time_utc=t0, location_id=0).capacity_mwp.item()
     gsp_capacities = ds_gen.sel(time_utc=t0, location_id=slice(1, None)).capacity_mwp.values
-    gsp_ids = ds_gen.location_id.values
 
     data_downloaders = []
 
@@ -248,7 +256,6 @@ async def _run_forecast_pipeline(
                 data_config_path=data_config_path,
                 run_data_dir=scratch_dir,
                 t0=t0,
-                gsp_ids=gsp_ids,
                 device=device,
                 gsp_capacities=gsp_capacities,
                 national_capacity=national_capacity,
@@ -266,32 +273,39 @@ async def _run_forecast_pipeline(
 
     logger.info("Making predictions")
 
+    forecasts: dict[str, xr.DataArray] = {}
+
     for i, (model_name, forecaster) in enumerate(forecasters.items()):
         batch = forecaster.make_batch()
 
         # Do basic validation of the batch: Will raise error if the batch fails the checks
-        check_batch(batch)
+        try:
+            check_batch(batch)
+            validate_batch_against_config(batch=batch, model=forecaster.model)
+        except Exception as e:
+            logger.error(f"Batch validation failed for model {model_name}: {e}")
+            continue
+
+        forecasts[model_name] = forecaster.predict(batch)
 
         if (settings.save_batches_dir is not None) and i == 0:
             # Save the batch under the name of the first model
             save_batch_to_s3(batch, model_name, settings.save_batches_dir)
 
-        forecaster.predict(batch)
 
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
 
     logger.info("Validating forecasts")
-    for model_name in list(forecasters.keys()):
-        national_forecast = (
-            forecasters[model_name].da_abs_all.sel(gsp_id=0, output_label="p50")
-        ).to_series()
+    for model_name, da_normed_forecast in forecasts.items():
 
         forecast_okay = validate_forecast(
-            national_forecast=national_forecast,
-            national_capacity=national_capacity,
-            zig_zag_warning_threshold=settings.forecast_validate_zig_zag_warning_threshold,
-            zig_zag_error_threshold=settings.forecast_validate_zig_zag_error_threshold,
+            normed_national_forecast=(
+                da_normed_forecast.sel(gsp_id=0, output_label="p50").to_series()
+            ),
+            national_capacity_mw=national_capacity,
+            zig_zag_warning_threshold_mw=settings.forecast_validate_zig_zag_warning_threshold,
+            zig_zag_error_threshold_mw=settings.forecast_validate_zig_zag_error_threshold,
             sun_elevation_lower_limit=settings.forecast_validate_sun_elevation_lower_limit,
             model_name=model_name,
         )
@@ -300,15 +314,15 @@ async def _run_forecast_pipeline(
             logger.warning(f"Forecast for model {model_name} failed validation")
             if settings.filter_bad_forecasts:
                 # This forecast will not be saved
-                del forecasters[model_name]
+                del forecasts[model_name]
 
-    if len(forecasters) == 0:
+    if len(forecasts) == 0:
         raise Exception("No models passed the forecast validation checks")
 
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally
     if not write_predictions:
-        return forecasters
+        return forecasts
 
     # ---------------------------------------------------------------------------
     # Write predictions to data-platform
@@ -318,10 +332,12 @@ async def _run_forecast_pipeline(
     async with Channel(settings.data_platform_host, settings.data_platform_port) as dp_channel:
         dp_client = dp.DataPlatformDataServiceStub(dp_channel)
 
-        input_metadata = await build_input_metadata(
+        await write_forecasts_to_data_platform(
             client=dp_client,
-            location_uuid=locations[0].location_uuid,
-            input_s3_paths = {
+            forecasts=forecasts,
+            locations=locations,
+            t0=t0,
+            input_s3_paths={
                 "nwp_ecmwf": settings.nwp_ecmwf_zarr_path,
                 "nwp_ukv": settings.nwp_ukv_zarr_path,
                 "satellite": settings.satellite_icechunk_path_5,
@@ -330,30 +346,11 @@ async def _run_forecast_pipeline(
             app_version=__version__,
         )
 
-        all_requests: list[list[dp.CreateForecastRequest]] = await asyncio.gather(
-            *(
-                forecaster.create_write_requests(
-                    client=dp_client,
-                    locations=locations,
-                    metadata=input_metadata,
-                )
-                for forecaster in forecasters.values()
-            ),
-        )
-
-        write_results = await asyncio.gather(
-            *(dp_client.create_forecast(req) for reqs in all_requests for req in reqs),
-            return_exceptions=True,
-        )
-
-    for exc in filter(lambda x: isinstance(x, Exception), write_results):
-        raise exc
-
     logger.info("Finished forecast")
 
     if settings.raise_model_failure in ["any", "critical"]:
         check_model_runs_finished(
-            completed_forecasts=list(forecasters.keys()),
+            completed_forecasts=list(forecasts.keys()),
             model_specs=model_specs,
             raise_if_missing=settings.raise_model_failure,
         )
