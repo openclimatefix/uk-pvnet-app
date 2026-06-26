@@ -113,22 +113,6 @@ def get_required_nwp_providers(data_configs: list[dict]) -> set[str]:
     return providers
 
 
-def load_model_data_configs(
-    model_specs: list[ModelSpec],
-    hf_token: str | None,
-) -> tuple[dict[str, str], list[dict]]:
-    """Fetch each model's data config; return (paths by model name, loaded configs)."""
-    paths: dict[str, str] = {}
-    configs: list[dict] = []
-    for spec in model_specs:
-        path = PVNetBaseModel.get_data_config(
-            spec.pvnet.repo, revision=spec.pvnet.commit, token=hf_token,
-        )
-        paths[spec.name] = path
-        configs.append(load_yaml_config(path))
-    return paths, configs
-
-
 def fetch_model_data_config_paths(
     model_specs: list[ModelSpec],
     hf_token: str | None,
