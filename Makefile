@@ -16,4 +16,7 @@ sync: $(VENV_DIR)
 
 # Run the test suite (after syncing dependencies)
 test: sync
-	conda run --no-capture-output -p $(VENV_DIR) uv run python -m pytest tests
+	conda run --no-capture-output -p $(VENV_DIR) uv run python -m pytest
+
+test: sync
+	@echo "Run: conda activate ./$(VENV_DIR); pytest"
