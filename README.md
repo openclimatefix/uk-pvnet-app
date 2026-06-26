@@ -30,41 +30,46 @@ The app is configured at runtime with many environmental variables. See [setting
 
 ## Validation Checks
 
-We run a number of different validation checks on the data and the forecasts that are made. 
-These are in place to ensure quality forecasts are made and saved to the data-platform.
+We run a number of validation checks on the input data and on the forecasts that are
+produced.
 
-Before feeding data into the model(s) we check whether the data avilable is compatible with the 
-data that the model expects.
+Before feeding data into the model(s) we check whether the available data is compatible
+with what each model expects.
 
 ### Satellite data
 
 We check:
-- Whether 5 minute and/or 15 minute satellite data is available
-- If more than 5% of satellite data is NaN - if so the satellite data is treated as missing
-- If more that 10% of satellite data is zero - if so the satellite data is treated as missing
-- Whether there are any missing timestamps in the satellite data. We linearly interpolate
-any gaps less that 15 minutes.
-- Whether the exact timestamps that the model expects are all available after infilling and checks
+- Whether 5-minute and/or 15-minute satellite data is available.
+- If more than 5% of the satellite data in the required area is NaN. If so, the satellite data is 
+  treated as completely missing.
+- Whether there are any missing timestamps in the satellite data. Gaps of up to 15 minutes are 
+  linearly interpolated.
+- After interpolation, the most recent missing timestamps are extended forward with NaNs up to the 
+  delay the model allows.
+- Whether the exact timestamps the model expects are all available after infilling.
 
 ### NWP data
 
 We check:
-- If the NWP data contains any NaNs - if so that NWP source is treated as missing
-- Whether the exact timestamps that the model expects from each NWP are available
+- If the NWP data contains any NaNs — if so, that NWP source is treated as missing.
+- Whether the exact timestamps the model expects from each NWP source are available.
 
 ### ML batch checks
 
-Just before the batch data goes into the ML models, we check that 
-- All the NWP are not zeros. We raise an error if, for any nwp provider, all the NWP data is zero. 
-- TODO: https://github.com/openclimatefix/PVNet/issues/324
+Just before the batch goes into the ML models, we check that:
+- The NWP data for each provider is not entirely zeros. We raise an error if, for any
+  NWP provider, all the NWP data is zero.
 
 ### Forecast checks
 
-After the ML models have run, we check the following
-- The forecast is not above 110% of the national capacity. An error is raised if any forecast value is above 110% of the national capacity.
-- The forecast is not above 100 GW, any forecast value above 30 GW we get a warning but any forecast value above 100 GW we raise an error. 
-- If the forecast goes up, then down, then up, more than 500 MW we raise an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
-- Check positive values in day. If the sun is up, we expect positive values. 
+After the ML models have run, we check the national forecast only:
+- It does not exceed 110% of the national capacity. The forecast fails validation if any
+  value is above this.
+- It does not exceed an absolute ceiling of 20 GW. The forecast fails validation if any
+  value is above this.
+- It does not zig-zag (go up, then down, then up). Swings above 500\* MW fail validation;
+  swings above 250\* MW produce a warning. \*configurable - see setting.py
+- Forecast values are positive when the sun is up (above the configured elevation).
 
 ## Development
 
