@@ -9,9 +9,10 @@ import pandas as pd
 import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
 from ocf import dp
+
 from pvnet_app.adjuster import calculate_adjusted_forecast
-from pvnet_app.utils import convert_to_utc_datetime
 from pvnet_app.consts import forecast_version
+from pvnet_app.utils import convert_to_utc_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ async def fetch_or_create_forecaster(
 ) -> dp.Forecaster:
     """Create the current forecaster if it does not exist."""
     name = model_tag.replace("-", "_")
-    
+
     forecasters = (
         await client.list_forecasters(
             dp.ListForecastersRequest(forecaster_names_filter=[name]),
