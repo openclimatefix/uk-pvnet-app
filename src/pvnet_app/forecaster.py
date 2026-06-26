@@ -68,7 +68,7 @@ def preds_to_dataarray(
     )
 
 
-class Forecaster:
+class PVNetForecaster:
     """Class for making and compiling solar forecasts from for all GB GSPs and national total."""
 
     def __init__(
@@ -78,8 +78,7 @@ class Forecaster:
         run_data_dir: str,
         t0: pd.Timestamp,
         device: torch.device,
-        gsp_capacities: xr.DataArray,
-        national_capacity: float,
+        capacities: dict[int, float],
         hf_token: bool | str | None = None,
 
     ) -> None:
@@ -91,8 +90,7 @@ class Forecaster:
             run_data_dir: The directory where the downloaded input data is stored
             t0: The forecast init-time
             device: Device to run the model on
-            gsp_capacities: DataArray of the solar capacities for all regional GSPs at t0
-            national_capacity: The national solar capacity at t0
+            capacities: Dictionary of the solar capacities for all locations at t0
             hf_token: HF authentication token. If True, the token is read from the HF config folder.
                 If string, it is used as the authentication token.
         """
@@ -106,8 +104,7 @@ class Forecaster:
         self.run_data_dir = run_data_dir
         self.t0 = t0
         self.device = device
-        self.gsp_capacities = gsp_capacities
-        self.national_capacity = national_capacity
+        self.capacities = capacities
 
         # Load the GSP and summation models
         self.model, self.summation_model = self.load_model(
@@ -201,22 +198,25 @@ class Forecaster:
         gsp_ids = batch["location_id"]
         self.logger.debug(f"GSPs: {gsp_ids}")
 
-        tensor_batch: TensorBatch = copy_batch_to_device(batch_to_tensor(batch), self.device)
+        relative_capacities = self.get_relative_capacities(gsp_ids.tolist())
 
-        # Convert regional and national predictions to DataArrays separately since they may have
-        # different output quantiles. We will concatenate them later after all the processing is
-        # done. Else we might accidentally infill missing quantiles with zeros when concatenating.
+        tensor_batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
+
         if self.summation_model is None:
             self.logger.debug("Summing across GSPs to produce national forecast")
-            da_preds = self.predict_with_regional_sum(tensor_batch)
+            da_preds = self.predict_with_regional_sum(tensor_batch, relative_capacities)
 
         else:
             self.logger.debug("Using summation model to produce national forecast")
-            da_preds = self.predict_with_summation_model(tensor_batch)
+            da_preds = self.predict_with_summation_model(tensor_batch, relative_capacities)
 
         return da_preds
 
-    def predict_with_summation_model(self, batch: TensorBatch) -> xr.DataArray:
+    def predict_with_summation_model(
+        self,
+        batch: TensorBatch,
+        relative_capacities: np.ndarray,
+    ) -> xr.DataArray:
         """Make predictions for the batch using regional and summation models."""
         # Make regional predictions using the GSP model
         regional_preds = self.model(batch).detach().cpu().numpy()
@@ -225,7 +225,7 @@ class Forecaster:
         summation_batch = construct_sum_sample(
             pvnet_inputs=None,
             valid_times=self.valid_times,
-            relative_capacities=self.gsp_capacities / self.national_capacity,
+            relative_capacities=relative_capacities,
             longitude=self.longitude,
             latitude=self.latitude,
             target=None,
@@ -240,6 +240,9 @@ class Forecaster:
 
         normed_national = self.summation_model(summation_batch).detach().squeeze().cpu().numpy()
 
+        # Convert regional and national predictions to DataArrays separately since they may have
+        # different output quantiles. We will concatenate them later after all the processing is
+        # done. Else we might accidentally infill missing quantiles with zeros when concatenating.
         da_regional_preds = preds_to_dataarray(
             preds=regional_preds,
             output_quantiles=self.model.output_quantiles,
@@ -275,7 +278,11 @@ class Forecaster:
 
         return xr.concat([da_national_preds, da_regional_preds], dim="gsp_id")
 
-    def predict_with_regional_sum(self, batch: TensorBatch) -> xr.DataArray:
+    def predict_with_regional_sum(
+        self,
+        batch: TensorBatch,
+        relative_capacities: np.ndarray,
+    ) -> xr.DataArray:
         """Make predictions for the batch using regional model and regional sum."""
         # Make regional predictions using the GSP model
         regional_preds = self.model(batch).detach().cpu().numpy()
@@ -305,8 +312,8 @@ class Forecaster:
         # The national predictions inherit the sundown masking and clipping from the regional
         # predictions since they are derived from them
         da_national_preds = (
-            (da_regional_preds * self.gsp_capacities[:, None, None] / self.national_capacity)
-            .sum(dim="gsp_id").expand_dims(dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
+            (da_regional_preds * relative_capacities[:, None, None]).sum(dim="gsp_id")
+            .expand_dims(dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
         )
 
         return xr.concat([da_national_preds, da_regional_preds], dim="gsp_id")
@@ -332,3 +339,10 @@ class Forecaster:
         da_national_sundown_mask = da_regional_sundown_mask.all(dim="gsp_id")
 
         return da_regional_sundown_mask, da_national_sundown_mask
+
+    def get_relative_capacities(self, gsp_ids: list[int]) -> np.ndarray:
+        """Get the relative capacities for the given GSP IDs."""
+        return np.array(
+            [self.capacities[gsp_id] for gsp_id in gsp_ids],
+            dtype=np.float32,
+        ) / self.capacities[0]

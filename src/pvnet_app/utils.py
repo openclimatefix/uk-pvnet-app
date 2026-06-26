@@ -1,6 +1,5 @@
 """General utility functions for pvnet_app."""
 import logging
-import os
 from datetime import datetime
 
 import fsspec
@@ -10,29 +9,35 @@ from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 
 from pvnet_app.models.registry import ModelSpec
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 
-def save_batch_to_s3(batch: NumpyBatch, model_name: str, s3_directory: str) -> None:
+def save_batch_to_s3(
+    batch: NumpyBatch,
+    model_name: str,
+    s3_directory: str,
+    scratch_dir: str,
+) -> None:
     """Saves a batch to a local file and uploads it to S3.
 
     Args:
         batch: The data batch to save
         model_name: The name of the model
         s3_directory: The S3 directory to save the batch to
+        scratch_dir: The local directory to save the batch to before uploading
     """
-    save_path = f"{model_name}_latest_batch.pt"
-    torch.save(batch, save_path)
+    filename = f"{model_name}_latest_batch.pt"
+
+    local_path = f"{scratch_dir}/{filename}"
+    torch.save(batch, local_path)
 
     try:
         fs = fsspec.open(s3_directory).fs
-        fs.put(save_path, f"{s3_directory}/{save_path}")
-        logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{save_path}")
+        fs.put(local_path, f"{s3_directory}/{filename}")
+        logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{filename}")
     except Exception as e:
-        logger.error(f"Failed to save batch to {s3_directory}/{save_path} with error {e}")
-    finally:
-        os.remove(save_path)
+        logger.error(f"Failed to save batch to {s3_directory}/{filename} with error {e}")
 
 
 def check_model_runs_finished(

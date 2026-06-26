@@ -163,8 +163,8 @@ async def build_multi_forecast_creation_request(
         locations: Mapping of GSP IDs to location summaries
         model_tag: The name of the model to saved to the database
         init_time_utc: Forecast initialization time
-        client: Data platform client. If None, a new client will be created.
-        metadata: Optional metadata to assign to each location forecast.
+        client: A connected data-platform service client
+        metadata: Optional metadata to assign to each location forecast
     """
     # Fetch the forecaster and adjuster forecaster in parallel
     forecaster, adjuster_forecaster = await asyncio.gather(
@@ -222,7 +222,7 @@ def build_forecast_creation_request(
         forecaster: Forecaster object
         location_uuid: UUID of the location
         init_time_utc: Forecast initialization time
-        metadata: Optional metadata to assign to the forecast.
+        metadata: Optional metadata to assign to the forecast
     """
     gsp_id = int(da_forecast.gsp_id.values)
     horizons_mins = da_forecast.horizon_mins.values.tolist()

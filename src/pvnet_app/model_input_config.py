@@ -1,5 +1,6 @@
 """Functions to load, save, and modify a PVNet model's data-configuration file."""
 import yaml
+from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.consts import (
     generation_path,
@@ -8,6 +9,7 @@ from pvnet_app.consts import (
     nwp_ukv_path,
     sat_path,
 )
+from pvnet_app.models.registry import ModelSpec
 
 
 def load_yaml_config(path: str) -> dict:
@@ -100,3 +102,33 @@ def modify_data_config_for_production(input_path: str, output_path: str, run_dat
     config = overwrite_config_dropouts(config)
 
     save_yaml_config(config, output_path)
+
+
+def get_required_nwp_providers(data_configs: list[dict]) -> set[str]:
+    """Return the set of NWP providers required by any of the model data configs."""
+    providers = set()
+    for conf in data_configs:
+        for source in conf["input_data"].get("nwp", {}).values():
+            providers.add(source["provider"])
+    return providers
+
+
+def fetch_model_data_config_paths(
+    model_specs: list[ModelSpec],
+    hf_token: str | None,
+) -> dict[str, str]:
+    """Return the local data config path for each model, keyed by model name.
+
+    Downloads each config from Hugging Face if it is not already cached locally.
+
+    Args:
+        model_specs: The specs of the models to fetch data config paths for
+        hf_token: Hugging Face token, required for models in private repos
+    """
+    paths: dict[str, str] = {}
+    for spec in model_specs:
+        path = PVNetBaseModel.get_data_config(
+            spec.pvnet.repo, revision=spec.pvnet.commit, token=hf_token,
+        )
+        paths[spec.name] = path
+    return paths

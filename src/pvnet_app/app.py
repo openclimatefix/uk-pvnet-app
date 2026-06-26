@@ -1,6 +1,5 @@
 """Application to run forecasts with a collection of PVNet models."""
 
-
 import asyncio
 import contextlib
 import logging
@@ -15,7 +14,6 @@ import sentry_sdk
 import torch
 from grpclib.client import Channel
 from ocf import dp
-from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet.utils import validate_batch_against_config
 
 from pvnet_app.consts import (
@@ -29,8 +27,12 @@ from pvnet_app.data.batch_validation import check_batch
 from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader
-from pvnet_app.forecaster import Forecaster
-from pvnet_app.model_input_config import load_yaml_config
+from pvnet_app.forecaster import PVNetForecaster
+from pvnet_app.model_input_config import (
+    fetch_model_data_config_paths,
+    get_required_nwp_providers,
+    load_yaml_config,
+)
 from pvnet_app.models.registry import get_model_specs
 from pvnet_app.save import (
     extract_location_capacities_mwp,
@@ -54,7 +56,7 @@ logging.basicConfig(
     level=getattr(logging, os.getenv("LOGLEVEL", "DEBUG")),
     format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
 )
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 # Turn off logs from aiobotocore
 logging.getLogger("aiobotocore").setLevel(logging.ERROR)
@@ -103,13 +105,11 @@ async def run_app(
     # If a scratch directory is configured, use it. Otherwise, create a temporary directory which
     # will be deleted after the forecast is complete.
     if settings.scratch_dir is not None:
-        logger.info(f"Using configured scratch directory: {settings.scratch_dir}")
         # Create the scratch directory if it doesn't exist. If it does exist, raise an error to
         # avoid clashing with data from a previous run.
         os.makedirs(settings.scratch_dir, exist_ok=False)
         dir_context = contextlib.nullcontext(settings.scratch_dir)
     else:
-        logger.info("No scratch directory configured. Creating a temporary scratch directory.")
         dir_context = tempfile.TemporaryDirectory(prefix="pvnet-app-")
 
     with dir_context as scratch_dir:
@@ -144,18 +144,9 @@ async def _run_forecast_pipeline(
     if len(model_specs) == 0:
         raise Exception("No models found after filtering")
 
-    # Fetch the model's data configs
-    data_config_paths: dict[str, str] = {}
-    data_configs: list[dict] = []
-    for model_spec in model_specs:
-        # First load the data config
-        data_config_path = PVNetBaseModel.get_data_config(
-            model_spec.pvnet.repo,
-            revision=model_spec.pvnet.commit,
-            token=settings.huggingface_token,
-        )
-        data_config_paths[model_spec.name] = data_config_path
-        data_configs.append(load_yaml_config(data_config_path))
+    # Fetch the models' data configs paths and load the configs
+    data_config_paths = fetch_model_data_config_paths(model_specs, settings.huggingface_token)
+    data_configs = [load_yaml_config(path) for path in data_config_paths.values()]
 
     # ---------------------------------------------------------------------------
     # Prepare data sources
@@ -166,15 +157,12 @@ async def _run_forecast_pipeline(
     async with Channel(settings.data_platform_host, settings.data_platform_port) as dp_channel:
         locations = await fetch_locations(client=dp.DataPlatformDataServiceStub(dp_channel))
 
-    ds_gen = create_null_generation_data(
-        t0=t0,
-        capacities_mwp=extract_location_capacities_mwp(locations),
-    )
+    capacities_mwp = extract_location_capacities_mwp(locations)
 
+    # Save out a dummy generation dataset to the scratch directory
+    # The models don't actually use this data, but the current ocf-data-sampler version requires it
+    ds_gen = create_null_generation_data(t0=t0, capacities_mwp=capacities_mwp)
     ds_gen.to_zarr(f"{scratch_dir}/{generation_path}")
-
-    national_capacity = ds_gen.sel(time_utc=t0, location_id=0).capacity_mwp.item()
-    gsp_capacities = ds_gen.sel(time_utc=t0, location_id=slice(1, None)).capacity_mwp.values
 
     data_downloaders = []
 
@@ -197,12 +185,8 @@ async def _run_forecast_pipeline(
     if any("nwp" in conf["input_data"] for conf in data_configs):
         logger.info("Downloading NWP data")
 
-        # Find the NWP sources required by the models
-        required_providers = set()
-        for conf in data_configs:
-            if "nwp" in conf["input_data"]:
-                for source in conf["input_data"]["nwp"].values():
-                    required_providers.add(source["provider"])
+        # Only download the NWP sources which are required by the models
+        required_providers = get_required_nwp_providers(data_configs)
 
         if "ukv" in required_providers:
             ukv_downloader = UKVDownloader(
@@ -235,13 +219,14 @@ async def _run_forecast_pipeline(
     # Set up models
 
     # Prepare all the models which can be run
-    forecasters = {}
+    model_forecasters = {}
     for model_spec in model_specs:
-        # First load the data config
-        data_config_path = data_config_paths[model_spec.name]
 
         # Check if the data available will allow the model to run
+        data_config_path = data_config_paths[model_spec.name]
+
         logger.info(f"Checking that the input data for model '{model_spec.name}' exists")
+
         model_can_run = all(
             downloader.check_model_inputs_available(data_config_path, t0)
             for downloader in data_downloaders
@@ -249,22 +234,21 @@ async def _run_forecast_pipeline(
 
         if model_can_run:
             logger.info(f"The input data for model '{model_spec.name}' is available")
-            # Set up a forecast compiler for the model
-            forecasters[model_spec.name] = Forecaster(
+
+            model_forecasters[model_spec.name] = PVNetForecaster(
                 model_spec=model_spec,
                 data_config_path=data_config_path,
                 run_data_dir=scratch_dir,
                 t0=t0,
                 device=device,
-                gsp_capacities=gsp_capacities,
-                national_capacity=national_capacity,
+                capacities=capacities_mwp,
                 hf_token=settings.huggingface_token,
             )
 
         else:
             logger.warning(f"The model {model_spec.name} cannot be run with input data available")
 
-    if len(forecasters) == 0:
+    if len(model_forecasters) == 0:
         raise Exception("No models were compatible with the available input data.")
 
     # ---------------------------------------------------------------------------
@@ -274,7 +258,7 @@ async def _run_forecast_pipeline(
 
     forecasts: dict[str, xr.DataArray] = {}
 
-    for i, (model_name, forecaster) in enumerate(forecasters.items()):
+    for i, (model_name, forecaster) in enumerate(model_forecasters.items()):
         batch = forecaster.make_batch()
 
         # Do basic validation of the batch: Will raise error if the batch fails the checks
@@ -287,22 +271,20 @@ async def _run_forecast_pipeline(
 
         forecasts[model_name] = forecaster.predict(batch)
 
+        # Save the batch for the first model
         if (settings.save_batches_dir is not None) and i == 0:
-            # Save the batch under the name of the first model
-            save_batch_to_s3(batch, model_name, settings.save_batches_dir)
+            save_batch_to_s3(batch, model_name, settings.save_batches_dir, scratch_dir=scratch_dir)
 
 
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
 
     logger.info("Validating forecasts")
-    for model_name, da_normed_forecast in forecasts.items():
+    for model_name, da_forecast in forecasts.items():
 
         forecast_okay = validate_forecast(
-            normed_national_forecast=(
-                da_normed_forecast.sel(gsp_id=0, output_label="p50").to_series()
-            ),
-            national_capacity_mw=national_capacity,
+            da_forecast=da_forecast,
+            national_capacity_mw=capacities_mwp[0],
             zig_zag_warning_threshold_mw=settings.forecast_validate_zig_zag_warning_threshold,
             zig_zag_error_threshold_mw=settings.forecast_validate_zig_zag_error_threshold,
             sun_elevation_lower_limit=settings.forecast_validate_sun_elevation_lower_limit,
