@@ -4,9 +4,10 @@ import logging
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 import pvlib
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 # A forecast is bad if above this fraction of national capacity
 RELATIVE_MAX_FORECAST = 1.1
@@ -136,7 +137,7 @@ def check_forecast_positive_during_daylight(
 
 
 def validate_forecast(
-    normed_national_forecast: pd.Series,
+    da_forecast: xr.DataArray,
     national_capacity_mw: float,
     zig_zag_warning_threshold_mw: float,
     zig_zag_error_threshold_mw: float,
@@ -151,7 +152,7 @@ def validate_forecast(
       `check_forecast_positive_during_daylight()`
 
     Args:
-        normed_national_forecast: All the forecast values for the nation (normalized).
+        da_forecast: The normalised forecast values.
         national_capacity_mw: The national PV capacity (in MW).
         zig_zag_warning_threshold_mw: The threshold in MW for zig-zag check warning.
         zig_zag_error_threshold_mw:  The threshold in MW for zig-zag check failure.
@@ -159,7 +160,12 @@ def validate_forecast(
             values must be positive when the sun is above this angle.
         model_name: The name of the model that generated the forecast.
     """
-    national_forecast_mw = normed_national_forecast * national_capacity_mw
+
+    # Compute the national forecast in MW from the normalised forecast
+    # Validation is only performed on the national forecast
+    national_forecast_mw = (
+        da_forecast.sel(gsp_id=0, output_label="p50").to_series() * national_capacity_mw
+    )
 
     forecast_max_okay = check_forecast_max(
         national_forecast_mw=national_forecast_mw,

@@ -3,7 +3,7 @@ import torch
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
 
-from pvnet_app.forecaster import Forecaster
+from pvnet_app.forecaster import PVNetForecaster
 from pvnet_app.models.registry import get_model_specs
 
 
@@ -15,14 +15,13 @@ def test_model_loading():
 
     for model_spec in models:
 
-        forecaster = Forecaster(
+        forecaster = PVNetForecaster(
             model_spec=model_spec,
             data_config_path="dummy.yaml",
             run_data_dir="dummy_dir",
             t0=pd.Timestamp.now(),
             device=device,
-            gsp_capacities=None,
-            national_capacity=1,
+            capacities={},
         )
 
         # Verify models loaded correctly
