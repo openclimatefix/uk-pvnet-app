@@ -6,6 +6,7 @@ import contextlib
 import logging
 import os
 import tempfile
+from datetime import datetime
 from importlib.metadata import version
 from typing import TYPE_CHECKING
 
@@ -37,7 +38,7 @@ from pvnet_app.save import (
     write_forecasts_to_data_platform,
 )
 from pvnet_app.settings import AppSettings
-from pvnet_app.utils import check_model_runs_finished, save_batch_to_s3
+from pvnet_app.utils import check_model_runs_finished, resolve_t0, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
 if TYPE_CHECKING:
@@ -69,7 +70,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 async def run_app(
     settings: AppSettings,
-    t0: str | None = None,
+    t0: str | datetime | pd.Timestamp | None = None,
     write_predictions: bool = True,
 ) -> None | dict:
     """Set up the app environment and run a forecast.
@@ -79,8 +80,8 @@ async def run_app(
 
     Args:
         settings: The application settings
-        t0: The forecast init-time. If None, the current time is used. Floored
-            to the previous 30-minute mark and made naive-UTC before running
+        t0: The forecast init-time. If None, the current time is used. Input will be floored to the
+            previous 30-minutes.
         write_predictions: If True, write forecasts to the data platform. If
             False, skip the write and return the forecasters for local testing
     """
@@ -92,9 +93,7 @@ async def run_app(
     sentry_sdk.set_tag("app_name", "pvnet_app")
     sentry_sdk.set_tag("version", __version__)
 
-    # If inference datetime is None, set to now
-    t0 = pd.Timestamp.now(tz="UTC") if t0 is None else pd.Timestamp(t0).tz_localize("UTC")
-    t0 = t0.replace(tzinfo=None).floor("30min")
+    t0 = resolve_t0(t0)
 
     logger.info(f"Using `pvnet` library version: {version('pvnet')}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")

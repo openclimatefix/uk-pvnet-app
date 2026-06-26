@@ -1,8 +1,10 @@
 """General utility functions for pvnet_app."""
 import logging
 import os
+from datetime import datetime
 
 import fsspec
+import pandas as pd
 import torch
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 
@@ -68,3 +70,20 @@ def check_model_runs_finished(
         raise Exception(
             f"{message}: {failed_forecasts}. Completed forecasts: {completed_forecasts}",
         )
+
+
+def resolve_t0(t0: str | datetime | pd.Timestamp | None) -> pd.Timestamp:
+    """Resolve any accepted t0 input to a timezone-naive UTC timestamp floored to 30 minutes.
+
+    Naive inputs are assumed to already be in UTC; timezone-aware inputs are converted to UTC before
+    the zone is dropped.
+
+    Args:
+        t0: The input timestamp. If None, the current time is used.
+    """
+    t0 = pd.Timestamp.now(tz="UTC") if t0 is None else pd.Timestamp(t0)
+
+    # If the input is timezone-aware, convert to UTC and then make it naive
+    if t0.tzinfo is not None:
+        t0 = t0.tz_convert("UTC").tz_localize(None)
+    return t0.floor("30min")
