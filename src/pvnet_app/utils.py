@@ -87,3 +87,8 @@ def resolve_t0(t0: str | datetime | pd.Timestamp | None) -> pd.Timestamp:
     if t0.tzinfo is not None:
         t0 = t0.tz_convert("UTC").tz_localize(None)
     return t0.floor("30min")
+
+
+def convert_to_utc_datetime(ts: pd.Timestamp) -> datetime:
+    """Converts internal naive UTC timestamp to aware UTC datetime."""
+    return ts.tz_localize("UTC").to_pydatetime()
