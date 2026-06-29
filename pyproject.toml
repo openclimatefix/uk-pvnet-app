@@ -27,6 +27,7 @@ dependencies = [
     "ocf_data_sampler==1.0.18",
     "pandas==2.2.3",
     "pvnet==5.3.12",
+    "pvlib==0.15.2",
     "pydantic==2.12.3",
     "requests==2.32.3",
     "sentry-sdk==2.21.0",
