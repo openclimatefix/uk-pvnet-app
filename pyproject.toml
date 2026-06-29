@@ -103,7 +103,7 @@ plugins = [
 [tool.ruff]
 line-length = 100
 indent-width = 4
-exclude = ["__init__.py"]
+extend-exclude = ["__init__.py", "scripts"]
 
 [tool.ruff.lint]
 select = [
@@ -128,6 +128,7 @@ select = [
 ]
 fixable = ["ALL"]
 ignore = [
+    "COM812",   # conflicts with the formatter, which handles trailing commas
     "D203", "D213", "D215", "D400", "D401", "D404", "D406",
     "D407", "D408", "D409", "D413",
 ]

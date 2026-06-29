@@ -1,4 +1,5 @@
 """Class and helpers to run PVNet model forecasts."""
+
 import logging
 
 import numpy as np
@@ -71,7 +72,6 @@ class PVNetForecaster:
         device: torch.device,
         capacities: dict[int, float],
         hf_token: bool | str | None = None,
-
     ) -> None:
         """Class for making and compiling solar forecasts from for all GB GSPs and national total.
 
@@ -111,7 +111,7 @@ class PVNetForecaster:
         self.location_coords = get_gsp_locations()
 
         # These are the valid times this forecast will predict for
-        self.horizon_mins = np.arange(1, self.model.forecast_len+1) * 30
+        self.horizon_mins = np.arange(1, self.model.forecast_len + 1) * 30
         self.valid_times = self.t0 + pd.to_timedelta(self.horizon_mins, unit="m")
 
     def load_model(
@@ -232,8 +232,10 @@ class PVNetForecaster:
 
         normed_national = (
             self.summation_model(summation_batch)
-            .detach().cpu().numpy()
-            .squeeze(axis=0) # Remove the batch dimension
+            .detach()
+            .cpu()
+            .numpy()
+            .squeeze(axis=0)  # Remove the batch dimension
         )
 
         location_ids = batch["location_id"].cpu().numpy().tolist()
@@ -310,8 +312,10 @@ class PVNetForecaster:
         # The national predictions inherit the sundown masking and clipping from the regional
         # predictions since they are derived from them
         da_national_preds = (
-            (da_regional_preds * relative_capacities[:, None, None]).sum(dim="location_id")
-            .expand_dims(dim="location_id", axis=0).assign_coords(location_id=[0])
+            (da_regional_preds * relative_capacities[:, None, None])
+            .sum(dim="location_id")
+            .expand_dims(dim="location_id", axis=0)
+            .assign_coords(location_id=[0])
         )
 
         return xr.concat([da_national_preds, da_regional_preds], dim="location_id")
@@ -320,7 +324,6 @@ class PVNetForecaster:
         """Make a sundown mask for all locations and valid times."""
         elevations = []
         for loc_id in location_ids:
-
             elevation = get_solarposition(
                 time=self.valid_times,
                 longitude=self.location_coords.loc[loc_id].longitude.item(),
@@ -348,7 +351,10 @@ class PVNetForecaster:
 
     def get_relative_capacities(self, location_ids: list[int]) -> np.ndarray:
         """Get the relative capacities for the given location IDs."""
-        return np.array(
-            [self.capacities[location_id] for location_id in location_ids],
-            dtype=np.float32,
-        ) / self.capacities[0]
+        return (
+            np.array(
+                [self.capacities[location_id] for location_id in location_ids],
+                dtype=np.float32,
+            )
+            / self.capacities[0]
+        )

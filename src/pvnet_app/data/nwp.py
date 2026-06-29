@@ -1,4 +1,5 @@
 """Functions and classes to download and process NWP data."""
+
 import logging
 import shutil
 from abc import ABC, abstractmethod
@@ -131,6 +132,7 @@ def check_model_nwp_inputs_available(
 
 class NWPDownloader(ABC):
     """Abstract base class to download and process NWP data."""
+
     nwp_source: str = None
     save_chunk_dict: dict = None
 
@@ -229,8 +231,9 @@ class NWPDownloader(ABC):
 
 class ECMWFDownloader(NWPDownloader):
     """Class to download and process the ECMWF data."""
+
     nwp_source = "ecmwf"
-    save_chunk_dict = { # noqa: RUF012
+    save_chunk_dict = {  # noqa: RUF012
         "step": 10,
         "latitude": 50,
         "longitude": 50,
@@ -248,8 +251,9 @@ class ECMWFDownloader(NWPDownloader):
 
 class UKVDownloader(NWPDownloader):
     """Class to download and process the UKV data."""
+
     nwp_source = "ukv"
-    save_chunk_dict = { # noqa: RUF012
+    save_chunk_dict = {  # noqa: RUF012
         "step": 10,
         "x_osgb": 100,
         "y_osgb": 100,
@@ -330,8 +334,9 @@ class UKVDownloader(NWPDownloader):
 
 class CloudcastingDownloader(NWPDownloader):
     """Class to download and process the cloudcasting data."""
+
     nwp_source = "cloudcasting"
-    save_chunk_dict: dict[str, int] = { # noqa: RUF012
+    save_chunk_dict: dict[str, int] = {  # noqa: RUF012
         "step": -1,
         "x_geostationary": 100,
         "y_geostationary": 100,

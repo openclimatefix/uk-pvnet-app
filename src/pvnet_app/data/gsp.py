@@ -1,4 +1,5 @@
 """Functions to get GSP data from the data platform."""
+
 from importlib.resources import files
 
 import numpy as np

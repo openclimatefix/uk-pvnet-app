@@ -1,4 +1,5 @@
 """Functions to download and process satellite data."""
+
 import logging
 import shutil
 
@@ -358,7 +359,7 @@ class SatelliteDownloader:
 
         too_many_nans = contains_too_many_of_value(ds, value=np.nan, threshold=0.05)
 
-        return (not too_many_nans)
+        return not too_many_nans
 
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         """Apply all processing steps to the satellite data in order to match the training data.
@@ -413,7 +414,6 @@ class SatelliteDownloader:
         ds_dict = {}
 
         for path, label in [(self.source_path_5, "5-min"), (self.source_path_15, "15-min")]:
-
             if path is not None:
                 ds = open_satellite_data(
                     s3_icechunk_path=path,
@@ -432,7 +432,7 @@ class SatelliteDownloader:
             return
 
         # Select the source with the most recent data, and use 5-minute data if equal recency
-        best_source = max(ds_dict, key=lambda k: (ds_dict[k].time.max(), k=="5-min"))
+        best_source = max(ds_dict, key=lambda k: (ds_dict[k].time.max(), k == "5-min"))
         self.sat_choice = best_source
         logger.info(f"Using {best_source} satellite data")
 
@@ -468,4 +468,3 @@ class SatelliteDownloader:
             t0=t0,
             sat_datetimes=self.valid_times,
         )
-

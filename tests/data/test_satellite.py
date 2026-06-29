@@ -37,7 +37,6 @@ def test_run_sat_5_data(sat_5_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path:
     dst_path = f"{tmp_path}/sat.zarr"
 
     with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[sat_5_data]):
-
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
             source_path_5="s3://fake/sat5",
@@ -46,7 +45,6 @@ def test_run_sat_5_data(sat_5_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path:
             destination_path=dst_path,
         )
         sat_downloader.run()
-
 
     assert os.path.exists(dst_path)
     assert sat_downloader.sat_choice == "5-min"
@@ -61,7 +59,6 @@ def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp_pat
     dst_path = f"{tmp_path}/sat.zarr"
 
     with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[sat_15_data]):
-
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
             source_path_5=None,

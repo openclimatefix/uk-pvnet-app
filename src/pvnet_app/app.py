@@ -70,6 +70,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ---------------------------------------------------------------------------
 # APP MAIN
 
+
 async def run_app(
     settings: AppSettings,
     t0: str | datetime | pd.Timestamp | None = None,
@@ -221,7 +222,6 @@ async def _run_forecast_pipeline(
     # Prepare all the models which can be run
     model_forecasters = {}
     for model_spec in model_specs:
-
         # Check if the data available will allow the model to run
         data_config_path = data_config_paths[model_spec.name]
 
@@ -275,13 +275,11 @@ async def _run_forecast_pipeline(
         if (settings.save_batches_dir is not None) and i == 0:
             save_batch_to_s3(batch, model_name, settings.save_batches_dir, scratch_dir=scratch_dir)
 
-
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
 
     logger.info("Validating forecasts")
     for model_name, da_forecast in list(forecasts.items()):
-
         forecast_okay = validate_forecast(
             da_forecast=da_forecast,
             national_capacity_mw=capacities_mwp[0],
@@ -335,6 +333,7 @@ async def _run_forecast_pipeline(
             model_specs=model_specs,
             raise_if_missing=settings.raise_model_failure,
         )
+
 
 def main() -> None:
     """Main entrypoint to the inference app."""

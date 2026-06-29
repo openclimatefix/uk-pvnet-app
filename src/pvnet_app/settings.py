@@ -1,4 +1,5 @@
 """Runtime configuration loaded from environment."""
+
 from typing import Literal
 
 from pydantic_settings import BaseSettings

@@ -48,7 +48,7 @@ async def fetch_locations(
                 energy_source_filter=dp.EnergySource.SOLAR,
                 # TODO: We should filter specifically within the UK, but the current locations in
                 # the data-platform don't allow this yet. See commented line below for future use.
-                #enclosing_location_uuid_filter=national_location.location_uuid,
+                # enclosing_location_uuid_filter=national_location.location_uuid,
             ),
         )
     ).locations
@@ -95,7 +95,6 @@ async def fetch_or_create_forecaster(
 
         # Forecaster version does not exist, update it
         if len(filtered_forecasters) == 0:
-
             update_forecaster_response = await client.update_forecaster(
                 dp.UpdateForecasterRequest(name=name, new_version=forecast_version),
             )
@@ -178,7 +177,6 @@ async def build_multi_forecast_creation_request(
     forecast_requests: list[dp.CreateForecastRequest] = []
 
     for loc_id in da_forecast.location_id.values.tolist():
-
         request = build_forecast_creation_request(
             da_forecast.sel(location_id=loc_id),
             forecaster=forecaster,
@@ -195,7 +193,7 @@ async def build_multi_forecast_creation_request(
         location=locations[0],
         init_time_utc=init_time_utc,
         da_forecast=da_forecast.sel(location_id=0),
-        forecaster=forecaster, # We get the adjuster values for the original forecaster
+        forecaster=forecaster,  # We get the adjuster values for the original forecaster
     )
 
     request = build_forecast_creation_request(
@@ -232,13 +230,11 @@ def build_forecast_creation_request(
     plevels = ["p10", "p50", "p90"]
 
     forecast_array = (
-        da_forecast.transpose("valid_times_utc", "output_label")
-        .sel(output_label=plevels)
+        da_forecast.transpose("valid_times_utc", "output_label").sel(output_label=plevels)
     ).values
 
     forecast_value_requests = []
     for h, row in zip(horizons_mins, forecast_array, strict=False):
-
         if (row > DATAPLATFORM_MAX_VALUE).any():
             high_plevels = np.array(plevels)[row > DATAPLATFORM_MAX_VALUE].tolist()
             logger.warning(
