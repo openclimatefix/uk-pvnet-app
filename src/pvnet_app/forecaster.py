@@ -12,6 +12,7 @@ from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
     batch_to_tensor,
     copy_batch_to_device,
 )
+from pvlib.solarposition import get_solarposition
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 from pvnet_summation.data.datamodule import construct_sample as construct_sum_sample
 from pvnet_summation.models.base_model import BaseModel as SummationBaseModel
@@ -30,16 +31,6 @@ _model_mismatch_msg = (
     "the shape of PVNet output doesn't match the expected shape of the summation model. Combining "
     "may lead to unreliable results even if the shapes match."
 )
-
-
-def get_uk_centroid_coords() -> tuple[float, float]:
-    """Get the UK centroid longitude and latitude."""
-    df_loc = get_gsp_locations()
-
-    longitude = df_loc.loc[0].longitude.item()
-    latitude = df_loc.loc[0].latitude.item()
-
-    return longitude, latitude
 
 
 def preds_to_dataarray(
@@ -116,8 +107,8 @@ class PVNetForecaster:
             hf_token,
         )
 
-        # Get the UK centroid coordinates
-        self.longitude, self.latitude = get_uk_centroid_coords()
+        # Load the locations of all GSPs
+        self.location_coords = get_gsp_locations()
 
         # These are the valid times this forecast will predict for
         self.horizon_mins = np.arange(1, self.model.forecast_len+1) * 30
@@ -226,8 +217,9 @@ class PVNetForecaster:
             pvnet_inputs=None,
             valid_times=self.valid_times,
             relative_capacities=relative_capacities,
-            longitude=self.longitude,
-            latitude=self.latitude,
+            # The summation model expects the central coords of the entire UK area
+            longitude=self.location_coords.loc[0].longitude.item(),
+            latitude=self.location_coords.loc[0].latitude.item(),
             target=None,
         )
         summation_batch["pvnet_outputs"] = regional_preds
@@ -244,13 +236,15 @@ class PVNetForecaster:
             .squeeze(axis=0) # Remove the batch dimension
         )
 
+        location_ids = batch["location_id"].cpu().numpy().tolist()
+
         # Convert regional and national predictions to DataArrays separately since they may have
         # different output quantiles. We will concatenate them later after all the processing is
         # done. Else we might accidentally infill missing quantiles with zeros when concatenating.
         da_regional_preds = preds_to_dataarray(
             preds=regional_preds,
             output_quantiles=self.model.output_quantiles,
-            location_ids=batch["location_id"].cpu().numpy(),
+            location_ids=location_ids,
             valid_times_utc=self.valid_times,
             horizon_mins=self.horizon_mins,
         )
@@ -264,7 +258,7 @@ class PVNetForecaster:
         )
 
         # Make sundown masks so we can set predictions to zero when the sun is down
-        da_regional_sundown_mask, da_national_sundown_mask = self._make_sundown_masks(batch)
+        da_regional_sundown_mask, da_national_sundown_mask = self._make_sundown_masks(location_ids)
 
         da_regional_preds = (
             # Set regional predictions to zero when sun is down
@@ -291,7 +285,7 @@ class PVNetForecaster:
         # Make regional predictions using the GSP model
         regional_preds = self.model(batch).detach().cpu().numpy()
 
-        location_ids = batch["location_id"].cpu().numpy()
+        location_ids = batch["location_id"].cpu().numpy().tolist()
 
         da_regional_preds = preds_to_dataarray(
             preds=regional_preds,
@@ -302,7 +296,7 @@ class PVNetForecaster:
         )
 
         # Make sundown masks so we can set predictions to zero when the sun is down
-        da_regional_sundown_mask, _ = self._make_sundown_masks(batch)
+        da_regional_sundown_mask, _ = self._make_sundown_masks(location_ids)
 
         # Postprocess the regional predictions
         da_regional_preds = (
@@ -322,19 +316,28 @@ class PVNetForecaster:
 
         return xr.concat([da_national_preds, da_regional_preds], dim="location_id")
 
-    def _make_sundown_masks(self, batch: TensorBatch) -> tuple[xr.DataArray, xr.DataArray]:
-        """Make a sundown mask for the batch."""
-        regional_sundown_mask = (
-            # In the batch the solar elevation angle is scaled to the range [0, 1]
-            ((batch["solar_elevation"].cpu().numpy() - 0.5) * 180 < MIN_DAY_ELEVATION_DEGREES)
-            # We only need sundown mask for forecasted values, not model input history
-            [:, -len(self.valid_times):]
-        )
+    def _make_sundown_masks(self, location_ids: list[int]) -> tuple[xr.DataArray, xr.DataArray]:
+        """Make a sundown mask for all locations and valid times."""
+
+        elevations = []
+        for loc_id in location_ids:
+
+            elevation = get_solarposition(
+                time=self.valid_times,
+                longitude=self.location_coords.loc[loc_id].longitude.item(),
+                latitude=self.location_coords.loc[loc_id].latitude.item(),
+                method="nrel_numpy",
+            )["elevation"].values
+
+            elevations.append(elevation)
+
+        regional_sundown_mask = np.array(elevations) < MIN_DAY_ELEVATION_DEGREES
+        
         da_regional_sundown_mask = xr.DataArray(
             data=regional_sundown_mask,
             dims=["location_id", "valid_times_utc"],
             coords={
-                "location_id": batch["location_id"].cpu().numpy(),
+                "location_id": location_ids,
                 "valid_times_utc": self.valid_times,
             },
         )
