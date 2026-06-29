@@ -97,7 +97,7 @@ class PVNetForecaster:
         self.device = device
         self.capacities = capacities
 
-        # Load the GSP and summation models
+        # Load the regional and summation models
         self.model, self.summation_model = self.load_model(
             model_spec.pvnet.repo,
             model_spec.pvnet.commit,
@@ -107,7 +107,7 @@ class PVNetForecaster:
             hf_token,
         )
 
-        # Load the locations of all GSPs
+        # Load the coordinates of all locations
         self.location_coords = get_gsp_locations()
 
         # These are the valid times this forecast will predict for
