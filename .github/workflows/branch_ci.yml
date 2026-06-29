@@ -16,6 +16,6 @@ jobs:
       enable_linting: true
       enable_typechecking: false
       tests_folder: tests
-      tests_conda_deps: "esmpy gdal hdf5=1.14.4"
+      tests_conda_deps: "esmpy hdf5=1.14.4"
 
 

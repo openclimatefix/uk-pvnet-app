@@ -1,4 +1,4 @@
-"""General utility functions for pvnet_app."""
+"""General utility functions."""
 import logging
 from datetime import datetime
 

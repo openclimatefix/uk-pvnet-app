@@ -79,7 +79,7 @@ To be able to run the tests locally it is recommended to use `conda` and `uv`. T
 
 ### Running the app locally
 
-It is possbile to run the app locally by setting the required environment variables listed at the top of the [app](pvnet_app/app.py), these should point to the relevant data sources and the data platform instance for the environment you want to run the app in. You will need to make sure the data platform at `DATA_PLATFORM_HOST:DATA_PLATFORM_PORT` is reachable, as well as authenticating against any cloud providers where data may be stored (e.g if using AWS S3 then can do this via the AWS CLI command `aws configure`), a simple [notebook](scripts/run_app_local_example.ipynb) has been created as an example.  
+It is possbile to run the app locally by setting the required environment variables listed in [settings.py](pvnet_app/settings.py), these should point to the relevant data sources and the data platform instance for the environment you want to run the app in. You will need to make sure the data platform at `DATA_PLATFORM_HOST:DATA_PLATFORM_PORT` is reachable, as well as authenticating against any cloud providers where data may be stored (e.g if using AWS S3 then can do this via the AWS CLI command `aws configure`).
 
 
 ## Contributors ✨

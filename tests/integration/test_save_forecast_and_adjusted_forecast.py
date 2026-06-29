@@ -8,7 +8,10 @@ import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
 from ocf import dp
 
-from src.pvnet_app.save import build_multi_forecast_creation_request, fetch_or_create_forecaster
+from src.pvnet_app.data_platform import (
+    build_multi_forecast_creation_request,
+    fetch_or_create_forecaster,
+)
 
 
 @pytest.mark.asyncio(loop_scope="session")
@@ -43,7 +46,7 @@ async def test_save_forecast_and_adjusted_forecast(
     forecaster_name = "test_model"
 
     async def create_location(
-        gsp_id: int,
+        location_id: int,
         location_name: str,
         location_type: dp.LocationType,
         geometry_wkt: str,
@@ -55,7 +58,7 @@ async def test_save_forecast_and_adjusted_forecast(
                 geometry_wkt=geometry_wkt,
                 location_type=location_type,
                 effective_capacity_watts=capacity_watts,
-                metadata=Struct(fields={"gsp_id": Value(number_value=gsp_id)}),
+                metadata=Struct(fields={"gsp_id": Value(number_value=location_id)}),
                 valid_from_utc=t0_yesterday,
             ),
         )
@@ -64,14 +67,14 @@ async def test_save_forecast_and_adjusted_forecast(
     locations = {}
 
     locations[0] = await create_location(
-        gsp_id=0,
+        location_id=0,
         location_name="test_save_gsp0",
         geometry_wkt="POINT(10 10)",
         location_type=dp.LocationType.NATION,
     )
 
     locations[1] = await create_location(
-        gsp_id=1,
+        location_id=1,
         location_name="test_save_gsp1",
         geometry_wkt="POINT(11 11)",
         location_type=dp.LocationType.GSP,
@@ -122,10 +125,10 @@ async def test_save_forecast_and_adjusted_forecast(
     forecast_normed_da = xr.DataArray(
         # 24 horizons, 2 GSPs, 3 outputs (values: p10=0.3, p50=0.5, p90=0.7)
         data=np.tile([p10_frac, p50_frac, p90_frac], (n_steps, len(locations), 1)),
-        dims=["valid_times_utc", "gsp_id", "output_label"],
+        dims=["valid_times_utc", "location_id", "output_label"],
         coords={
             "valid_times_utc": pd.date_range(t0, periods=n_steps, freq=f"{freq_mins}min"),
-            "gsp_id": list(locations.keys()),
+            "location_id": list(locations.keys()),
             "output_label": ["p10", "p50", "p90"],
             "horizon_mins": ("valid_times_utc", np.arange(n_steps) * freq_mins),
         },
@@ -133,7 +136,7 @@ async def test_save_forecast_and_adjusted_forecast(
 
     # Test: Run the function
     requests = await build_multi_forecast_creation_request(
-        forecast_normed_da=forecast_normed_da,
+        da_forecast=forecast_normed_da,
         locations=locations,
         client=client,
         model_tag=forecaster_name,
@@ -142,7 +145,7 @@ async def test_save_forecast_and_adjusted_forecast(
     )
 
     # Check: The requests are as expected
-    assert len(requests) == len(locations) + 1  # 2 forecasts for gsp_id 0, 1 forecast for others
+    assert len(requests) == len(locations) + 1 # two forecasts for GSP 0, one forecast for others
     assert isinstance(requests[0], dp.CreateForecastRequest)
 
     # Test: Save the forecasts to the data platform

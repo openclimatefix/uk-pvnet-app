@@ -1,4 +1,4 @@
-"""Functions to run the forecaster."""
+"""Class and helpers to run PVNet model forecasts."""
 import logging
 
 import numpy as np
@@ -44,7 +44,7 @@ def get_uk_centroid_coords() -> tuple[float, float]:
 
 def preds_to_dataarray(
     preds: np.ndarray,
-    gsp_ids: list[int],
+    location_ids: list[int],
     output_quantiles: list[float] | None,
     valid_times_utc: pd.DatetimeIndex,
     horizon_mins: np.ndarray,
@@ -58,9 +58,9 @@ def preds_to_dataarray(
 
     return xr.DataArray(
         data=preds,
-        dims=["gsp_id", "valid_times_utc", "output_label"],
+        dims=["location_id", "valid_times_utc", "output_label"],
         coords={
-            "gsp_id": gsp_ids,
+            "location_id": location_ids,
             "output_label": output_labels,
             "valid_times_utc": valid_times_utc,
             "horizon_mins": ("valid_times_utc", horizon_mins),
@@ -195,10 +195,10 @@ class PVNetForecaster:
         """Make predictions for the batch."""
         self.logger.debug(f"Predicting for model: {self.model_tag}")
 
-        gsp_ids = batch["location_id"]
-        self.logger.debug(f"GSPs: {gsp_ids}")
+        location_ids = batch["location_id"]
+        self.logger.debug(f"GSPs: {location_ids}")
 
-        relative_capacities = self.get_relative_capacities(gsp_ids.tolist())
+        relative_capacities = self.get_relative_capacities(location_ids.tolist())
 
         tensor_batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
@@ -238,7 +238,11 @@ class PVNetForecaster:
             k: torch.from_numpy(v[None, ...]).to(self.device) for k, v in summation_batch.items()
         }
 
-        normed_national = self.summation_model(summation_batch).detach().squeeze().cpu().numpy()
+        normed_national = (
+            self.summation_model(summation_batch)
+            .detach().cpu().numpy()
+            .squeeze(axis=0) # Remove the batch dimension
+        )
 
         # Convert regional and national predictions to DataArrays separately since they may have
         # different output quantiles. We will concatenate them later after all the processing is
@@ -246,7 +250,7 @@ class PVNetForecaster:
         da_regional_preds = preds_to_dataarray(
             preds=regional_preds,
             output_quantiles=self.model.output_quantiles,
-            gsp_ids=batch["location_id"].cpu().numpy(),
+            location_ids=batch["location_id"].cpu().numpy(),
             valid_times_utc=self.valid_times,
             horizon_mins=self.horizon_mins,
         )
@@ -254,7 +258,7 @@ class PVNetForecaster:
         da_national_preds = preds_to_dataarray(
             preds=normed_national[np.newaxis],
             output_quantiles=self.summation_model.output_quantiles,
-            gsp_ids=[0],
+            location_ids=[0],
             valid_times_utc=self.valid_times,
             horizon_mins=self.horizon_mins,
         )
@@ -276,7 +280,7 @@ class PVNetForecaster:
             .clip(0, None)
         )
 
-        return xr.concat([da_national_preds, da_regional_preds], dim="gsp_id")
+        return xr.concat([da_national_preds, da_regional_preds], dim="location_id")
 
     def predict_with_regional_sum(
         self,
@@ -287,12 +291,12 @@ class PVNetForecaster:
         # Make regional predictions using the GSP model
         regional_preds = self.model(batch).detach().cpu().numpy()
 
-        gsp_ids = batch["location_id"].cpu().numpy()
+        location_ids = batch["location_id"].cpu().numpy()
 
         da_regional_preds = preds_to_dataarray(
             preds=regional_preds,
             output_quantiles=self.model.output_quantiles,
-            gsp_ids=gsp_ids,
+            location_ids=location_ids,
             valid_times_utc=self.valid_times,
             horizon_mins=self.horizon_mins,
         )
@@ -312,11 +316,11 @@ class PVNetForecaster:
         # The national predictions inherit the sundown masking and clipping from the regional
         # predictions since they are derived from them
         da_national_preds = (
-            (da_regional_preds * relative_capacities[:, None, None]).sum(dim="gsp_id")
-            .expand_dims(dim="gsp_id", axis=0).assign_coords(gsp_id=[0])
+            (da_regional_preds * relative_capacities[:, None, None]).sum(dim="location_id")
+            .expand_dims(dim="location_id", axis=0).assign_coords(location_id=[0])
         )
 
-        return xr.concat([da_national_preds, da_regional_preds], dim="gsp_id")
+        return xr.concat([da_national_preds, da_regional_preds], dim="location_id")
 
     def _make_sundown_masks(self, batch: TensorBatch) -> tuple[xr.DataArray, xr.DataArray]:
         """Make a sundown mask for the batch."""
@@ -328,21 +332,21 @@ class PVNetForecaster:
         )
         da_regional_sundown_mask = xr.DataArray(
             data=regional_sundown_mask,
-            dims=["gsp_id", "valid_times_utc"],
+            dims=["location_id", "valid_times_utc"],
             coords={
-                "gsp_id": batch["location_id"].cpu().numpy(),
+                "location_id": batch["location_id"].cpu().numpy(),
                 "valid_times_utc": self.valid_times,
             },
         )
 
         # All GSPs must be masked to mask national
-        da_national_sundown_mask = da_regional_sundown_mask.all(dim="gsp_id")
+        da_national_sundown_mask = da_regional_sundown_mask.all(dim="location_id")
 
         return da_regional_sundown_mask, da_national_sundown_mask
 
-    def get_relative_capacities(self, gsp_ids: list[int]) -> np.ndarray:
-        """Get the relative capacities for the given GSP IDs."""
+    def get_relative_capacities(self, location_ids: list[int]) -> np.ndarray:
+        """Get the relative capacities for the given location IDs."""
         return np.array(
-            [self.capacities[gsp_id] for gsp_id in gsp_ids],
+            [self.capacities[location_id] for location_id in location_ids],
             dtype=np.float32,
         ) / self.capacities[0]

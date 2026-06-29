@@ -287,8 +287,8 @@ def get_pvnet_satellite_spatial_bounds(
 
     # Add the projection to the locations objects
     locations = []
-    for x, y, gsp_id in zip(geo_xs, geo_ys, df_locs.index.values, strict=True):
-        locations.append(Location(x=x, y=y, coord_system="geostationary", id=gsp_id))
+    for x, y, loc_id in zip(geo_xs, geo_ys, df_locs.index.values, strict=True):
+        locations.append(Location(x=x, y=y, coord_system="geostationary", id=loc_id))
 
     return select_spatial_slice_pixels_multiple(ds, locations, width_pixels, height_pixels)
 

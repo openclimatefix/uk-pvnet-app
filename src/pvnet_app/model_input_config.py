@@ -1,4 +1,4 @@
-"""Functions to load, save, and modify a PVNet model's data-configuration file."""
+"""Functions to fetch, load, modify, and query PVNet model data configs."""
 import yaml
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 

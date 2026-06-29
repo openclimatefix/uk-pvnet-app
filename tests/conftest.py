@@ -28,8 +28,9 @@ DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS = 60
 def test_t0() -> pd.Timestamp:
     return pd.Timestamp.now(tz=None).floor("30min")
 
+
 @pytest.fixture(scope="session")
-def gsp_ids() -> list[int]:
+def location_ids() -> list[int]:
     return get_gsp_locations().index.tolist()
 
 
@@ -93,15 +94,15 @@ async def dp_client(
 @pytest_asyncio.fixture(scope="session")
 async def dp_client_with_locations(
     dp_client: dp.DataPlatformDataServiceStub,
-    gsp_ids: list[int],
+    location_ids: list[int],
 ) -> dp.DataPlatformDataServiceStub:
     """Set up GSP locations and observer in the shared Data Platform for integration tests."""
 
-    for gsp_id in gsp_ids:
-        metadata = Struct(fields={"gsp_id": Value(number_value=gsp_id)})
-        location_type = dp.LocationType.NATION if gsp_id == 0 else dp.LocationType.GSP
-        effective_capacity_watts = 15_000_000_000 if gsp_id == 0 else 1_000_000
-        location_name = "uk" if gsp_id == 0 else f"gsp{gsp_id}"
+    for location_id in location_ids:
+        metadata = Struct(fields={"gsp_id": Value(number_value=location_id)})
+        location_type = dp.LocationType.NATION if location_id == 0 else dp.LocationType.GSP
+        effective_capacity_watts = 15_000_000_000 if location_id == 0 else 1_000_000
+        location_name = "uk" if location_id == 0 else f"gsp{location_id}"
 
         req = dp.CreateLocationRequest(
             location_name=location_name,

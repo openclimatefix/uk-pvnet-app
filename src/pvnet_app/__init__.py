@@ -1,1 +1,1 @@
-"""PVNet App"""
+"""uk-pvnet-app"""

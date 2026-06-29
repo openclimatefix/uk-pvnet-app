@@ -1,4 +1,4 @@
-"""Function to help validate PV forecasts."""
+"""Functions to validate solar forecasts."""
 
 import logging
 
@@ -163,7 +163,7 @@ def validate_forecast(
     # Compute the national forecast in MW from the normalised forecast
     # Validation is only performed on the national forecast
     national_forecast_mw = (
-        da_forecast.sel(gsp_id=0, output_label="p50").to_series() * national_capacity_mw
+        da_forecast.sel(location_id=0, output_label="p50").to_series() * national_capacity_mw
     )
 
     forecast_max_okay = check_forecast_max(

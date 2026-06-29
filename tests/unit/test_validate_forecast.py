@@ -20,11 +20,11 @@ def make_forecast_dataarray(
     return xr.DataArray(
         np.array(forecast_values)[None, :, None],  # MW
         coords={
-            "gsp_id": [0],
+            "location_id": [0],
             "valid_times_utc": valid_times,
             "output_label": ["p50"],
         },
-        dims=["gsp_id", "valid_times_utc", "output_label"],
+        dims=["location_id", "valid_times_utc", "output_label"],
     )
 
 
@@ -44,7 +44,7 @@ def test_validate_forecast_ok():
     )
 
     national_forecast_mw = (
-        da_forecast_mw.sel(gsp_id=0, output_label="p50").to_series()
+        da_forecast_mw.sel(location_id=0, output_label="p50").to_series()
     )
 
     assert check_forecast_max(

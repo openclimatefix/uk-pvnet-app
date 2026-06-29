@@ -1,4 +1,4 @@
-"""A pydantic model for the ML models."""
+"""Schema and loader for the model catalogue."""
 
 import logging
 from importlib.resources import files
