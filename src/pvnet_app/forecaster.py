@@ -318,7 +318,6 @@ class PVNetForecaster:
 
     def _make_sundown_masks(self, location_ids: list[int]) -> tuple[xr.DataArray, xr.DataArray]:
         """Make a sundown mask for all locations and valid times."""
-
         elevations = []
         for loc_id in location_ids:
 
@@ -332,7 +331,7 @@ class PVNetForecaster:
             elevations.append(elevation)
 
         regional_sundown_mask = np.array(elevations) < MIN_DAY_ELEVATION_DEGREES
-        
+
         da_regional_sundown_mask = xr.DataArray(
             data=regional_sundown_mask,
             dims=["location_id", "valid_times_utc"],
