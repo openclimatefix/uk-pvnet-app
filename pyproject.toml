@@ -128,6 +128,7 @@ select = [
 ]
 fixable = ["ALL"]
 ignore = [
+    "COM812",   # conflicts with the formatter, which handles trailing commas
     "D203", "D213", "D215", "D400", "D401", "D404", "D406",
     "D407", "D408", "D409", "D413",
 ]
