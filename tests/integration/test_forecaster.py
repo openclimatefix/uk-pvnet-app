@@ -14,7 +14,6 @@ def test_model_loading():
     device = torch.device("cpu")
 
     for model_spec in models:
-
         forecaster = PVNetForecaster(
             model_spec=model_spec,
             data_config_path="dummy.yaml",

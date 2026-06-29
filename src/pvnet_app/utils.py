@@ -1,4 +1,5 @@
 """General utility functions."""
+
 import logging
 from datetime import datetime
 
@@ -10,7 +11,6 @@ from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from pvnet_app.models.registry import ModelSpec
 
 logger = logging.getLogger(__name__)
-
 
 
 def save_batch_to_s3(

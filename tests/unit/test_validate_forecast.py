@@ -31,7 +31,6 @@ def make_forecast_dataarray(
 def test_validate_forecast_ok():
     """Test that validate_forecast passes when forecast is valid"""
 
-
     national_capacity_mw = 50
     zig_zag_warning_threshold_mw = 500
     zig_zag_error_threshold_mw = 1000
@@ -43,9 +42,7 @@ def test_validate_forecast_ok():
         valid_times=pd.date_range("2025-01-01 00:00", periods=3, freq="30min"),
     )
 
-    national_forecast_mw = (
-        da_forecast_mw.sel(location_id=0, output_label="p50").to_series()
-    )
+    national_forecast_mw = da_forecast_mw.sel(location_id=0, output_label="p50").to_series()
 
     assert check_forecast_max(
         national_forecast_mw=national_forecast_mw,
@@ -123,10 +120,13 @@ def test_validate_forecast_no_fluctuations(caplog):
 
     national_capacity_mw = 2000
 
-    da_forecast = make_forecast_dataarray(
-        forecast_values=[1000, 1100, 1050, 1200, 1150],
-        valid_times=pd.date_range(start="2025-01-01 00:00", periods=5, freq="30min"),
-    ) / national_capacity_mw
+    da_forecast = (
+        make_forecast_dataarray(
+            forecast_values=[1000, 1100, 1050, 1200, 1150],
+            valid_times=pd.date_range(start="2025-01-01 00:00", periods=5, freq="30min"),
+        )
+        / national_capacity_mw
+    )
 
     # Capture warning messages
     with caplog.at_level(logging.WARNING):
@@ -152,10 +152,13 @@ def test_validate_forecast_with_zigzag_warning(caplog):
 
     national_capacity_mw = 2000
 
-    da_forecast = make_forecast_dataarray(
-        forecast_values=[1000, 1300, 800, 1200, 500],
-        valid_times=pd.date_range(start="2025-01-01 00:00", periods=5, freq="30min"),
-    ) / national_capacity_mw
+    da_forecast = (
+        make_forecast_dataarray(
+            forecast_values=[1000, 1300, 800, 1200, 500],
+            valid_times=pd.date_range(start="2025-01-01 00:00", periods=5, freq="30min"),
+        )
+        / national_capacity_mw
+    )
 
     # Capture warning messages
     with caplog.at_level(logging.WARNING):
@@ -182,10 +185,13 @@ def test_validate_forecast_with_zigzag_failure(caplog):
 
     national_capacity_mw = 2000
 
-    da_forecast = make_forecast_dataarray(
-        forecast_values=[1000, 1600, 800, 1301, 500],
-        valid_times=pd.date_range(start="2025-01-01 00:00", periods=5, freq="30min"),
-    ) / national_capacity_mw
+    da_forecast = (
+        make_forecast_dataarray(
+            forecast_values=[1000, 1600, 800, 1301, 500],
+            valid_times=pd.date_range(start="2025-01-01 00:00", periods=5, freq="30min"),
+        )
+        / national_capacity_mw
+    )
 
     # Capture warning messages
     with caplog.at_level(logging.WARNING):
@@ -212,10 +218,13 @@ def test_validate_forecast_sun_elevation_check(caplog):
 
     national_capacity_mw = 2000
     # Create forecast values (some values are ≤ 0 to trigger the exception)
-    da_forecast = make_forecast_dataarray(
-        forecast_values=[0, 50, 100, -1, 75],
-        valid_times=pd.date_range("2025-01-01 12:00", periods=5, freq="30min"),
-    ) / national_capacity_mw
+    da_forecast = (
+        make_forecast_dataarray(
+            forecast_values=[0, 50, 100, -1, 75],
+            valid_times=pd.date_range("2025-01-01 12:00", periods=5, freq="30min"),
+        )
+        / national_capacity_mw
+    )
 
     # Capture warning messages
     with caplog.at_level(logging.WARNING):

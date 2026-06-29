@@ -1,4 +1,5 @@
 """Functions to fetch, load, modify, and query PVNet model data configs."""
+
 import yaml
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
@@ -128,7 +129,9 @@ def fetch_model_data_config_paths(
     paths: dict[str, str] = {}
     for spec in model_specs:
         path = PVNetBaseModel.get_data_config(
-            spec.pvnet.repo, revision=spec.pvnet.commit, token=hf_token,
+            spec.pvnet.repo,
+            revision=spec.pvnet.commit,
+            token=hf_token,
         )
         paths[spec.name] = path
     return paths

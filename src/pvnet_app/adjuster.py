@@ -12,7 +12,6 @@ from pvnet_app.utils import convert_to_utc_datetime
 logger = logging.getLogger(__name__)
 
 
-
 async def fetch_adjuster_values(
     client: dp.DataPlatformDataServiceStub,
     location_uuid: str,

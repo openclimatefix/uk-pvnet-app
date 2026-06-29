@@ -36,8 +36,8 @@ async def test_save_forecast_and_adjusted_forecast(
     t0 = datetime(2025, 1, 1, tzinfo=UTC)
     t0_yesterday = t0 - timedelta(days=1)
 
-    n_steps = 24 # number of forecast steps
-    freq_mins = 30 # frequency of forecast steps in minutes
+    n_steps = 24  # number of forecast steps
+    freq_mins = 30  # frequency of forecast steps in minutes
     capacity_watts = 1_000
     p10_frac = 0.3
     p50_frac = 0.5
@@ -52,7 +52,7 @@ async def test_save_forecast_and_adjusted_forecast(
         geometry_wkt: str,
     ):
         return await client.create_location(
-                dp.CreateLocationRequest(
+            dp.CreateLocationRequest(
                 location_name=location_name,
                 energy_source=dp.EnergySource.SOLAR,
                 geometry_wkt=geometry_wkt,
@@ -91,7 +91,7 @@ async def test_save_forecast_and_adjusted_forecast(
             init_time_utc=t0_yesterday,
             values=[
                 dp.CreateForecastRequestForecastValue(
-                    horizon_mins=i*freq_mins,
+                    horizon_mins=i * freq_mins,
                     p50_fraction=p50_frac,
                 )
                 for i in range(n_steps)
@@ -100,10 +100,9 @@ async def test_save_forecast_and_adjusted_forecast(
     )
 
     # Setup: Add fake generation data so that the adjusted forecast can be calculated
-    prev_valid_times = (
-        pd.date_range(t0_yesterday, periods=n_steps, freq=f"{freq_mins}min", tz="UTC")
-        .to_pydatetime()
-    )
+    prev_valid_times = pd.date_range(
+        t0_yesterday, periods=n_steps, freq=f"{freq_mins}min", tz="UTC"
+    ).to_pydatetime()
     prev_values = np.array([0.5 + 0.01 * i for i in range(n_steps)]) * capacity_watts
 
     _ = await client.create_observations(
@@ -145,7 +144,7 @@ async def test_save_forecast_and_adjusted_forecast(
     )
 
     # Check: The requests are as expected
-    assert len(requests) == len(locations) + 1 # two forecasts for GSP 0, one forecast for others
+    assert len(requests) == len(locations) + 1  # two forecasts for GSP 0, one forecast for others
     assert isinstance(requests[0], dp.CreateForecastRequest)
 
     # Test: Save the forecasts to the data platform
@@ -186,10 +185,9 @@ async def test_save_forecast_and_adjusted_forecast(
         ),
     )
     assert len(latest_forecasts_resp.forecasts) == 2
-    assert (
-        {f.forecaster.forecaster_name for f in latest_forecasts_resp.forecasts}
-        == expected_forecasters
-    )
+    assert {
+        f.forecaster.forecaster_name for f in latest_forecasts_resp.forecasts
+    } == expected_forecasters
 
     time_window = dp.TimeWindow(start_timestamp_utc=t0, end_timestamp_utc=t0 + timedelta(days=1))
 
@@ -223,14 +221,13 @@ async def test_save_forecast_and_adjusted_forecast(
     # - The deltas are 0, -0.01, -0.02, ...
     # - Limited to 10% of forecasted value
     expected_adjustments = np.clip(
-        p50_frac - prev_values/capacity_watts,
-        -p50_frac* 0.1,
+        p50_frac - prev_values / capacity_watts,
+        -p50_frac * 0.1,
         p50_frac * 0.1,
     )
 
     for i, value in enumerate(forecast_response.values):
         expected_adjustment = expected_adjustments[i]
         assert np.isclose(value.p50_value_fraction, p50_frac - expected_adjustment, atol=1e-4)
-        assert np.isclose(value.other_statistics_fractions["p10"],  p10_frac - expected_adjustment)
+        assert np.isclose(value.other_statistics_fractions["p10"], p10_frac - expected_adjustment)
         assert np.isclose(value.other_statistics_fractions["p90"], p90_frac - expected_adjustment)
-

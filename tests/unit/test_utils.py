@@ -6,7 +6,7 @@ from pvnet_app.utils import check_model_runs_finished
 
 def test_check_model_runs_finished():
     null_commit = HuggingFaceCommit(repo="dummy", commit="dummy")
-    kwargs = {"pvnet": null_commit, "summation":null_commit, "log_level": "INFO"}
+    kwargs = {"pvnet": null_commit, "summation": null_commit, "log_level": "INFO"}
     model_specs = [
         ModelSpec(name="pvnet_v2", is_critical=True, **kwargs),
         ModelSpec(name="pvnet_test", is_critical=False, **kwargs),
