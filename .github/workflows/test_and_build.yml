@@ -1,4 +1,4 @@
-name: Non-Default Branch Push CI (Python)
+name: Branch Test and Build
 
 on:
   push:
@@ -9,19 +9,13 @@ on:
     paths-ignore: ['README.md']
 
 jobs:
-  format-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v3
-        with:
-          args: "format --check"
 
   branch-ci:
-    uses: openclimatefix/.github/.github/workflows/nondefault_branch_push_ci_python.yml@main
+    uses: openclimatefix/.github/.github/workflows/branch_ci.yml@main
     secrets: inherit
     with:
       enable_linting: true
+      enable_formatting: true
       enable_typechecking: false
       tests_folder: tests
       tests_conda_deps: "esmpy hdf5=1.14.4"
