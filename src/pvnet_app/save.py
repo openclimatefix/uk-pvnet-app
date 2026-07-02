@@ -123,13 +123,14 @@ def map_values_da_to_dp_requests(
     p90s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_90").values.astype(float)
 
     forecast_values = []
+    max_value = 1.09
     for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
-        if p90 >= 1.1:
+        if p90 >= max_value:
             logger.warning(
-                f"p90 value {p90} exceeds 1.1 for model={model_tag}, gsp_id={gsp_id}, "
-                f"horizon_mins={h}; clamping to 1.1",
+                f"p90 value {p90} exceeds {max_value} for model={model_tag}, gsp_id={gsp_id}, "
+                f" horizon_mins={h}; clamping to {max_value}",
             )
-            p90 = 1.1
+            p90 = max_value
         forecast_values.append(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=h,
