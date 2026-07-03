@@ -11,7 +11,6 @@ models:
     is_critical: True
     is_day_ahead: False
     log_level: DEBUG
-    uses_satellite_data: True
 
   # This uses 2NWP + satellite with 0-minute delay
   - name: pvnet_intra_allbells0
@@ -24,7 +23,6 @@ models:
     is_critical: False
     is_day_ahead: False
     log_level: INFO
-    uses_satellite_data: True
 
   # Only uses ECMWF data
   - name: pvnet_da_ecmwf # This name is important as it used for blending
@@ -37,7 +35,6 @@ models:
     is_critical: True
     is_day_ahead: True
     log_level: INFO
-    uses_satellite_data: False
 
   # Only uses satellite data with 30 minute delay
   - name: pvnet_intra_sat30
@@ -50,7 +47,6 @@ models:
     is_critical: True
     is_day_ahead: False
     log_level: INFO
-    uses_satellite_data: True
 
   # Only uses UKV data
   - name: pvnet_da_ukv
@@ -63,7 +59,6 @@ models:
     is_critical: True
     is_day_ahead: True
     log_level: INFO
-    uses_satellite_data: False
 
   # Day-ahead model which does not use satellite data
   - name: pvnet_da_2nwp
@@ -76,4 +71,3 @@ models:
     is_critical: True
     is_day_ahead: True
     log_level: INFO
-    uses_satellite_data: False

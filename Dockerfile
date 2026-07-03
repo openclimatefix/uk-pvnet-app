@@ -23,18 +23,14 @@ RUN mkdir src && uv sync --no-dev --no-install-project --compile-bytecode --inex
 FROM build-deps AS build-app
 
 # Install the app
-# * The .git folder is needed here for setuptools-git-versioning
 COPY src /app/src
-COPY .git /app/.git
 RUN uv sync --no-editable --no-dev --compile-bytecode --inexact
 
 # --- Runtime image --- #
 FROM python:3.12-slim
 
 # Copy required elements of the builder image
-# * This app uses the git binary within the source code, hence coopying it over
 COPY --from=build-app /app/.venv /app/.venv
-COPY --from=build-app /usr/bin/git /usr/bin/git
 
 # This is just a check to make sure it works, we've had problems with this in the past
 ENV PATH="/app/.venv/bin:${PATH}"

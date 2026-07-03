@@ -46,7 +46,6 @@ def test_check_model_nwp_inputs_available(
     nwp_ecmwf_data: xr.Dataset,
     tmp_path: Path,
 ):
-
     # ---- Test case where all inputs are available
 
     # Create the required NWP data

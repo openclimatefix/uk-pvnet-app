@@ -5,11 +5,30 @@ import pandas as pd
 import pytest
 import xarray as xr
 from ocf import dp
+from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.app import run_app
 from pvnet_app.data_platform import fetch_locations
+from pvnet_app.model_input_config import load_yaml_config
 from pvnet_app.models.registry import ModelSpec, get_model_specs
 from pvnet_app.settings import AppSettings
+
+
+def model_uses_satellite_data(model_spec: ModelSpec, hf_token: str) -> bool:
+    """Determine if a model uses satellite data.
+
+    Args:
+        model_spec: The model specification
+        hf_token: The Hugging Face token
+    """
+    data_config_path = PVNetBaseModel.get_data_config(
+        model_spec.pvnet.repo,
+        revision=model_spec.pvnet.commit,
+        token=hf_token,
+    )
+    data_config = load_yaml_config(data_config_path)
+
+    return "satellite" in data_config["input_data"]
 
 
 async def check_number_of_forecasts(
@@ -177,7 +196,10 @@ async def test_app_no_sat(
         await run_app(settings=settings, t0=t0)
 
     # Only the models which don't use satellite will be run in this case
-    model_specs = get_model_specs()
-    model_specs = [model for model in model_specs if not model.uses_satellite_data]
+    model_specs = [
+        model
+        for model in get_model_specs()
+        if not model_uses_satellite_data(model, hf_token=settings.huggingface_token)
+    ]
 
-    await check_number_of_forecasts(dp_client_with_locations, model_specs, test_t0, location_ids)
+    await check_number_of_forecasts(dp_client_with_locations, model_specs, t0, location_ids)

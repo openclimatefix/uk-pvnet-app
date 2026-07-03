@@ -234,7 +234,7 @@ def build_forecast_creation_request(
     ).values
 
     forecast_value_requests = []
-    for h, row in zip(horizons_mins, forecast_array, strict=False):
+    for h, row in zip(horizons_mins, forecast_array, strict=True):
         if (row > DATAPLATFORM_MAX_VALUE).any():
             high_plevels = np.array(plevels)[row > DATAPLATFORM_MAX_VALUE].tolist()
             logger.warning(

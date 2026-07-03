@@ -72,7 +72,7 @@ def check_model_runs_finished(
         )
 
     if len(failed_forecasts) > 0:
-        raise Exception(
+        raise ValueError(
             f"{message}: {failed_forecasts}. Completed forecasts: {completed_forecasts}",
         )
 
