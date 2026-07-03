@@ -101,7 +101,7 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
 
     # If all the requested times are present we avoid running interpolation
     if timestamp_available.all():
-        logger.info("No gaps in the available satllite sequence - no interpolation run")
+        logger.info("No gaps in the available satellite sequence - no interpolation run")
         return ds
 
     # If less than 2 of the buffer requested times are present we cannot infill
@@ -149,7 +149,7 @@ def extend_satellite_data_with_nans(
 ) -> xr.Dataset:
     """Fill missing satellite timestamps with NaNs.
 
-    The satellite data is filled with NaNs after its last avilable timestamp. The data is
+    The satellite data is filled with NaNs after its last available timestamp. The data is
     extended forwards in time either up to t0 or up to the limit, whichever is smaller.
 
     Args:
@@ -202,37 +202,33 @@ def check_model_satellite_inputs_available(
     Returns:
         bool: Whether the satellite data satisfies that specified in the config
     """
-    input_config = load_yaml_configuration(data_config_filename).input_data
-
-    available = True
+    sat_config = load_yaml_configuration(data_config_filename).input_data.satellite
 
     # Only check if using satellite data
-    model_uses_satellite = hasattr(input_config, "satellite") and (
-        input_config.satellite is not None
-    )
+    model_uses_satellite = sat_config is not None
 
     # In case the model does not require satellite
     if not model_uses_satellite:
-        available = True
+        return True
 
     # In case the model requires satellite but none is available
-    elif model_uses_satellite and (sat_datetimes is None):
-        available = False
+    elif sat_datetimes is None:
+        return False
 
     # In case the model requires satellite and some is available
-    elif model_uses_satellite:
+    else:
         # Take into account how recently the model tries to slice satellite data from
         # interval_[start/end]_minutes is relative to t0 so negative means before t0
-        interval_start_minutes = input_config.satellite.interval_start_minutes
-        interval_end_minutes = input_config.satellite.interval_end_minutes
+        interval_start_minutes = sat_config.interval_start_minutes
+        interval_end_minutes = sat_config.interval_end_minutes
 
         # Take into account the dropout the model was trained with
         # If the model was trained with dropout, we can allow the satellite data to be
         # delayed by most negative dropout time
-        if input_config.satellite.dropout_fraction > 0:
+        if sat_config.dropout_fraction > 0:
             interval_end_minutes = min(
                 interval_end_minutes,
-                np.array(input_config.satellite.dropout_timedeltas_minutes).min(),
+                np.array(sat_config.dropout_timedeltas_minutes).min(),
             )
 
         expected_datetimes = pd.date_range(
@@ -249,7 +245,7 @@ def check_model_satellite_inputs_available(
         if len(missing_time_steps) > 0:
             logger.info(f"Some satellite timesteps for {t0=} missing: \n{missing_time_steps}")
 
-    return available
+        return available
 
 
 def get_pvnet_satellite_spatial_bounds(
@@ -316,7 +312,7 @@ def contains_too_many_of_value(ds: xr.Dataset, value: float, threshold: float) -
 
     if exceeds_threshold:
         logger.warning(
-            f"Satellite data contains values {value} greater than {threshold:.2%} of the time"
+            f"Satellite data contains values {value} greater than {threshold:.2%} of the time: "
             f"{fraction_values.to_series().to_string()}",
         )
 

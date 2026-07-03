@@ -25,6 +25,12 @@ def create_null_generation_data(t0: pd.Timestamp, capacities_mwp: dict[int, floa
     # Load the GSP location data
     df_locs = get_gsp_locations()
 
+    if missing := set(df_locs.index.tolist()) - set(capacities_mwp.keys()):
+        raise ValueError(
+            f"The following location IDs are in the GSP locations metadata but missing from "
+            f"capacities_mwp: {sorted(missing)}"
+        )
+
     capacities_array = np.array(
         [capacities_mwp[loc_id] for loc_id in df_locs.index.tolist()],
         dtype=np.float32,
@@ -35,7 +41,7 @@ def create_null_generation_data(t0: pd.Timestamp, capacities_mwp: dict[int, floa
     gen_data = np.full((len(time_utc), len(df_locs)), fill_value=-1, dtype=np.float32)
     cap_data = np.tile(capacities_array, (len(time_utc), 1))
 
-    # Conststruct generation dataset
+    # Construct generation dataset
     ds_gen = xr.Dataset(
         data_vars={
             "generation_mw": (("time_utc", "location_id"), gen_data),

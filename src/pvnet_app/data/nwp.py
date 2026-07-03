@@ -106,8 +106,8 @@ def check_model_nwp_inputs_available(
         # Get the NWP valid times required by the model
         freq = pd.Timedelta(f"{nwp_config.time_resolution_minutes}min")
 
+        # ocf-data-sampler uses ceil to round up to the nearest timestep; match that here
         req_start_time = (t0 + pd.Timedelta(f"{nwp_config.interval_start_minutes}min")).ceil(freq)
-
         req_end_time = (t0 + pd.Timedelta(f"{nwp_config.interval_end_minutes}min")).ceil(freq)
 
         # If we diff accumulated channels in time we'll need one more timestamp
@@ -133,8 +133,8 @@ def check_model_nwp_inputs_available(
 class NWPDownloader(ABC):
     """Abstract base class to download and process NWP data."""
 
-    nwp_source: str = None
-    save_chunk_dict: dict = None
+    nwp_source: str
+    save_chunk_dict: dict[str, int]
 
     def __init__(self, source_path: str | None, destination_path: str) -> None:
         """Initialise the NWP downloader."""
@@ -149,7 +149,6 @@ class NWPDownloader(ABC):
         """Apply all processing steps to the NWP data in order to match the training data."""
         pass
 
-    @abstractmethod
     def data_is_okay(self, ds: xr.Dataset) -> bool:
         """Apply quality checks to the NWP data.
 
@@ -159,7 +158,15 @@ class NWPDownloader(ABC):
         Returns:
             bool: Whether the data passes the quality checks
         """
-        pass
+        # ocf-data-sampler expects there to be only one variable and no NaNs
+        vars = list(ds.data_vars)
+        if len(vars) > 1:
+            logger.warning(f"{self.nwp_source} data has unexpected variables: {vars}")
+            return False
+        else:
+            contains_nans = ds[vars[0]].isnull().any().compute().item()
+
+        return not contains_nans
 
     def resave(self, ds: xr.Dataset) -> None:
         """Resave the NWP data to the destination path."""
@@ -243,11 +250,6 @@ class ECMWFDownloader(NWPDownloader):
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         return ds
 
-    @override
-    def data_is_okay(self, ds: xr.Dataset) -> bool:
-        contains_nans = ds[next(iter(ds.data_vars.keys()))].isnull().any().compute().item()
-        return not contains_nans
-
 
 class UKVDownloader(NWPDownloader):
     """Class to download and process the UKV data."""
@@ -326,11 +328,6 @@ class UKVDownloader(NWPDownloader):
         ds = self.regrid(ds)
         return ds
 
-    @override
-    def data_is_okay(self, ds: xr.Dataset) -> bool:
-        contains_nans = ds[next(iter(ds.data_vars.keys()))].isnull().any().compute().item()
-        return not contains_nans
-
 
 class CloudcastingDownloader(NWPDownloader):
     """Class to download and process the cloudcasting data."""
@@ -346,8 +343,3 @@ class CloudcastingDownloader(NWPDownloader):
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         # The cloudcasting data needs no changes
         return ds
-
-    @override
-    def data_is_okay(self, ds: xr.Dataset) -> bool:
-        contains_nans = ds[next(iter(ds.data_vars.keys()))].isnull().any().compute().item()
-        return not contains_nans

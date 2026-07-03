@@ -53,7 +53,7 @@ __version__ = version("pvnet-app")
 
 # Create a logger
 logging.basicConfig(
-    level=getattr(logging, os.getenv("LOGLEVEL", "DEBUG")),
+    level=getattr(logging, os.getenv("LOGLEVEL", "INFO")),
     format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
@@ -143,7 +143,7 @@ async def _run_forecast_pipeline(
     model_specs = get_model_specs(get_critical_only=settings.run_critical_models_only)
 
     if len(model_specs) == 0:
-        raise Exception("No models found after filtering")
+        raise ValueError("No models found after filtering")
 
     # Fetch the models' data configs paths and load the configs
     data_config_paths = fetch_model_data_config_paths(model_specs, settings.huggingface_token)
@@ -249,7 +249,7 @@ async def _run_forecast_pipeline(
             logger.warning(f"The model {model_spec.name} cannot be run with input data available")
 
     if len(model_forecasters) == 0:
-        raise Exception("No models were compatible with the available input data.")
+        raise ValueError("No models were compatible with the available input data.")
 
     # ---------------------------------------------------------------------------
     # Make predictions
@@ -265,7 +265,7 @@ async def _run_forecast_pipeline(
         try:
             check_batch(batch)
             validate_batch_against_config(batch=batch, model=forecaster.model)
-        except Exception as e:
+        except ValueError as e:
             logger.error(f"Batch validation failed for model {model_name}: {e}")
             continue
 
@@ -296,7 +296,7 @@ async def _run_forecast_pipeline(
                 del forecasts[model_name]
 
     if len(forecasts) == 0:
-        raise Exception("No models passed the forecast validation checks")
+        raise ValueError("No models passed the forecast validation checks")
 
     # ---------------------------------------------------------------------------
     # Escape clause for making predictions locally

@@ -18,7 +18,7 @@ async def fetch_adjuster_values(
     init_time_utc: pd.Timestamp,
     forecaster: dp.Forecaster,
 ) -> dict[int, float]:
-    """Make a forecaster adjuster based on week average deltas."""
+    """Fetch the adjuster values for the given location and forecaster."""
     deltas = (
         await client.get_week_average_deltas(
             dp.GetWeekAverageDeltasRequest(

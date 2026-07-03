@@ -34,10 +34,6 @@ class ModelSpec(BaseModel):
         description="If this model must always be part of the critical set of models which should "
         "always be run",
     )
-    uses_satellite_data: bool = Field(
-        True,
-        description="If this model uses satellite data (currently this is only used in tests)",
-    )
 
 
 class ModelRegistry(BaseModel):
