@@ -7,7 +7,7 @@ import pandas as pd
 import torch
 import xarray as xr
 import yaml
-from ocf_data_sampler.numpy_sample.common_types import NumpyBatch, TensorBatch
+from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from ocf_data_sampler.torch_datasets.pvnet_dataset import PVNetConcurrentDataset
 from ocf_data_sampler.torch_datasets.utils.torch_batch_utils import (
     batch_to_tensor,
@@ -122,18 +122,18 @@ class PVNetForecaster:
         summation_commit: str | None,
         device: torch.device,
         hf_token: bool | str | None = None,
-    ) -> tuple[PVNetBaseModel, SummationBaseModel | None]:
-        """Load the GSP and summation models.
+    ) -> tuple[PVNetBaseModel, SummationBaseModel]:
+        """Load the regional and summation models.
 
         Args:
-            pvnet_repo: The huggingface repo of the GSP model
-            pvnet_commit: The commit hash of the GSP repo to load
+            pvnet_repo: The huggingface repo of the regional model
+            pvnet_commit: The commit hash of the regional model to load
             summation_repo: The huggingface repo of the summation model
             summation_commit: The commit hash of the summation model to load
             device: The device the models will be run on
             hf_token: HF authentication token.
         """
-        # Load the GSP level model
+        # Load the regional model
         model = PVNetBaseModel.from_pretrained(
             model_id=pvnet_repo,
             revision=pvnet_commit,
@@ -141,31 +141,28 @@ class PVNetForecaster:
         ).to(device)
 
         # Load the summation model
-        if summation_repo is None:
-            sum_model = None
-        else:
-            sum_model = SummationBaseModel.from_pretrained(
-                model_id=summation_repo,
-                revision=summation_commit,
-                token=hf_token,
-            ).to(device)
+        sum_model = SummationBaseModel.from_pretrained(
+            model_id=summation_repo,
+            revision=summation_commit,
+            token=hf_token,
+        ).to(device)
 
-            # Compare the current GSP model with the one the summation model was trained on
-            datamodule_path = SummationBaseModel.get_datamodule_config(
-                model_id=summation_repo,
-                revision=summation_commit,
-                token=hf_token,
+        # Compare the current GSP model with the one the summation model was trained on
+        datamodule_path = SummationBaseModel.get_datamodule_config(
+            model_id=summation_repo,
+            revision=summation_commit,
+            token=hf_token,
+        )
+        with open(datamodule_path) as cfg:
+            sum_pvnet_cfg = yaml.safe_load(cfg)["pvnet_model"]
+
+        sum_expected_gsp_model = (sum_pvnet_cfg["model_id"], sum_pvnet_cfg["revision"])
+        this_gsp_model = (pvnet_repo, pvnet_commit)
+
+        if sum_expected_gsp_model != this_gsp_model:
+            self.logger.warning(
+                _model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model),
             )
-            with open(datamodule_path) as cfg:
-                sum_pvnet_cfg = yaml.safe_load(cfg)["pvnet_model"]
-
-            sum_expected_gsp_model = (sum_pvnet_cfg["model_id"], sum_pvnet_cfg["revision"])
-            this_gsp_model = (pvnet_repo, pvnet_commit)
-
-            if sum_expected_gsp_model != this_gsp_model:
-                self.logger.warning(
-                    _model_mismatch_msg.format(*this_gsp_model, *sum_expected_gsp_model),
-                )
 
         return model, sum_model
 
@@ -192,27 +189,10 @@ class PVNetForecaster:
         self.logger.debug(f"GSPs: {location_ids}")
 
         relative_capacities = self.get_relative_capacities(location_ids.tolist())
-
         tensor_batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
-        if self.summation_model is None:
-            self.logger.debug("Summing across GSPs to produce national forecast")
-            da_preds = self.predict_with_regional_sum(tensor_batch, relative_capacities)
-
-        else:
-            self.logger.debug("Using summation model to produce national forecast")
-            da_preds = self.predict_with_summation_model(tensor_batch, relative_capacities)
-
-        return da_preds
-
-    def predict_with_summation_model(
-        self,
-        batch: TensorBatch,
-        relative_capacities: np.ndarray,
-    ) -> xr.DataArray:
-        """Make predictions for the batch using regional and summation models."""
         # Make regional predictions using the GSP model
-        regional_preds = self.model(batch).detach().cpu().numpy()
+        regional_preds = self.model(tensor_batch).detach().cpu().numpy()
 
         # Make national predictions using summation model
         summation_batch = construct_sum_sample(
@@ -280,48 +260,6 @@ class PVNetForecaster:
 
         return xr.concat([da_national_preds, da_regional_preds], dim="location_id")
 
-    def predict_with_regional_sum(
-        self,
-        batch: TensorBatch,
-        relative_capacities: np.ndarray,
-    ) -> xr.DataArray:
-        """Make predictions for the batch using regional model and regional sum."""
-        # Make regional predictions using the GSP model
-        regional_preds = self.model(batch).detach().cpu().numpy()
-
-        location_ids = batch["location_id"].cpu().numpy().tolist()
-
-        da_regional_preds = preds_to_dataarray(
-            preds=regional_preds,
-            output_quantiles=self.model.output_quantiles,
-            location_ids=location_ids,
-            valid_times_utc=self.valid_times,
-            horizon_mins=self.horizon_mins,
-        )
-
-        # Make sundown masks so we can set predictions to zero when the sun is down
-        da_regional_sundown_mask, _ = self._make_sundown_masks(location_ids)
-
-        # Postprocess the regional predictions
-        da_regional_preds = (
-            # Set regional predictions to zero when sun is down
-            da_regional_preds.where(~da_regional_sundown_mask, other=0)
-            # Also clip negative predictions to zero
-            .clip(0, None)
-        )
-
-        # Make national predictions by summing the regional predictions weighted by the capacities
-        # The national predictions inherit the sundown masking and clipping from the regional
-        # predictions since they are derived from them
-        da_national_preds = (
-            (da_regional_preds * relative_capacities[:, None, None])
-            .sum(dim="location_id")
-            .expand_dims(dim="location_id", axis=0)
-            .assign_coords(location_id=[0])
-        )
-
-        return xr.concat([da_national_preds, da_regional_preds], dim="location_id")
-
     def _make_sundown_masks(self, location_ids: list[int]) -> tuple[xr.DataArray, xr.DataArray]:
         """Make a sundown mask for all locations and valid times."""
         elevations = []
@@ -346,7 +284,7 @@ class PVNetForecaster:
             },
         )
 
-        # All GSPs must be masked to mask national
+        # All regions must be masked to mask national
         da_national_sundown_mask = da_regional_sundown_mask.all(dim="location_id")
 
         return da_regional_sundown_mask, da_national_sundown_mask

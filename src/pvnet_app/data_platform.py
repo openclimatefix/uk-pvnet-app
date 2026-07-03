@@ -16,8 +16,11 @@ from pvnet_app.utils import convert_to_utc_datetime
 
 logger = logging.getLogger(__name__)
 
-
+# Forecast values above this will be clipped before writing to the data-platform. Data-platform
+# currently only supports values up to this limit.
 DATAPLATFORM_MAX_VALUE = 1.09
+# Only allow these p-levels to be written to the data-platform
+ALLOWED_PLEVELS = ("p10", "p50", "p90")
 
 
 async def fetch_locations(
@@ -209,6 +212,31 @@ async def build_multi_forecast_creation_request(
     return forecast_requests
 
 
+def _build_forecast_value(
+    horizon_mins: int,
+    pvalues: np.ndarray,
+    plevels: list[str],
+    forecaster_name: str,
+    location_id: int,
+) -> dp.CreateForecastRequestForecastValue:
+    if (pvalues > DATAPLATFORM_MAX_VALUE).any():
+        high_plevels = np.array(plevels)[pvalues > DATAPLATFORM_MAX_VALUE].tolist()
+        logger.warning(
+            f"p-levels={high_plevels} exceed {DATAPLATFORM_MAX_VALUE} for model="
+            f"{forecaster_name}, location_id={location_id}, horizon_mins={horizon_mins}; "
+            f"clipping to {DATAPLATFORM_MAX_VALUE}",
+        )
+        pvalues = pvalues.clip(None, DATAPLATFORM_MAX_VALUE)
+
+    return dp.CreateForecastRequestForecastValue(
+        horizon_mins=horizon_mins,
+        p50_fraction=pvalues[plevels.index("p50")],
+        other_statistics_fractions={
+            k: v for k, v in zip(plevels, pvalues, strict=True) if k != "p50"
+        },
+    )
+
+
 def build_forecast_creation_request(
     da_forecast: xr.DataArray,
     forecaster: dp.Forecaster,
@@ -227,32 +255,23 @@ def build_forecast_creation_request(
     """
     location_id = int(da_forecast.location_id.values)
     horizons_mins = da_forecast.horizon_mins.values.tolist()
-    plevels = ["p10", "p50", "p90"]
 
+    # Filter the p-levels to the allowed set
+    plevels = [level for level in ALLOWED_PLEVELS if level in da_forecast.output_label.values]
     forecast_array = (
-        da_forecast.transpose("valid_times_utc", "output_label").sel(output_label=plevels)
+        da_forecast.sel(output_label=plevels).transpose("valid_times_utc", "output_label")
     ).values
 
-    forecast_value_requests = []
-    for h, row in zip(horizons_mins, forecast_array, strict=True):
-        if (row > DATAPLATFORM_MAX_VALUE).any():
-            high_plevels = np.array(plevels)[row > DATAPLATFORM_MAX_VALUE].tolist()
-            logger.warning(
-                f"p-levels={high_plevels} exceed {DATAPLATFORM_MAX_VALUE} for model="
-                f"{forecaster.forecaster_name}, location_id={location_id}, horizon_mins={h}; "
-                f"clipping to {DATAPLATFORM_MAX_VALUE}",
-            )
-            p10, p50, p90 = row.clip(None, DATAPLATFORM_MAX_VALUE)
-        else:
-            p10, p50, p90 = row
-
-        forecast_value_requests.append(
-            dp.CreateForecastRequestForecastValue(
-                horizon_mins=h,
-                p50_fraction=p50,
-                other_statistics_fractions={"p10": p10, "p90": p90},
-            ),
+    forecast_value_requests = [
+        _build_forecast_value(
+            horizon_mins=h,
+            pvalues=pvalues,
+            plevels=plevels,
+            forecaster_name=forecaster.forecaster_name,
+            location_id=location_id,
         )
+        for h, pvalues in zip(horizons_mins, forecast_array, strict=True)
+    ]
 
     return dp.CreateForecastRequest(
         forecaster=forecaster,
