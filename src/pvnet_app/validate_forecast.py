@@ -82,10 +82,12 @@ def check_forecast_fluctuations(
 
     def zig_zag_over_threshold(threshold: float) -> bool:
         return (
-            (diff[0:-2] > threshold)  # forecast goes up
-            & (diff[1:-1] < -threshold)  # goes down
-            & (diff[2:] > threshold)  # goes up
-        ).any()
+            (
+                (diff[0:-2] > threshold)  # forecast goes up
+                & (diff[1:-1] < -threshold)  # goes down
+                & (diff[2:] > threshold)  # goes up
+            ).any()
+        )
 
     has_large_jumps = zig_zag_over_threshold(warning_threshold_mw)
     has_critical_jumps = zig_zag_over_threshold(error_threshold_mw)
