@@ -35,6 +35,15 @@ class ModelSpec(BaseModel):
         "always be run",
     )
 
+    @field_validator("name")
+    @classmethod
+    def check_name_compliance(cls, value: str) -> str:
+        """Check the model name is allowed by data-platform."""
+        # data-platform doesn't allow hyphens in the name
+        if "-" in value:
+            raise ValueError("The 'name' field cannot contain hyphens (-).")
+        return value
+
 
 class ModelRegistry(BaseModel):
     """The full collection of model specs loaded from the catalog."""

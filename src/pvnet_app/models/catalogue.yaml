@@ -1,6 +1,18 @@
 models:
   
-  # Currently this model uses a 30 minute satellite delay
+  # This uses 2NWP + satellite with 0-minute delay
+  - name: pvnet_v2
+    pvnet:
+        repo: openclimatefix-models/pvnet_uk_region
+        commit: 0f6a00de0c6a12b36f6c050ba7d9916949803ad8
+    summation:
+        repo: openclimatefix-models/pvnet_uk_summation
+        commit: f5b6b7fab06d762e900f6caeb3ec6af07db3ec4c
+    is_critical: True
+    is_day_ahead: False
+    log_level: DEBUG
+  
+  # This uses 2NWP + satellite with 30-minute delay
   - name: pvnet_intra_allbells30
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
@@ -8,24 +20,12 @@ models:
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
         commit: b10af61ef303566dee6647f0b9eba07432d91957
-    is_critical: True
-    is_day_ahead: False
-    log_level: DEBUG
-
-  # This uses 2NWP + satellite with 0-minute delay
-  - name: pvnet_intra_allbells0
-    pvnet:
-        repo: openclimatefix-models/pvnet_uk_region
-        commit: 0f6a00de0c6a12b36f6c050ba7d9916949803ad8
-    summation:
-        repo: openclimatefix-models/pvnet_uk_summation
-        commit: f5b6b7fab06d762e900f6caeb3ec6af07db3ec4c
     is_critical: False
     is_day_ahead: False
     log_level: INFO
 
-  # Only uses ECMWF data
-  - name: pvnet_da_ecmwf # This name is important as it used for blending
+  # This uses only ECMWF data
+  - name: pvnet_ecmwf
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
         commit: bd376303f753dd869dd0fd194906451b91b2dcd1
@@ -36,8 +36,8 @@ models:
     is_day_ahead: True
     log_level: INFO
 
-  # Only uses satellite data with 30 minute delay
-  - name: pvnet_intra_sat30
+  # This uses only satellite data with 30-minute delay
+  - name: pvnet_sat_only
     pvnet:
       repo: openclimatefix-models/pvnet_uk_region
       commit: 14f2223681c9741163a3099493d97bcd1c4e0025
@@ -48,8 +48,8 @@ models:
     is_day_ahead: False
     log_level: INFO
 
-  # Only uses UKV data
-  - name: pvnet_da_ukv
+  # This uses only UKV data
+  - name: pvnet_ukv_only
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
         commit: b242aad4ed243efe4e701b9ae61136615795faa8
@@ -60,8 +60,8 @@ models:
     is_day_ahead: True
     log_level: INFO
 
-  # Day-ahead model which does not use satellite data
-  - name: pvnet_da_2nwp
+  # This uses 2NWP but no satellite
+  - name: pvnet_day_ahead
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
         commit: 723603423d1b2b74fe49715a2d52fa7593a9451e
