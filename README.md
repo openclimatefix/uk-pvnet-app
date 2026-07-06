@@ -63,7 +63,7 @@ Just before the batch goes into the ML models, we check that:
 ### Forecast checks
 
 After the ML models have run, we check the national forecast only:
-- It does not exceed 110% of the national capacity. The forecast fails validation if any
+- It does not exceed 100% of the national capacity. The forecast fails validation if any
   value is above this.
 - It does not exceed an absolute ceiling of 20 GW. The forecast fails validation if any
   value is above this.
