@@ -18,11 +18,14 @@ def make_forecast_dataarray(
 ) -> xr.DataArray:
     """Helper function to create a forecast DataArray for testing purposes."""
     return xr.DataArray(
-        np.array(forecast_values)[None, :, None],  # MW
+        np.array(forecast_values)[None, :, None],
         coords={
             "location_id": [0],
             "valid_times_utc": valid_times,
             "output_label": ["p50"],
+            # Set some dummy coordinates for the location of roughly the UK
+            "longitude": ("location_id", [-3]),
+            "latitude": ("location_id", [55]),
         },
         dims=["location_id", "valid_times_utc", "output_label"],
     )
@@ -42,7 +45,7 @@ def test_validate_forecast_ok():
         valid_times=pd.date_range("2025-01-01 00:00", periods=3, freq="30min"),
     )
 
-    national_forecast_mw = da_forecast_mw.sel(location_id=0, output_label="p50").to_series()
+    national_forecast_mw = da_forecast_mw.sel(location_id=0, output_label="p50")
 
     assert check_forecast_max(
         national_forecast_mw=national_forecast_mw,
@@ -74,7 +77,7 @@ def test_validate_forecast_ok():
 
 
 def test_validate_forecast_above_110percent():
-    """Test that validate_forecast returns False when forecast is above 110% of capacity"""
+    """Test that validate_forecast returns False when forecast is above 100% of capacity"""
 
     da_forecast = make_forecast_dataarray(
         forecast_values=[1.2],

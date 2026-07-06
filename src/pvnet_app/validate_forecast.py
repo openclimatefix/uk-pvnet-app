@@ -3,27 +3,24 @@
 import logging
 
 import numpy as np
-import pandas as pd
 import pvlib
 import xarray as xr
 
 logger = logging.getLogger(__name__)
 
-# A forecast is bad if above this fraction of national capacity
-RELATIVE_MAX_FORECAST = 1.1
+# A forecast fails validation if the national forecast is above this fraction of capacity
+# The GSP forecasts are not checked on this criteria since a few regions can have generations
+# significantly above the capacity
+NATIONAL_RELATIVE_MAX_FORECAST: float = 1.0
 
-# A forecast is bad if above this absolute value
-# Note: The all time peak generation as of 2025-04-27 was ~15.4 GW
-#  - See https://www.solar.sheffield.ac.uk/pvlive/
-ABSOLUTE_MAX_FORECAST = 20_000
-
-# The UK's longitude and latitude - used for solar position calculations
-UK_LONGITUDE = -3.4360
-UK_LATITUDE = 55.3781
+# A forecast fails validation if the national forecast is above this absolute value in MW
+# Note: The all time peak generation as of 2026-07-06 was ~16.3 GW
+#       See https://www.solar.sheffield.ac.uk/pvlive/
+NATIONAL_ABSOLUTE_MAX_FORECAST_MW: int = 20_000
 
 
 def check_forecast_max(
-    national_forecast_mw: pd.Series,
+    national_forecast_mw: xr.DataArray,
     national_capacity_mw: float,
     model_name: str,
 ) -> bool:
@@ -33,28 +30,28 @@ def check_forecast_max(
     - Check the forecast doesn't exceed some arbitrary limit.
 
     Args:
-        national_forecast_mw: The forecast values for the nation (in MW)
+        national_forecast_mw: The national forecast values (in MW)
         national_capacity_mw: The national PV capacity (in MW)
         model_name: The name of the model that generated the forecast
     """
     forecast_okay = True
 
-    # Compute the maximum from the entire forecast array
     max_forecast_mw = national_forecast_mw.values.max()
 
-    # Check it doesn't exceed the national capacity
+    # Check forecast doesn't exceed relative limit of the national capacity
     max_forecast_frac = max_forecast_mw / national_capacity_mw
-    if max_forecast_frac > RELATIVE_MAX_FORECAST:
+    if max_forecast_frac > NATIONAL_RELATIVE_MAX_FORECAST:
         logger.warning(
             f"{model_name}: The maximum of the national forecast is {max_forecast_mw} which is "
             f"{max_forecast_frac:.2%} of the national capacity ({national_capacity_mw}MW).",
         )
         forecast_okay = False
 
-    if max_forecast_mw > ABSOLUTE_MAX_FORECAST:
+    # Check forecast doesn't exceed absolute limit
+    if max_forecast_mw > NATIONAL_ABSOLUTE_MAX_FORECAST_MW:
         logger.warning(
-            f"{model_name}: National forecast exceeds {ABSOLUTE_MAX_FORECAST / 1e3:.2f} GW. "
-            f"Max forecast value is {max_forecast_mw / 1e3:.2f} GW).",
+            f"{model_name}: The maximum of the national forecast is {max_forecast_mw} which "
+            f"exceeds the limit of {NATIONAL_ABSOLUTE_MAX_FORECAST_MW} MW."
         )
         forecast_okay = False
 
@@ -62,7 +59,7 @@ def check_forecast_max(
 
 
 def check_forecast_fluctuations(
-    national_forecast_mw: pd.Series,
+    national_forecast_mw: xr.DataArray,
     warning_threshold_mw: float,
     error_threshold_mw: float,
     model_name: str,
@@ -82,12 +79,10 @@ def check_forecast_fluctuations(
 
     def zig_zag_over_threshold(threshold: float) -> bool:
         return (
-            (
-                (diff[0:-2] > threshold)  # forecast goes up
-                & (diff[1:-1] < -threshold)  # goes down
-                & (diff[2:] > threshold)  # goes up
-            ).any()
-        )
+            (diff[0:-2] > threshold)  # forecast goes up
+            & (diff[1:-1] < -threshold)  # goes down
+            & (diff[2:] > threshold)  # goes up
+        ).any()
 
     has_large_jumps = zig_zag_over_threshold(warning_threshold_mw)
     has_critical_jumps = zig_zag_over_threshold(error_threshold_mw)
@@ -104,34 +99,36 @@ def check_forecast_fluctuations(
 
 
 def check_forecast_positive_during_daylight(
-    national_forecast_mw: pd.Series,
+    national_forecast_mw: xr.DataArray,
     sun_elevation_lower_limit: float,
     model_name: str,
 ) -> bool:
     """Check that the forecast values are positive when the sun is up.
 
     Args:
-        national_forecast_mw: The forecast values for the nation (in MW)
+        national_forecast_mw: The national forecast values (in MW)
         sun_elevation_lower_limit: The lower limit for the sun elevation (in degrees)
         model_name: The name of the model that generated the forecast
     """
     # Calculate the solar position throughout the forecast
-    solpos = pvlib.solarposition.get_solarposition(
-        time=national_forecast_mw.index,  # The index is expect to be the valid times
-        longitude=UK_LONGITUDE,
-        latitude=UK_LATITUDE,
+    solar_elevation = pvlib.solarposition.get_solarposition(
+        time=national_forecast_mw["valid_times_utc"].values,
+        longitude=national_forecast_mw["longitude"].item(),
+        latitude=national_forecast_mw["latitude"].item(),
         method="nrel_numpy",
-    )
+    )["elevation"].values
 
     # Check if forecast values are > 0 when sun elevation is over the threshold
-    is_daylight = solpos["elevation"] > sun_elevation_lower_limit
-    bad_times = national_forecast_mw[is_daylight & (national_forecast_mw <= 0)]
+    is_daylight_and_zero = (solar_elevation > sun_elevation_lower_limit) & (
+        national_forecast_mw.values <= 0
+    )
 
-    if (num_bad_times := len(bad_times)) > 0:
+    if is_daylight_and_zero.sum().item() > 0:
+        offending_times = national_forecast_mw["valid_times_utc"].values[is_daylight_and_zero]
         logger.warning(
             f"{model_name}: Forecast values must be > 0 when sun elevation > "
             f"{sun_elevation_lower_limit} degrees. "
-            f"Found {num_bad_times} offending timestamps: {bad_times.index.tolist()}",
+            f"Found {len(offending_times)} offending timestamps: {offending_times}",
         )
         return False
     else:
@@ -164,9 +161,7 @@ def validate_forecast(
     """
     # Compute the national forecast in MW from the normalised forecast
     # Validation is only performed on the national forecast
-    national_forecast_mw = (
-        da_forecast.sel(location_id=0, output_label="p50").to_series() * national_capacity_mw
-    )
+    national_forecast_mw = da_forecast.sel(location_id=0, output_label="p50") * national_capacity_mw
 
     forecast_max_okay = check_forecast_max(
         national_forecast_mw=national_forecast_mw,

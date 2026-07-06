@@ -23,7 +23,7 @@ from pvnet_app.model_input_config import modify_data_config_for_production
 from pvnet_app.models.registry import ModelSpec
 
 # If the solar elevation (in degrees) is less than this the predictions are set to zero
-MIN_DAY_ELEVATION_DEGREES = 0
+MIN_DAY_ELEVATION_DEGREES: float = 0.0
 
 
 _model_mismatch_msg = (
@@ -40,6 +40,8 @@ def preds_to_dataarray(
     output_quantiles: list[float] | None,
     valid_times_utc: pd.DatetimeIndex,
     horizon_mins: np.ndarray,
+    longitudes: np.ndarray,
+    latitudes: np.ndarray,
 ) -> xr.DataArray:
     """Put numpy array of predictions into a dataarray."""
     if output_quantiles is not None:
@@ -56,6 +58,8 @@ def preds_to_dataarray(
             "output_label": output_labels,
             "valid_times_utc": valid_times_utc,
             "horizon_mins": ("valid_times_utc", horizon_mins),
+            "longitude": ("location_id", longitudes),
+            "latitude": ("location_id", latitudes),
         },
     )
 
@@ -221,6 +225,9 @@ class PVNetForecaster:
         )
 
         location_ids = batch["location_id"].cpu().numpy().tolist()
+        longitudes, latitudes = self.location_coords.loc[
+            location_ids, ["longitude", "latitude"]
+        ].T.values
 
         # Convert regional and national predictions to DataArrays separately since they may have
         # different output quantiles. We will concatenate them later after all the processing is
@@ -231,14 +238,19 @@ class PVNetForecaster:
             location_ids=location_ids,
             valid_times_utc=self.valid_times,
             horizon_mins=self.horizon_mins,
+            longitudes=longitudes,
+            latitudes=latitudes,
         )
 
+        longitude, latitude = self.location_coords.loc[0, ["longitude", "latitude"]].values
         da_national_preds = preds_to_dataarray(
             preds=normed_national[np.newaxis],
             output_quantiles=self.summation_model.output_quantiles,
             location_ids=[0],
             valid_times_utc=self.valid_times,
             horizon_mins=self.horizon_mins,
+            longitudes=[longitude],
+            latitudes=[latitude],
         )
 
         # Make sundown masks so we can set predictions to zero when the sun is down
