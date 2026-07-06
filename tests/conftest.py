@@ -18,7 +18,7 @@ from testcontainers.postgres import PostgresContainer
 
 from pvnet_app.data.gsp import get_gsp_locations
 
-test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/test_data"
+test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/fixtures"
 
 DATA_PLATFORM_GRPC_PORT = 50051
 DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS = 60
