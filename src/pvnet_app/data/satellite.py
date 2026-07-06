@@ -86,7 +86,7 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
 
     The max gap is inclusive of timestamps either side. E.g. if max gap is 15 minutes and the
     satellite includes timestamps 12:00 and 12:15, then 12:05 and 12:10 will be filled. If the max
-    gap was 10 minutes, then none of the timestamps would be filled. A max gap if 5 minutes will do
+    gap was 10 minutes, then none of the timestamps would be filled. A max gap of 5 minutes will do
     nothing since the normal spacing is already 5 minutes.
 
     Args:

@@ -57,7 +57,7 @@ def apply_adjuster_values(
     absolute_limit = ADJUSTER_LIMIT_ABSOLUTE_WATTS / effective_capacity_watts
     adjuster_values_array = np.clip(adjuster_values_array, -absolute_limit, absolute_limit)
 
-    # Apply fraction limit to the ajusterr
+    # Apply fraction limit to the adjuster
     fraction_limit = da_forecast.sel(output_label="p50").values * ADJUSTER_LIMIT_FORECAST_FRACTION
     adjuster_values_array = np.clip(adjuster_values_array, -fraction_limit, fraction_limit)
 
