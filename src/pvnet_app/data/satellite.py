@@ -45,7 +45,7 @@ def open_satellite_data(s3_icechunk_path: str, region: str) -> xr.Dataset | None
     return ds
 
 
-def fill_1d_bool_gaps(x: np.array, max_gap: int) -> np.array:
+def fill_1d_bool_gaps(x: np.ndarray, max_gap: int) -> np.ndarray:
     """Fill consecutive False elements if their number is less than the gap_size.
 
     Args:
@@ -440,6 +440,10 @@ class SatelliteDownloader:
             .sel(time=slice(self.t0 - self.time_window, self.t0))
             .load()
         )
+
+        if len(ds.time) == 0:
+            logger.warning("No satellite data available in recent window.")
+            return
 
         if self.data_is_okay(ds):
             ds = self.process(ds)

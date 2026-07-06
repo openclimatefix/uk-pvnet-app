@@ -75,6 +75,36 @@ def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp_pat
     assert timesteps_match_expected_freq(dst_path, expected_freq_mins=5)
 
 
+def test_run_sat_too_delayed(
+    sat_5_data_delayed: xr.Dataset,
+    sat_15_data: xr.Dataset,
+    test_t0: pd.Timestamp,
+    tmp_path: Path,
+):
+    """Download and process 5 and 15 minute satellite data where both are extremely delayed
+    """
+
+    dst_path = f"{tmp_path}/sat.zarr"
+
+    with patch(
+        "pvnet_app.data.satellite.open_satellite_data",
+        side_effect=[sat_5_data_delayed, sat_15_data],
+    ):
+        sat_downloader = SatelliteDownloader(
+            t0=test_t0 + pd.Timedelta("12h"),
+            source_path_5="s3://fake/sat5",
+            source_path_15="s3://fake/sat15",
+            s3_region="fake-region",
+            destination_path=dst_path,
+        )
+        sat_downloader.run()
+
+    # If the satellite data is too delayed the valid_times attribute should be None and the
+    # satellite data should not be saved
+    assert sat_downloader.valid_times is None
+    assert not os.path.exists(dst_path)
+
+
 def test_run_sat_delayed_5_and_15_data(
     sat_5_data_delayed: xr.Dataset,
     sat_15_data: xr.Dataset,
