@@ -76,7 +76,6 @@ async def run_app(
         write_predictions: If True, write forecasts to the data platform. If
             False, skip the write and return the forecasters for local testing
     """
-
     logging.basicConfig(
         level=getattr(logging, settings.log_level),
         format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
