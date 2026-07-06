@@ -109,7 +109,7 @@ async def fetch_or_create_forecaster(
 async def build_input_metadata(
     client: dp.DataPlatformDataServiceStub,
     location_uuid: str,
-    input_s3_paths: dict[str, str],
+    input_paths: dict[str, str],
     app_version: str,
 ) -> Struct:
     """Get metadata for the forecast."""
@@ -132,17 +132,16 @@ async def build_input_metadata(
         )
 
     # Add timestamp when the NWP and satellite were last updated
-    fs = fsspec.filesystem("s3", anon=False)
-
-    for name, s3_path in input_s3_paths.items():
-        if s3_path is not None:
+    for name, path in input_paths.items():
+        fs = fsspec.open(path).fs
+        if path is not None:
             try:
-                if s3_path.endswith(".zarr"):
-                    modified_date = fs.modified(f"{s3_path}/.zattrs")
-                elif s3_path.endswith(".icechunk"):
-                    modified_date = fs.modified(f"{s3_path}/refs/branch.main")
+                if path.endswith(".zarr"):
+                    modified_date = fs.modified(f"{path}/.zattrs")
+                elif path.endswith(".icechunk"):
+                    modified_date = fs.modified(f"{path}/refs/branch.main")
                 else:
-                    logger.warning(f"Unknown file type for {name}: {s3_path}; skipping")
+                    logger.warning(f"Unknown file type for {name}: {path}; skipping")
                     continue
                 metadata[f"{name}_last_modified"] = Value(string_value=modified_date.isoformat())
             except Exception as e:
@@ -286,7 +285,7 @@ async def write_forecasts_to_data_platform(
     forecasts: dict[str, "xr.DataArray"],
     locations: dict[int, dp.ListLocationsResponseLocationSummary],
     t0: pd.Timestamp,
-    input_s3_paths: dict[str, str],
+    input_paths: dict[str, str],
     app_version: str,
 ) -> None:
     """Build requests and write all model forecasts to the data platform.
@@ -300,7 +299,7 @@ async def write_forecasts_to_data_platform(
         forecasts: Normed national + regional forecasts keyed by model name
         locations: Mapping of GSP ID to location summary, including national (0)
         t0: The forecast init-time, as a naive-UTC timestamp
-        input_s3_paths: Source data S3 paths, keyed by source name, for metadata
+        input_paths: Source data input paths, keyed by source name, for metadata
         app_version: The app version to record against the forecasts
 
     Raises:
@@ -309,7 +308,7 @@ async def write_forecasts_to_data_platform(
     input_metadata = await build_input_metadata(
         client=client,
         location_uuid=locations[0].location_uuid,
-        input_s3_paths=input_s3_paths,
+        input_paths=input_paths,
         app_version=app_version,
     )
 

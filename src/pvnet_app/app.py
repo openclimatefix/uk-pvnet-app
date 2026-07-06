@@ -317,7 +317,7 @@ async def _run_forecast_pipeline(
             forecasts=forecasts,
             locations=locations,
             t0=t0,
-            input_s3_paths={
+            input_paths={
                 "nwp_ecmwf": settings.nwp_ecmwf_zarr_path,
                 "nwp_ukv": settings.nwp_ukv_zarr_path,
                 "satellite": settings.satellite_icechunk_path_5,
