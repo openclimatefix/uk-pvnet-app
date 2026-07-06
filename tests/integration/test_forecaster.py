@@ -25,8 +25,4 @@ def test_model_loading():
 
         # Verify models loaded correctly
         assert isinstance(forecaster.model, PVNetBaseModel)
-
-        if model_spec.summation.repo is None:
-            assert forecaster.summation_model is None
-        else:
-            assert isinstance(forecaster.summation_model, SummationBaseModel)
+        assert isinstance(forecaster.summation_model, SummationBaseModel)

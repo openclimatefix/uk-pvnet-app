@@ -34,7 +34,7 @@ def model_uses_satellite_data(model_spec: ModelSpec, hf_token: str) -> bool:
 async def check_number_of_forecasts(
     client: dp.DataPlatformDataServiceStub,
     model_specs: list[ModelSpec],
-    test_t0: pd.Timestamp,
+    t0: pd.Timestamp,
     expected_location_ids: list[int],
 ) -> None:
     """Check that the expected number of forecasts have been saved to the Data Platform."""
@@ -46,7 +46,7 @@ async def check_number_of_forecasts(
         model_name = model_spec.name.replace("-", "_")
         model_adjust = f"{model_name}_adjust"
         expected_valid_times = pd.date_range(
-            test_t0 + pd.Timedelta("30min"),
+            t0 + pd.Timedelta("30min"),
             periods=(72 if model_spec.is_day_ahead else 16),
             freq="30min",
             tz="UTC",
@@ -77,7 +77,7 @@ async def check_number_of_forecasts(
                         energy_source=dp.EnergySource.SOLAR,
                         location_uuid=locations_dict[0].location_uuid,
                         forecaster=forecasters_by_name[forecaster_name],
-                        initialization_timestamp_utc=test_t0.tz_localize("UTC").to_pydatetime(),
+                        initialization_timestamp_utc=t0.tz_localize("UTC").to_pydatetime(),
                         # Set wide time window to make sure there aren't any values outside the
                         # expected valid times
                         time_window=dp.TimeWindow(
@@ -168,7 +168,7 @@ async def test_app_no_sat(
 
     host, port = dp_host_and_port
 
-    # Change the init time to be 30 minutes later than the test_t0, so that the forecasts are for a
+    # Change the init time to be 30 minutes before the test_t0, so that the forecasts are for a
     # different time than the previous test
     t0 = test_t0 - pd.Timedelta("30min")
 
