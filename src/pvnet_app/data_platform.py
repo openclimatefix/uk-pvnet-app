@@ -78,18 +78,16 @@ async def fetch_or_create_forecaster(
     model_tag: str,
 ) -> dp.Forecaster:
     """Create the current forecaster if it does not exist."""
-    name = model_tag.replace("-", "_")
-
     forecasters = (
         await client.list_forecasters(
-            dp.ListForecastersRequest(forecaster_names_filter=[name]),
+            dp.ListForecastersRequest(forecaster_names_filter=[model_tag]),
         )
     ).forecasters
 
     # Forecaster does not exist, create it
     if len(forecasters) == 0:
         create_forecaster_response = await client.create_forecaster(
-            dp.CreateForecasterRequest(name=name, version=forecast_version),
+            dp.CreateForecasterRequest(name=model_tag, version=forecast_version),
         )
         return create_forecaster_response.forecaster
 
@@ -99,7 +97,7 @@ async def fetch_or_create_forecaster(
         # Forecaster version does not exist, update it
         if len(filtered_forecasters) == 0:
             update_forecaster_response = await client.update_forecaster(
-                dp.UpdateForecasterRequest(name=name, new_version=forecast_version),
+                dp.UpdateForecasterRequest(name=model_tag, new_version=forecast_version),
             )
             return update_forecaster_response.forecaster
 
