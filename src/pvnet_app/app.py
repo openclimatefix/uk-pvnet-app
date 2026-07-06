@@ -14,7 +14,6 @@ import sentry_sdk
 import torch
 from grpclib.client import Channel
 from ocf import dp
-from pvnet.utils import validate_batch_against_config
 
 from pvnet_app.consts import (
     generation_path,
@@ -23,7 +22,7 @@ from pvnet_app.consts import (
     nwp_ukv_path,
     sat_path,
 )
-from pvnet_app.data.batch_validation import check_batch
+from pvnet_app.data.batch_validation import get_batch_validation_error
 from pvnet_app.data.gsp import create_null_generation_data
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader
@@ -48,18 +47,7 @@ if TYPE_CHECKING:
 
 __version__ = version("pvnet-app")
 
-# ---------------------------------------------------------------------------
-# LOGGING AND SENTRY
-
-# Create a logger
-logging.basicConfig(
-    level=getattr(logging, os.getenv("LOGLEVEL", "INFO")),
-    format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
-
-# Turn off logs from aiobotocore
-logging.getLogger("aiobotocore").setLevel(logging.ERROR)
 
 # ---------------------------------------------------------------------------
 # GLOBAL SETTINGS
@@ -88,6 +76,15 @@ async def run_app(
         write_predictions: If True, write forecasts to the data platform. If
             False, skip the write and return the forecasters for local testing
     """
+
+    logging.basicConfig(
+        level=getattr(logging, settings.log_level),
+        format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
+    )
+
+    # Turn off logs from aiobotocore
+    logging.getLogger("aiobotocore").setLevel(logging.ERROR)
+
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
         environment=settings.environment,
@@ -261,15 +258,12 @@ async def _run_forecast_pipeline(
     for i, (model_name, forecaster) in enumerate(model_forecasters.items()):
         batch = forecaster.make_batch()
 
-        # Do basic validation of the batch: Will raise error if the batch fails the checks
-        try:
-            check_batch(batch)
-            validate_batch_against_config(batch=batch, model=forecaster.model)
-        except ValueError as e:
-            logger.error(f"Batch validation failed for model {model_name}: {e}")
-            continue
-
-        forecasts[model_name] = forecaster.predict(batch)
+        # Check the batch for any validation errors before running the model
+        batch_val_error = get_batch_validation_error(batch, model=forecaster.model)
+        if batch_val_error is None:
+            forecasts[model_name] = forecaster.predict(batch)
+        else:
+            logger.error(f"Batch validation failed for model {model_name}: {batch_val_error}")
 
         # Save the batch for the first model
         if (settings.save_batches_dir is not None) and i == 0:

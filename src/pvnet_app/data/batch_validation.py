@@ -1,6 +1,8 @@
 """Functions to validate data batches."""
 
 from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
+from pvnet.utils import validate_batch_against_config
+from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 
 def check_nwp_sources_not_all_zero(batch: NumpyBatch) -> None:
@@ -21,7 +23,7 @@ def check_nwp_sources_not_all_zero(batch: NumpyBatch) -> None:
                 )
 
 
-def check_batch(batch: NumpyBatch) -> None:
+def _check_batch(batch: NumpyBatch, model: PVNetBaseModel) -> None:
     """Check the batch for any defined issues.
 
     Args:
@@ -31,3 +33,20 @@ def check_batch(batch: NumpyBatch) -> None:
         ValueError: If the batch is invalid
     """
     check_nwp_sources_not_all_zero(batch)
+    validate_batch_against_config(
+        batch=batch,
+        model=model,
+    )
+
+
+def get_batch_validation_error(
+    batch: NumpyBatch,
+    model: PVNetBaseModel,
+) -> str | None:
+    """Return the validation error message, or None if the batch is valid."""
+    try:
+        _check_batch(batch, model=model)
+    except ValueError as exc:
+        return str(exc)
+
+    return None

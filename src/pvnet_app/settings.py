@@ -63,6 +63,7 @@ class AppSettings(BaseSettings):
     forecast_validate_sun_elevation_lower_limit: float = 10.0
 
     # Other settings
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     sentry_dsn: str | None = None
     environment: str = "local"
     data_platform_host: str
