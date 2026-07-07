@@ -12,7 +12,7 @@ from pvnet_app.model_input_config import load_yaml_config
 from pvnet_app.models.registry import HuggingFaceCommit, get_model_specs
 
 
-def make_huffingface_link(model_commit: HuggingFaceCommit) -> str:
+def make_huggingface_link(model_commit: HuggingFaceCommit) -> str:
     """Make a link to the model on huggingface.
 
     Args:
@@ -22,7 +22,7 @@ def make_huffingface_link(model_commit: HuggingFaceCommit) -> str:
 
 
 def generate_table() -> str:
-    """Make a new summary table for the models descriobed in the model configs."""
+    """Make a new summary table for the models described in the model configs."""
     model_specs = get_model_specs()
     columns = [
         "Model Name",
@@ -41,8 +41,8 @@ def generate_table() -> str:
 
 
     for model_spec in model_specs:
-        pvnet_link = make_huffingface_link(model_spec.pvnet)
-        summation_link = make_huffingface_link(model_spec.summation)
+        pvnet_link = make_huggingface_link(model_spec.pvnet)
+        summation_link = make_huggingface_link(model_spec.summation)
 
         data_config_path = PVNetBaseModel.get_data_config(
             model_spec.pvnet.repo,

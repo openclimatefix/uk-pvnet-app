@@ -1,9 +1,9 @@
 """Constants."""
 
-sat_path = "sat.zarr"
-nwp_ukv_path = "nwp_ukv.zarr"
-nwp_ecmwf_path = "nwp_ecmwf.zarr"
-nwp_cloudcasting_path = "nwp_cloudcasting.zarr"
-generation_path = "generation.zarr"
+sat_path: str = "sat.zarr"
+nwp_ukv_path: str = "nwp_ukv.zarr"
+nwp_ecmwf_path: str = "nwp_ecmwf.zarr"
+nwp_cloudcasting_path: str = "nwp_cloudcasting.zarr"
+generation_path: str = "generation.zarr"
 
-forecast_version = "2.8.0"
+forecast_version: str = "2.8.0"

@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 # Forecast values above this will be clipped before writing to the data-platform. Data-platform
 # currently only supports values up to this limit.
-DATAPLATFORM_MAX_VALUE = 1.09
+DATAPLATFORM_MAX_VALUE: float = 1.09
 # Only allow these p-levels to be written to the data-platform
-ALLOWED_PLEVELS = ("p10", "p50", "p90")
+ALLOWED_PLEVELS: tuple[str, ...] = ("p10", "p50", "p90")
 
 
 async def fetch_locations(

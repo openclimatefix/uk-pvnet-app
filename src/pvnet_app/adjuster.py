@@ -11,6 +11,12 @@ from pvnet_app.utils import convert_to_utc_datetime
 
 logger = logging.getLogger(__name__)
 
+# Limit adjuster so it doesn't change the forecast by more than this amount in watts
+ADJUSTER_LIMIT_ABSOLUTE_WATTS: float = 1e9
+
+# Limit adjuster so it doesn't change the forecast by more than this fraction of the forecast value
+ADJUSTER_LIMIT_FORECAST_FRACTION: float = 0.1
+
 
 async def fetch_adjuster_values(
     client: dp.DataPlatformDataServiceStub,
@@ -47,13 +53,13 @@ def apply_adjuster_values(
         else:
             logger.warning(f"No adjuster value found for horizon_mins={h}; using 0.0 as default")
 
-    # Limit adjuster values to be no more than 1 GW
-    frac_1gw = 1e9 / effective_capacity_watts
-    adjuster_values_array = np.clip(adjuster_values_array, -frac_1gw, frac_1gw)
+    # Apply absolute limit to the adjuster
+    absolute_limit = ADJUSTER_LIMIT_ABSOLUTE_WATTS / effective_capacity_watts
+    adjuster_values_array = np.clip(adjuster_values_array, -absolute_limit, absolute_limit)
 
-    # Limit adjuster values to be no more than 10% of the forecast value
-    frac_10pc = da_forecast.sel(output_label="p50").values * 0.1
-    adjuster_values_array = np.clip(adjuster_values_array, -frac_10pc, frac_10pc)
+    # Apply fraction limit to the adjuster
+    fraction_limit = da_forecast.sel(output_label="p50").values * ADJUSTER_LIMIT_FORECAST_FRACTION
+    adjuster_values_array = np.clip(adjuster_values_array, -fraction_limit, fraction_limit)
 
     da_adjuster_values = xr.DataArray(
         data=adjuster_values_array,
@@ -63,7 +69,7 @@ def apply_adjuster_values(
 
     # Adjuster values are the average of (forecast - observed) so we need to subtract
     # Also force the adjusted forecast to be positive by clipping at 0.0
-    da_adjusted_forecast = (da_forecast - da_adjuster_values).clip(0, 1)
+    da_adjusted_forecast = (da_forecast - da_adjuster_values).clip(0, None)
 
     return da_adjusted_forecast
 
