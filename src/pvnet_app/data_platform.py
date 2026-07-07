@@ -113,7 +113,10 @@ async def build_input_metadata(
     app_version: str,
 ) -> Struct:
     """Get metadata for the forecast."""
-    metadata = {"app_version": Value(string_value=app_version), "interloper": Value(string_value="true")}
+    metadata = {
+        "app_version": Value(string_value=app_version),
+        "interloper": Value(string_value="true"),
+    }
 
     # Add timestamp when ground truths were last updated
     latest_observations = (
