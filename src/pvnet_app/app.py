@@ -34,7 +34,7 @@ from pvnet_app.data_platform import (
 from pvnet_app.forecaster import PVNetForecaster
 from pvnet_app.model_input_config import (
     fetch_model_data_config_paths,
-    get_earliest_satellite_start_interval_minutes,
+    get_earliest_satellite_interval_start_minutes,
     get_maximum_satellite_spatial_window_size,
     get_required_nwp_providers,
     load_yaml_config,
@@ -170,7 +170,7 @@ async def _run_forecast_pipeline(
         logger.info("Downloading satellite data")
 
         # Only download and check the satellite data which is required by the models
-        start_interval_minutes = get_earliest_satellite_start_interval_minutes(data_configs)
+        interval_start_minutes = get_earliest_satellite_interval_start_minutes(data_configs)
         window_size = get_maximum_satellite_spatial_window_size(data_configs)
 
         sat_downloader = SatelliteDownloader(
@@ -179,7 +179,7 @@ async def _run_forecast_pipeline(
             source_path_15=settings.satellite_icechunk_path_15,
             s3_region=settings.satellite_s3_region,
             destination_path=f"{scratch_dir}/{sat_path}",
-            start_interval_minutes=start_interval_minutes,
+            interval_start_minutes=interval_start_minutes,
             window_size_pixels=window_size,
         )
         sat_downloader.run()

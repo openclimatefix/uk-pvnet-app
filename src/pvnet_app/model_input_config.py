@@ -124,14 +124,14 @@ def get_maximum_satellite_spatial_window_size(data_configs: list[dict]) -> int:
     return max_window_size
 
 
-def get_earliest_satellite_start_interval_minutes(data_configs: list[dict]) -> int:
+def get_earliest_satellite_interval_start_minutes(data_configs: list[dict]) -> int:
     """Return the earliest satellite start interval required by any of the model data configs."""
     # Seed with zero since the start interval must be negative (i.e. in the past) and we want to
     # find the most negative value
     earliest_interval = 0
     for conf in data_configs:
         if "satellite" in conf["input_data"]:
-            start_interval = conf["input_data"]["satellite"]["start_interval_minutes"]
+            start_interval = conf["input_data"]["satellite"]["interval_start_minutes"]
             earliest_interval = min(earliest_interval, start_interval)
     return int(earliest_interval)
 

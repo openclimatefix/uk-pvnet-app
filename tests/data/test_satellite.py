@@ -43,7 +43,7 @@ def test_run_sat_5_data(sat_5_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path:
             source_path_15=None,
             s3_region="fake-region",
             destination_path=dst_path,
-            start_interval_minutes=60,
+            interval_start_minutes=-60,
             window_size_pixels=24,
         )
         sat_downloader.run()
@@ -67,7 +67,7 @@ def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp_pat
             source_path_15="s3://fake/sat15",
             s3_region="fake-region",
             destination_path=dst_path,
-            start_interval_minutes=60,
+            interval_start_minutes=-60,
             window_size_pixels=24,
         )
         sat_downloader.run()
@@ -99,7 +99,7 @@ def test_run_sat_too_delayed(
             source_path_15="s3://fake/sat15",
             s3_region="fake-region",
             destination_path=dst_path,
-            start_interval_minutes=60,
+            interval_start_minutes=-60,
             window_size_pixels=24,
         )
         sat_downloader.run()
@@ -132,7 +132,7 @@ def test_run_sat_delayed_5_and_15_data(
             source_path_15="s3://fake/sat15",
             s3_region="fake-region",
             destination_path=dst_path,
-            start_interval_minutes=60,
+            interval_start_minutes=-60,
             window_size_pixels=24,
         )
         sat_downloader.run()
@@ -160,7 +160,7 @@ def test_run_nan_in_sat_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp
             source_path_15="s3://fake/sat15",
             s3_region="fake-region",
             destination_path=dst_path,
-            start_interval_minutes=60,
+            interval_start_minutes=-60,
             window_size_pixels=24,
         )
         sat_downloader.run()

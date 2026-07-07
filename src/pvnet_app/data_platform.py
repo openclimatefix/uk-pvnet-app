@@ -133,9 +133,9 @@ async def build_input_metadata(
 
     # Add timestamp when the NWP and satellite were last updated
     for name, path in input_paths.items():
-        fs = fsspec.open(path).fs
         if path is not None:
             try:
+                fs = fsspec.open(path).fs
                 if path.endswith(".zarr"):
                     modified_date = fs.modified(f"{path}/.zattrs")
                 elif path.endswith(".icechunk"):

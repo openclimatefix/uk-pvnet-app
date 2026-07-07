@@ -329,7 +329,7 @@ class SatelliteDownloader:
         source_path_15: str | None,
         s3_region: str,
         destination_path: str,
-        start_interval_minutes: int,
+        interval_start_minutes: int,
         window_size_pixels: int,
     ) -> None:
         """Class to download and process satellite data."""
@@ -338,7 +338,7 @@ class SatelliteDownloader:
         self.source_path_15 = source_path_15
         self.s3_region = s3_region
         self.destination_path = destination_path
-        self.start_interval = pd.Timedelta(f"{start_interval_minutes}min")
+        self.start_interval = pd.Timedelta(f"{interval_start_minutes}min")
         self.window_size_pixels = window_size_pixels
         self.valid_times = None
         self.sat_choice = None
@@ -443,7 +443,7 @@ class SatelliteDownloader:
             ds_dict[best_source]
             .sortby("time")
             .drop_duplicates("time", keep="last")
-            .sel(time=slice(self.t0 - self.time_window, self.t0))
+            .sel(time=slice(self.t0 + self.start_interval, self.t0))
             .load()
         )
 
