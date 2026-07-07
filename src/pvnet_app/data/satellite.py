@@ -45,7 +45,7 @@ def open_satellite_data(s3_icechunk_path: str, region: str) -> xr.Dataset | None
     return ds
 
 
-def fill_1d_bool_gaps(x: np.array, max_gap: int) -> np.array:
+def fill_1d_bool_gaps(x: np.ndarray, max_gap: int) -> np.ndarray:
     """Fill consecutive False elements if their number is less than the gap_size.
 
     Args:
@@ -250,8 +250,8 @@ def check_model_satellite_inputs_available(
 
 def get_pvnet_satellite_spatial_bounds(
     ds: xr.Dataset,
-    width_pixels: int = 24,
-    height_pixels: int = 24,
+    width_pixels: int,
+    height_pixels: int,
 ) -> xr.Dataset:
     """Get the spatial extent of the satellite data used in PVNet.
 
@@ -329,19 +329,21 @@ class SatelliteDownloader:
         source_path_15: str | None,
         s3_region: str,
         destination_path: str,
+        interval_start_minutes: int,
+        window_size_pixels: int,
     ) -> None:
         """Class to download and process satellite data."""
         self.t0 = t0
         self.source_path_5 = source_path_5
         self.source_path_15 = source_path_15
         self.s3_region = s3_region
-        self.time_window = pd.Timedelta("1h")
+        self.destination_path = destination_path
+        self.start_interval = pd.Timedelta(f"{interval_start_minutes}min")
+        self.window_size_pixels = window_size_pixels
         self.valid_times = None
         self.sat_choice = None
-        self.destination_path = destination_path
 
-    @staticmethod
-    def data_is_okay(ds: xr.Dataset) -> bool:
+    def data_is_okay(self, ds: xr.Dataset) -> bool:
         """Apply quality checks to the satellite data.
 
         Args:
@@ -351,7 +353,11 @@ class SatelliteDownloader:
             bool: Whether the data passes the quality checks
         """
         # Slice the data to the spatial extent used in PVNet
-        ds = get_pvnet_satellite_spatial_bounds(ds)
+        ds = get_pvnet_satellite_spatial_bounds(
+            ds,
+            width_pixels=self.window_size_pixels,
+            height_pixels=self.window_size_pixels,
+        )
 
         too_many_nans = contains_too_many_of_value(ds, value=np.nan, threshold=0.05)
 
@@ -437,9 +443,13 @@ class SatelliteDownloader:
             ds_dict[best_source]
             .sortby("time")
             .drop_duplicates("time", keep="last")
-            .sel(time=slice(self.t0 - self.time_window, self.t0))
+            .sel(time=slice(self.t0 + self.start_interval, self.t0))
             .load()
         )
+
+        if len(ds.time) == 0:
+            logger.warning("No satellite data available in recent window.")
+            return
 
         if self.data_is_okay(ds):
             ds = self.process(ds)

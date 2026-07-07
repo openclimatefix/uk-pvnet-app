@@ -34,6 +34,8 @@ from pvnet_app.data_platform import (
 from pvnet_app.forecaster import PVNetForecaster
 from pvnet_app.model_input_config import (
     fetch_model_data_config_paths,
+    get_earliest_satellite_interval_start_minutes,
+    get_maximum_satellite_spatial_window_size,
     get_required_nwp_providers,
     load_yaml_config,
 )
@@ -167,12 +169,18 @@ async def _run_forecast_pipeline(
     if any("satellite" in conf["input_data"] for conf in data_configs):
         logger.info("Downloading satellite data")
 
+        # Only download and check the satellite data which is required by the models
+        interval_start_minutes = get_earliest_satellite_interval_start_minutes(data_configs)
+        window_size = get_maximum_satellite_spatial_window_size(data_configs)
+
         sat_downloader = SatelliteDownloader(
             t0=t0,
             source_path_5=settings.satellite_icechunk_path_5,
             source_path_15=settings.satellite_icechunk_path_15,
             s3_region=settings.satellite_s3_region,
             destination_path=f"{scratch_dir}/{sat_path}",
+            interval_start_minutes=interval_start_minutes,
+            window_size_pixels=window_size,
         )
         sat_downloader.run()
 
@@ -309,7 +317,7 @@ async def _run_forecast_pipeline(
             forecasts=forecasts,
             locations=locations,
             t0=t0,
-            input_s3_paths={
+            input_paths={
                 "nwp_ecmwf": settings.nwp_ecmwf_zarr_path,
                 "nwp_ukv": settings.nwp_ukv_zarr_path,
                 "satellite": settings.satellite_icechunk_path_5,

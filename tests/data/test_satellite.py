@@ -43,6 +43,8 @@ def test_run_sat_5_data(sat_5_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path:
             source_path_15=None,
             s3_region="fake-region",
             destination_path=dst_path,
+            interval_start_minutes=-60,
+            window_size_pixels=24,
         )
         sat_downloader.run()
 
@@ -65,6 +67,8 @@ def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp_pat
             source_path_15="s3://fake/sat15",
             s3_region="fake-region",
             destination_path=dst_path,
+            interval_start_minutes=-60,
+            window_size_pixels=24,
         )
         sat_downloader.run()
 
@@ -73,6 +77,37 @@ def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp_pat
 
     # We infill the satellite data to 5 minutes in the process step
     assert timesteps_match_expected_freq(dst_path, expected_freq_mins=5)
+
+
+def test_run_sat_too_delayed(
+    sat_5_data_delayed: xr.Dataset,
+    sat_15_data: xr.Dataset,
+    test_t0: pd.Timestamp,
+    tmp_path: Path,
+):
+    """Download and process 5 and 15 minute satellite data where both are extremely delayed"""
+
+    dst_path = f"{tmp_path}/sat.zarr"
+
+    with patch(
+        "pvnet_app.data.satellite.open_satellite_data",
+        side_effect=[sat_5_data_delayed, sat_15_data],
+    ):
+        sat_downloader = SatelliteDownloader(
+            t0=test_t0 + pd.Timedelta("12h"),
+            source_path_5="s3://fake/sat5",
+            source_path_15="s3://fake/sat15",
+            s3_region="fake-region",
+            destination_path=dst_path,
+            interval_start_minutes=-60,
+            window_size_pixels=24,
+        )
+        sat_downloader.run()
+
+    # If the satellite data is too delayed the valid_times attribute should be None and the
+    # satellite data should not be saved
+    assert sat_downloader.valid_times is None
+    assert not os.path.exists(dst_path)
 
 
 def test_run_sat_delayed_5_and_15_data(
@@ -97,6 +132,8 @@ def test_run_sat_delayed_5_and_15_data(
             source_path_15="s3://fake/sat15",
             s3_region="fake-region",
             destination_path=dst_path,
+            interval_start_minutes=-60,
+            window_size_pixels=24,
         )
         sat_downloader.run()
 
@@ -123,6 +160,8 @@ def test_run_nan_in_sat_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp
             source_path_15="s3://fake/sat15",
             s3_region="fake-region",
             destination_path=dst_path,
+            interval_start_minutes=-60,
+            window_size_pixels=24,
         )
         sat_downloader.run()
 

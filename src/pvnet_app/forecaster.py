@@ -189,10 +189,10 @@ class PVNetForecaster:
         """Make predictions for the batch."""
         self.logger.debug(f"Predicting for model: {self.model_tag}")
 
-        location_ids = batch["location_id"]
+        location_ids = batch["location_id"].tolist()
         self.logger.debug(f"GSPs: {location_ids}")
 
-        relative_capacities = self.get_relative_capacities(location_ids.tolist())
+        relative_capacities = self.get_relative_capacities(location_ids)
         tensor_batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
         # Make regional predictions using the GSP model
@@ -224,7 +224,6 @@ class PVNetForecaster:
             .squeeze(axis=0)  # Remove the batch dimension
         )
 
-        location_ids = batch["location_id"].cpu().numpy().tolist()
         longitudes, latitudes = self.location_coords.loc[
             location_ids, ["longitude", "latitude"]
         ].T.values
