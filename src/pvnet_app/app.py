@@ -34,8 +34,8 @@ from pvnet_app.data_platform import (
 from pvnet_app.forecaster import PVNetForecaster
 from pvnet_app.model_input_config import (
     fetch_model_data_config_paths,
-    get_maximum_satellite_spatial_window_size,
     get_earliest_satellite_start_interval_minutes,
+    get_maximum_satellite_spatial_window_size,
     get_required_nwp_providers,
     load_yaml_config,
 )

@@ -2,7 +2,6 @@
 
 import yaml
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
-import numpy as np
 
 from pvnet_app.consts import (
     generation_path,
@@ -116,8 +115,7 @@ def get_required_nwp_providers(data_configs: list[dict]) -> set[str]:
 
 
 def get_maximum_satellite_spatial_window_size(data_configs: list[dict]) -> int:
-    """Return the maximum satellite spatial window size required by any of the model data configs.
-    """
+    """Return the max satellite spatial window size required by any of the model data configs."""
     max_window_size = 0
     for conf in data_configs:
         if "satellite" in conf["input_data"]:
@@ -128,7 +126,7 @@ def get_maximum_satellite_spatial_window_size(data_configs: list[dict]) -> int:
 
 def get_earliest_satellite_start_interval_minutes(data_configs: list[dict]) -> int:
     """Return the earliest satellite start interval required by any of the model data configs."""
-    # Seed with zero since the start interval must be negative (i.e. in the past) and we want to 
+    # Seed with zero since the start interval must be negative (i.e. in the past) and we want to
     # find the most negative value
     earliest_interval = 0
     for conf in data_configs:

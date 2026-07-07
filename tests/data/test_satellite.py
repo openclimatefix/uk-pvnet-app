@@ -85,8 +85,7 @@ def test_run_sat_too_delayed(
     test_t0: pd.Timestamp,
     tmp_path: Path,
 ):
-    """Download and process 5 and 15 minute satellite data where both are extremely delayed
-    """
+    """Download and process 5 and 15 minute satellite data where both are extremely delayed"""
 
     dst_path = f"{tmp_path}/sat.zarr"
 

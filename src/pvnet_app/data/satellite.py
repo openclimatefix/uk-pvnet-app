@@ -354,8 +354,8 @@ class SatelliteDownloader:
         """
         # Slice the data to the spatial extent used in PVNet
         ds = get_pvnet_satellite_spatial_bounds(
-            ds, 
-            width_pixels=self.window_size_pixels, 
+            ds,
+            width_pixels=self.window_size_pixels,
             height_pixels=self.window_size_pixels,
         )
 
