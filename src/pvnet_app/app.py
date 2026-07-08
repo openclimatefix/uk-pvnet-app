@@ -35,7 +35,6 @@ from pvnet_app.data_platform import (
     write_forecasts_to_data_platform,
 )
 from pvnet_app.forecaster import PVNetForecaster
-from pvnet_app.logging_utils import log_duration
 from pvnet_app.model_input_config import (
     fetch_model_data_config_paths,
     get_maximum_nwp_spatial_window_sizes,
@@ -46,7 +45,7 @@ from pvnet_app.model_input_config import (
 )
 from pvnet_app.models.registry import get_model_specs
 from pvnet_app.settings import AppSettings
-from pvnet_app.utils import check_model_runs_finished, resolve_t0, save_batch_to_s3
+from pvnet_app.utils import check_model_runs_finished, log_duration, resolve_t0, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
 __version__ = version("pvnet-app")
@@ -86,9 +85,7 @@ async def run_app(
     logging.getLogger("pvnet.utils").setLevel(logging.WARNING)
     warnings.filterwarnings(
         "ignore",
-        message=(
-            "The data type \\(FixedLengthUTF32.* does not have a Zarr V3 specification.*"
-        ),
+        message=("The data type \\(FixedLengthUTF32.* does not have a Zarr V3 specification.*"),
     )
     warnings.filterwarnings(
         "ignore",
@@ -283,10 +280,9 @@ async def _run_forecast_pipeline(
                 skipped_models.append(model_spec.name)
 
     logger.info(
-        "Prepared runnable models: selected=%d runnable=%d skipped=%d runnable_models=%s skipped_models=%s",
-        len(model_specs),
+        "Prepared runnable models: runnable=%d skipped=%d runnable_models=%s skipped_models=%s",
         len(model_forecasters),
-        len(model_specs) - len(model_forecasters),
+        len(skipped_models),
         sorted(model_forecasters),
         skipped_models,
     )
@@ -312,12 +308,13 @@ async def _run_forecast_pipeline(
 
             # Save the batch for the first model
             if (settings.save_batches_dir is not None) and i == 0:
-                save_batch_to_s3(
-                    batch,
-                    model_name,
-                    settings.save_batches_dir,
-                    scratch_dir=scratch_dir,
-                )
+                with log_duration(logger, "Saving batch to S3"):
+                    save_batch_to_s3(
+                        batch,
+                        model_name,
+                        settings.save_batches_dir,
+                        scratch_dir=scratch_dir,
+                    )
 
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values

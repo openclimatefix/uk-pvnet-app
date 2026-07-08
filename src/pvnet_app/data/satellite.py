@@ -257,7 +257,6 @@ def contains_too_many_of_value(ds: xr.Dataset, value: float, threshold: float) -
         value: The value to check for
         threshold: The maximum fraction of the value allowed
     """
-
     # We calculate fraction for each time
     reduction_dims = set(ds.data.dims) - {"time"}
     if np.isnan(value):
@@ -360,7 +359,6 @@ class SatelliteDownloader:
 
     def run(self) -> None:
         """Download, process, and save the satellite data."""
-
         ds_dict = {}
 
         for path, label in [(self.source_path_5, "5-min"), (self.source_path_15, "15-min")]:

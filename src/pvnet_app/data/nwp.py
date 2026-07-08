@@ -190,7 +190,6 @@ class NWPDownloader(ABC):
 
     def run(self) -> None:
         """Download, process, and save the NWP data."""
-
         if self.source_path is None:
             logger.warning(f"Source file for {self.nwp_source} is not set. Skipping download.")
             return
@@ -312,7 +311,6 @@ class UKVDownloader(NWPDownloader):
         Equal Area grid. We need to add longitudes and latitudes coords so we can regrid the data
         to the training grid.
         """
-
         # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
         laea = pyproj.Proj(
             proj="laea",

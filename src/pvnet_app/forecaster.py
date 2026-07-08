@@ -185,7 +185,6 @@ class PVNetForecaster:
     @torch.inference_mode()
     def predict(self, batch: NumpyBatch) -> xr.DataArray:
         """Make predictions for the batch."""
-
         location_ids = batch["location_id"].tolist()
         relative_capacities = self.get_relative_capacities(location_ids)
         tensor_batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
