@@ -75,7 +75,7 @@ async def run_app(
     """
     logging.basicConfig(
         level=getattr(logging, settings.log_level),
-        format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
+        format="[%(asctime)s] {%(name)s:%(lineno)d} %(levelname)s - %(message)s",
         force=True,
     )
 
@@ -295,7 +295,7 @@ async def _run_forecast_pipeline(
 
     forecasts: dict[str, xr.DataArray] = {}
 
-    with log_duration(logger, "Making forecasts"):
+    with log_duration(logger, "Making all forecasts"):
         for i, (model_name, forecaster) in enumerate(model_forecasters.items()):
             batch = forecaster.make_batch()
 
@@ -308,13 +308,12 @@ async def _run_forecast_pipeline(
 
             # Save the batch for the first model
             if (settings.save_batches_dir is not None) and i == 0:
-                with log_duration(logger, "Saving batch to S3"):
-                    save_batch_to_s3(
-                        batch,
-                        model_name,
-                        settings.save_batches_dir,
-                        scratch_dir=scratch_dir,
-                    )
+                save_batch_to_s3(
+                    batch,
+                    model_name,
+                    settings.save_batches_dir,
+                    scratch_dir=scratch_dir,
+                )
 
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
