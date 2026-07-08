@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 DATAPLATFORM_MAX_VALUE: float = 1.09
 # Only allow these p-levels to be written to the data-platform
 ALLOWED_PLEVELS: tuple[str, ...] = ("p10", "p50", "p90")
+# Maximum number of concurrent forecast writes to the data-platform
+MAX_INFLIGHT_FORECAST_WRITES: int = 32
 
 
 async def fetch_locations(
@@ -326,11 +328,28 @@ async def write_forecasts_to_data_platform(
         ),
     )
 
+    # Write the forecasts whilst limiting the number of concurrent writes to the data-platform to
+    # avoid overwhelming it
+    semaphore = asyncio.Semaphore(MAX_INFLIGHT_FORECAST_WRITES)
+
     write_results = await asyncio.gather(
-        *(client.create_forecast(req) for reqs in all_requests for req in reqs),
+        *(
+            _create_forecast_bounded(client, req, semaphore)
+            for reqs in all_requests
+            for req in reqs
+        ),
         return_exceptions=True,
     )
 
     errors = [r for r in write_results if isinstance(r, Exception)]
     if errors:
         raise ExceptionGroup("Failed writing forecasts to data platform", errors)
+
+
+async def _create_forecast_bounded(
+    client: dp.DataPlatformDataServiceStub,
+    request: dp.CreateForecastRequest,
+    semaphore: asyncio.Semaphore,
+) -> dp.CreateForecastResponse:
+    async with semaphore:
+        return await client.create_forecast(request)
