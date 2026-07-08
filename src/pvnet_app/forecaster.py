@@ -75,7 +75,7 @@ class PVNetForecaster:
         t0: pd.Timestamp,
         device: torch.device,
         capacities: dict[int, float],
-        hf_token: bool | str | None = None,
+        hf_token: str | None,
     ) -> None:
         """Class for making and compiling solar forecasts from for all GB GSPs and national total.
 
@@ -86,8 +86,7 @@ class PVNetForecaster:
             t0: The forecast init-time
             device: Device to run the model on
             capacities: Dictionary of the solar capacities for all locations at t0
-            hf_token: HF authentication token. If True, the token is read from the HF config folder.
-                If string, it is used as the authentication token.
+            hf_token: HF authentication token
         """
         self.logger = logging.getLogger(model_spec.name)
         self.logger.setLevel(getattr(logging, model_spec.log_level))
@@ -115,7 +114,7 @@ class PVNetForecaster:
         self.location_coords = get_gsp_locations()
 
         # These are the valid times this forecast will predict for
-        self.horizon_mins = np.arange(1, self.model.forecast_len + 1) * 30
+        self.horizon_mins = np.arange(1, self.model.forecast_len + 1) * self.model.interval_minutes
         self.valid_times = self.t0 + pd.to_timedelta(self.horizon_mins, unit="m")
 
     def load_model(
@@ -125,7 +124,7 @@ class PVNetForecaster:
         summation_repo: str | None,
         summation_commit: str | None,
         device: torch.device,
-        hf_token: bool | str | None = None,
+        hf_token: str | None,
     ) -> tuple[PVNetBaseModel, SummationBaseModel]:
         """Load the regional and summation models.
 
@@ -196,7 +195,7 @@ class PVNetForecaster:
         tensor_batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 
         # Make regional predictions using the GSP model
-        regional_preds = self.model(tensor_batch).detach().cpu().numpy()
+        regional_preds = self.model(tensor_batch).cpu().numpy()
 
         # Make national predictions using summation model
         summation_batch = construct_sum_sample(
@@ -218,7 +217,6 @@ class PVNetForecaster:
 
         normed_national = (
             self.summation_model(summation_batch)
-            .detach()
             .cpu()
             .numpy()
             .squeeze(axis=0)  # Remove the batch dimension

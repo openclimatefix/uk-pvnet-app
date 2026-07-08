@@ -72,7 +72,17 @@ def extract_location_capacities_mwp(
     locations: dict[int, dp.ListLocationsResponseLocationSummary],
 ) -> dict[int, float]:
     """Extract capacities in MW from location summaries."""
-    return {loc_id: loc.effective_capacity_watts / 1e6 for loc_id, loc in locations.items()}
+    capacities_mwp = {
+        loc_id: loc.effective_capacity_watts / 1e6 for loc_id, loc in locations.items()
+    }
+
+    if (national_capacity_mwp := capacities_mwp[0]) <= 0:
+        raise ValueError(
+            "Expected positive national capacity for location_id=0, "
+            f"got {national_capacity_mwp} MW",
+        )
+
+    return capacities_mwp
 
 
 async def fetch_or_create_forecaster(
@@ -218,6 +228,13 @@ def _build_forecast_value(
     forecaster_name: str,
     location_id: int,
 ) -> dp.CreateForecastRequestForecastValue:
+    
+    if len(pvalues) != len(plevels):
+        raise ValueError("pvalues and plevels must have the same length")
+    
+    if "p50" not in plevels:
+        raise ValueError("p50 must be in plevels")
+
     if (pvalues > DATAPLATFORM_MAX_VALUE).any():
         high_plevels = np.array(plevels)[pvalues > DATAPLATFORM_MAX_VALUE].tolist()
         logger.warning(

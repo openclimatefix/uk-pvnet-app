@@ -160,7 +160,7 @@ class NWPDownloader(ABC):
         """
         # ocf-data-sampler expects there to be only one variable and no NaNs
         vars = list(ds.data_vars)
-        if len(vars) > 1:
+        if len(vars) != 1:
             logger.warning(f"{self.nwp_source} data has unexpected variables: {vars}")
             return False
         else:

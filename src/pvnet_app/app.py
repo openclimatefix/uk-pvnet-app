@@ -34,7 +34,7 @@ from pvnet_app.data_platform import (
 from pvnet_app.forecaster import PVNetForecaster
 from pvnet_app.model_input_config import (
     fetch_model_data_config_paths,
-    get_earliest_satellite_interval_start_minutes,
+    get_required_satellite_interval,
     get_maximum_satellite_spatial_window_size,
     get_required_nwp_providers,
     load_yaml_config,
@@ -44,8 +44,8 @@ from pvnet_app.settings import AppSettings
 from pvnet_app.utils import check_model_runs_finished, resolve_t0, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
-if TYPE_CHECKING:
-    import xarray as xr
+
+import xarray as xr
 
 __version__ = version("pvnet-app")
 
@@ -65,7 +65,7 @@ async def run_app(
     settings: AppSettings,
     t0: str | datetime | pd.Timestamp | None = None,
     write_predictions: bool = True,
-) -> None | dict:
+) -> None | dict[str, xr.DataArray]:
     """Set up the app environment and run a forecast.
 
     Handles Sentry, init-time resolution, and the scratch directory, then
@@ -76,7 +76,7 @@ async def run_app(
         t0: The forecast init-time. If None, the current time is used. Input will be floored to the
             previous 30-minutes.
         write_predictions: If True, write forecasts to the data platform. If
-            False, skip the write and return the forecasters for local testing
+            False, skip the write and return the forecasts for local testing
     """
     logging.basicConfig(
         level=getattr(logging, settings.log_level),
@@ -170,7 +170,7 @@ async def _run_forecast_pipeline(
         logger.info("Downloading satellite data")
 
         # Only download and check the satellite data which is required by the models
-        interval_start_minutes = get_earliest_satellite_interval_start_minutes(data_configs)
+        interval_start_minutes, interval_end_minutes = get_required_satellite_interval(data_configs)
         window_size = get_maximum_satellite_spatial_window_size(data_configs)
 
         sat_downloader = SatelliteDownloader(
@@ -180,6 +180,7 @@ async def _run_forecast_pipeline(
             s3_region=settings.satellite_s3_region,
             destination_path=f"{scratch_dir}/{sat_path}",
             interval_start_minutes=interval_start_minutes,
+            interval_end_minutes=interval_end_minutes,
             window_size_pixels=window_size,
         )
         sat_downloader.run()

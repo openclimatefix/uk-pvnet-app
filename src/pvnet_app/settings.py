@@ -34,6 +34,7 @@ class AppSettings(BaseSettings):
 
     Other settings
 
+        - LOG_LEVEL: logging level for the application
         - SENTRY_DSN: link to sentry
         - ENVIRONMENT: the environment this is running in.
         - DATA_PLATFORM_HOST: Hostname of the data platform gRPC server.
