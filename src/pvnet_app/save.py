@@ -118,7 +118,7 @@ def map_values_da_to_dp_requests(
 
     # Reduce singular dimensions
     gsp_normed_da = gsp_normed_da.squeeze(drop=True)
-    
+
     p50s = gsp_normed_da.sel(output_label="forecast_fraction").values.astype(float)
 
     # UK National (gsp_id=0) gets all 7 plevels; every other GSP keeps p10/p90 only
