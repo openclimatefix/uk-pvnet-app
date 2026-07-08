@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # --- Use conda to install required binaries into venv --- #
 FROM quay.io/condaforge/miniforge3:latest AS build-venv
 
@@ -31,8 +33,29 @@ RUN uv sync --no-editable --no-dev --compile-bytecode --inexact
 # --- Runtime image --- #
 FROM python:3.12-slim
 
-# Copy required elements of the builder image
-COPY --from=build-app /app/.venv /app/.venv
+# Copy the venv in multiple layers so the largest binary dependencies can be pulled separately.
+COPY --from=build-app \
+    --exclude=lib/python3.12/site-packages/torch \
+    --exclude=lib/python3.12/site-packages/torch/** \
+    --exclude=lib/python3.12/site-packages/llvmlite \
+    --exclude=lib/python3.12/site-packages/llvmlite/** \
+    --exclude=lib/python3.12/site-packages/scipy \
+    --exclude=lib/python3.12/site-packages/scipy/** \
+    --exclude=lib/python3.12/site-packages/scipy.libs \
+    --exclude=lib/python3.12/site-packages/scipy.libs/** \
+    /app/.venv /app/.venv
+COPY --from=build-app \
+    /app/.venv/lib/python3.12/site-packages/llvmlite \
+    /app/.venv/lib/python3.12/site-packages/llvmlite
+COPY --from=build-app \
+    /app/.venv/lib/python3.12/site-packages/scipy \
+    /app/.venv/lib/python3.12/site-packages/scipy
+COPY --from=build-app \
+    /app/.venv/lib/python3.12/site-packages/scipy.libs \
+    /app/.venv/lib/python3.12/site-packages/scipy.libs
+COPY --from=build-app \
+    /app/.venv/lib/python3.12/site-packages/torch \
+    /app/.venv/lib/python3.12/site-packages/torch
 
 # This is just a check to make sure it works, we've had problems with this in the past
 ENV PATH="/app/.venv/bin:${PATH}"
