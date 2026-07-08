@@ -403,7 +403,7 @@ class SatelliteDownloader:
         if len(ds.time) == 0:
             logger.warning("No satellite data available in recent window.")
             return
-        
+
         # Slice the data to the spatial extent used in PVNet
         ds = slice_to_pvnet_spatial_area(
             ds,
