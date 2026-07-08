@@ -90,7 +90,6 @@ class PVNetForecaster:
         """
         self.logger = logging.getLogger(model_spec.name)
         self.logger.setLevel(getattr(logging, model_spec.log_level))
-        self.logger.info(f"Loading model: {model_spec.pvnet.repo}")
 
         # Store settings
         self.model_tag = model_spec.name
@@ -186,11 +185,7 @@ class PVNetForecaster:
     @torch.inference_mode()
     def predict(self, batch: NumpyBatch) -> xr.DataArray:
         """Make predictions for the batch."""
-        self.logger.debug(f"Predicting for model: {self.model_tag}")
-
         location_ids = batch["location_id"].tolist()
-        self.logger.debug(f"GSPs: {location_ids}")
-
         relative_capacities = self.get_relative_capacities(location_ids)
         tensor_batch = copy_batch_to_device(batch_to_tensor(batch), self.device)
 

@@ -102,7 +102,7 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
 
     # If all the requested times are present we avoid running interpolation
     if timestamp_available.all():
-        logger.info("No gaps in the available satellite sequence - no interpolation run")
+        logger.info("No gaps in the required satellite sequence - no interpolation run")
         return ds
 
     # If less than 2 of the buffer requested times are present we cannot infill
@@ -257,8 +257,6 @@ def contains_too_many_of_value(ds: xr.Dataset, value: float, threshold: float) -
         value: The value to check for
         threshold: The maximum fraction of the value allowed
     """
-    logger.info(f"Checking satellite data for value ({value})")
-
     # We calculate fraction for each time
     reduction_dims = set(ds.data.dims) - {"time"}
     if np.isnan(value):
@@ -361,12 +359,12 @@ class SatelliteDownloader:
 
     def run(self) -> None:
         """Download, process, and save the satellite data."""
-        logger.info("Downloading and processing the satellite data")
-
         ds_dict = {}
 
         for path, label in [(self.source_path_5, "5-min"), (self.source_path_15, "15-min")]:
-            if path is not None:
+            if path is None:
+                logger.warning(f"No {label} satellite source path provided")
+            else:
                 ds = open_satellite_data(
                     s3_icechunk_path=path,
                     region=self.s3_region,

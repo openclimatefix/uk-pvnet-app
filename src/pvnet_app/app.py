@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import tempfile
+import warnings
 from datetime import datetime
 from importlib.metadata import version
 
@@ -14,6 +15,7 @@ import sentry_sdk
 import torch
 import xarray as xr
 from grpclib.client import Channel
+from huggingface_hub.utils import disable_progress_bars
 from ocf import dp
 
 from pvnet_app.consts import (
@@ -43,7 +45,7 @@ from pvnet_app.model_input_config import (
 )
 from pvnet_app.models.registry import get_model_specs
 from pvnet_app.settings import AppSettings
-from pvnet_app.utils import check_model_runs_finished, resolve_t0, save_batch_to_s3
+from pvnet_app.utils import check_model_runs_finished, log_duration, resolve_t0, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
 __version__ = version("pvnet-app")
@@ -73,12 +75,25 @@ async def run_app(
     """
     logging.basicConfig(
         level=getattr(logging, settings.log_level),
-        format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
+        format="[%(asctime)s] {%(name)s:%(lineno)d} %(levelname)s - %(message)s",
         force=True,
     )
 
-    # Turn off logs from aiobotocore
+    # Filter some logs and warnings
     logging.getLogger("aiobotocore").setLevel(logging.ERROR)
+    logging.getLogger("ocf_data_sampler.load.load_dataset").setLevel(logging.WARNING)
+    logging.getLogger("pvnet.utils").setLevel(logging.WARNING)
+    warnings.filterwarnings(
+        "ignore",
+        message=("The data type \\(FixedLengthUTF32.* does not have a Zarr V3 specification.*"),
+    )
+    warnings.filterwarnings(
+        "ignore",
+        message=(
+            "Consolidated metadata is currently not part in the Zarr format 3 specification.*"
+        ),
+    )
+    disable_progress_bars()
 
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
@@ -150,17 +165,17 @@ async def _run_forecast_pipeline(
         raise ValueError("No models found after filtering")
 
     # Fetch the models' data configs paths and load the configs
-    data_config_paths = fetch_model_data_config_paths(model_specs, settings.huggingface_token)
-    data_configs = [load_yaml_config(path) for path in data_config_paths.values()]
+    with log_duration(logger, "Fetching model data configs"):
+        data_config_paths = fetch_model_data_config_paths(model_specs, settings.huggingface_token)
+        data_configs = [load_yaml_config(path) for path in data_config_paths.values()]
 
     # ---------------------------------------------------------------------------
     # Prepare data sources
 
     # --- Get locations metadata from the data platform
-    logger.info("Loading locations")
-
-    async with Channel(settings.data_platform_host, settings.data_platform_port) as dp_channel:
-        locations = await fetch_locations(client=dp.DataPlatformDataServiceStub(dp_channel))
+    with log_duration(logger, "Loading locations"):
+        async with Channel(settings.data_platform_host, settings.data_platform_port) as dp_channel:
+            locations = await fetch_locations(client=dp.DataPlatformDataServiceStub(dp_channel))
 
     capacities_mwp = extract_location_capacities_mwp(locations)
 
@@ -173,61 +188,63 @@ async def _run_forecast_pipeline(
 
     # --- Try to download satellite data if any models require it
     if any("satellite" in conf["input_data"] for conf in data_configs):
-        logger.info("Downloading satellite data")
+        with log_duration(logger, "Downloading satellite data"):
+            # Only download and check the satellite data which is required by the models
+            interval_start_minutes, interval_end_minutes = get_required_satellite_interval(
+                data_configs
+            )
+            window_size = get_maximum_satellite_spatial_window_size(data_configs)
 
-        # Only download and check the satellite data which is required by the models
-        interval_start_minutes, interval_end_minutes = get_required_satellite_interval(data_configs)
-        window_size = get_maximum_satellite_spatial_window_size(data_configs)
-
-        sat_downloader = SatelliteDownloader(
-            t0=t0,
-            source_path_5=settings.satellite_icechunk_path_5,
-            source_path_15=settings.satellite_icechunk_path_15,
-            s3_region=settings.satellite_s3_region,
-            destination_path=f"{scratch_dir}/{sat_path}",
-            interval_start_minutes=interval_start_minutes,
-            interval_end_minutes=interval_end_minutes,
-            window_size_pixels=window_size,
-        )
-        sat_downloader.run()
+            sat_downloader = SatelliteDownloader(
+                t0=t0,
+                source_path_5=settings.satellite_icechunk_path_5,
+                source_path_15=settings.satellite_icechunk_path_15,
+                s3_region=settings.satellite_s3_region,
+                destination_path=f"{scratch_dir}/{sat_path}",
+                interval_start_minutes=interval_start_minutes,
+                interval_end_minutes=interval_end_minutes,
+                window_size_pixels=window_size,
+            )
+            sat_downloader.run()
 
         data_downloaders.append(sat_downloader)
 
     # --- Try to download NWP data if any models require it
     if any("nwp" in conf["input_data"] for conf in data_configs):
-        logger.info("Downloading NWP data")
-
         # Only download the NWP sources which are required by the models
         required_providers = get_required_nwp_providers(data_configs)
         nwp_window_sizes = get_maximum_nwp_spatial_window_sizes(data_configs)
 
         if "ukv" in required_providers:
-            ukv_downloader = UKVDownloader(
-                source_path=settings.nwp_ukv_zarr_path,
-                destination_path=f"{scratch_dir}/{nwp_ukv_path}",
-                window_size_pixels=nwp_window_sizes["ukv"],
-            )
-            ukv_downloader.run()
+            with log_duration(logger, "Downloading UKV data"):
+                ukv_downloader = UKVDownloader(
+                    source_path=settings.nwp_ukv_zarr_path,
+                    destination_path=f"{scratch_dir}/{nwp_ukv_path}",
+                    window_size_pixels=nwp_window_sizes["ukv"],
+                )
+                ukv_downloader.run()
 
             data_downloaders.append(ukv_downloader)
 
         if "ecmwf" in required_providers:
-            ecmwf_downloader = ECMWFDownloader(
-                source_path=settings.nwp_ecmwf_zarr_path,
-                destination_path=f"{scratch_dir}/{nwp_ecmwf_path}",
-                window_size_pixels=nwp_window_sizes["ecmwf"],
-            )
-            ecmwf_downloader.run()
+            with log_duration(logger, "Downloading ECMWF data"):
+                ecmwf_downloader = ECMWFDownloader(
+                    source_path=settings.nwp_ecmwf_zarr_path,
+                    destination_path=f"{scratch_dir}/{nwp_ecmwf_path}",
+                    window_size_pixels=nwp_window_sizes["ecmwf"],
+                )
+                ecmwf_downloader.run()
 
             data_downloaders.append(ecmwf_downloader)
 
         if "cloudcasting" in required_providers:
-            cloudcasting_downloader = CloudcastingDownloader(
-                source_path=settings.cloudcasting_zarr_path,
-                destination_path=f"{scratch_dir}/{nwp_cloudcasting_path}",
-                window_size_pixels=nwp_window_sizes["cloudcasting"],
-            )
-            cloudcasting_downloader.run()
+            with log_duration(logger, "Downloading cloudcasting data"):
+                cloudcasting_downloader = CloudcastingDownloader(
+                    source_path=settings.cloudcasting_zarr_path,
+                    destination_path=f"{scratch_dir}/{nwp_cloudcasting_path}",
+                    window_size_pixels=nwp_window_sizes["cloudcasting"],
+                )
+                cloudcasting_downloader.run()
 
             data_downloaders.append(cloudcasting_downloader)
 
@@ -236,32 +253,39 @@ async def _run_forecast_pipeline(
 
     # Prepare all the models which can be run
     model_forecasters = {}
-    for model_spec in model_specs:
-        # Check if the data available will allow the model to run
-        data_config_path = data_config_paths[model_spec.name]
+    skipped_models = []
+    with log_duration(logger, "Preparing runnable models"):
+        for model_spec in model_specs:
+            data_config_path = data_config_paths[model_spec.name]
 
-        logger.info(f"Checking that the input data for model '{model_spec.name}' exists")
-
-        model_can_run = all(
-            downloader.check_model_inputs_available(data_config_path, t0)
-            for downloader in data_downloaders
-        )
-
-        if model_can_run:
-            logger.info(f"The input data for model '{model_spec.name}' is available")
-
-            model_forecasters[model_spec.name] = PVNetForecaster(
-                model_spec=model_spec,
-                data_config_path=data_config_path,
-                run_data_dir=scratch_dir,
-                t0=t0,
-                device=device,
-                capacities=capacities_mwp,
-                hf_token=settings.huggingface_token,
+            model_can_run = all(
+                downloader.check_model_inputs_available(data_config_path, t0)
+                for downloader in data_downloaders
             )
 
-        else:
-            logger.warning(f"The model {model_spec.name} cannot be run with input data available")
+            if model_can_run:
+                model_forecasters[model_spec.name] = PVNetForecaster(
+                    model_spec=model_spec,
+                    data_config_path=data_config_path,
+                    run_data_dir=scratch_dir,
+                    t0=t0,
+                    device=device,
+                    capacities=capacities_mwp,
+                    hf_token=settings.huggingface_token,
+                )
+            else:
+                logger.warning(
+                    f"The model {model_spec.name} cannot be run with input data available",
+                )
+                skipped_models.append(model_spec.name)
+
+    logger.info(
+        "Prepared runnable models: runnable=%d skipped=%d runnable_models=%s skipped_models=%s",
+        len(model_forecasters),
+        len(skipped_models),
+        sorted(model_forecasters),
+        skipped_models,
+    )
 
     if len(model_forecasters) == 0:
         raise ValueError("No models were compatible with the available input data.")
@@ -269,43 +293,47 @@ async def _run_forecast_pipeline(
     # ---------------------------------------------------------------------------
     # Make predictions
 
-    logger.info("Making predictions")
-
     forecasts: dict[str, xr.DataArray] = {}
 
-    for i, (model_name, forecaster) in enumerate(model_forecasters.items()):
-        batch = forecaster.make_batch()
+    with log_duration(logger, "Making all forecasts"):
+        for i, (model_name, forecaster) in enumerate(model_forecasters.items()):
+            batch = forecaster.make_batch()
 
-        # Check the batch for any validation errors before running the model
-        batch_val_error = get_batch_validation_error(batch, model=forecaster.model)
-        if batch_val_error is None:
-            forecasts[model_name] = forecaster.predict(batch)
-        else:
-            logger.error(f"Batch validation failed for model {model_name}: {batch_val_error}")
+            # Check the batch for any validation errors before running the model
+            batch_val_error = get_batch_validation_error(batch, model=forecaster.model)
+            if batch_val_error is None:
+                forecasts[model_name] = forecaster.predict(batch)
+            else:
+                logger.error(f"Batch validation failed for model {model_name}: {batch_val_error}")
 
-        # Save the batch for the first model
-        if (settings.save_batches_dir is not None) and i == 0:
-            save_batch_to_s3(batch, model_name, settings.save_batches_dir, scratch_dir=scratch_dir)
+            # Save the batch for the first model
+            if (settings.save_batches_dir is not None) and i == 0:
+                save_batch_to_s3(
+                    batch,
+                    model_name,
+                    settings.save_batches_dir,
+                    scratch_dir=scratch_dir,
+                )
 
     # ---------------------------------------------------------------------------
     # Run validation checks on the forecast values
 
-    logger.info("Validating forecasts")
-    for model_name, da_forecast in list(forecasts.items()):
-        forecast_okay = validate_forecast(
-            da_forecast=da_forecast,
-            national_capacity_mw=capacities_mwp[0],
-            zig_zag_warning_threshold_mw=settings.forecast_validate_zig_zag_warning_threshold,
-            zig_zag_error_threshold_mw=settings.forecast_validate_zig_zag_error_threshold,
-            sun_elevation_lower_limit=settings.forecast_validate_sun_elevation_lower_limit,
-            model_name=model_name,
-        )
+    with log_duration(logger, "Validating forecasts"):
+        for model_name, da_forecast in list(forecasts.items()):
+            forecast_okay = validate_forecast(
+                da_forecast=da_forecast,
+                national_capacity_mw=capacities_mwp[0],
+                zig_zag_warning_threshold_mw=settings.forecast_validate_zig_zag_warning_threshold,
+                zig_zag_error_threshold_mw=settings.forecast_validate_zig_zag_error_threshold,
+                sun_elevation_lower_limit=settings.forecast_validate_sun_elevation_lower_limit,
+                model_name=model_name,
+            )
 
-        if not forecast_okay:
-            logger.warning(f"Forecast for model {model_name} failed validation")
-            if settings.filter_bad_forecasts:
-                # This forecast will not be saved
-                del forecasts[model_name]
+            if not forecast_okay:
+                logger.warning(f"Forecast for model {model_name} failed validation")
+                if settings.filter_bad_forecasts:
+                    # This forecast will not be saved
+                    del forecasts[model_name]
 
     if len(forecasts) == 0:
         raise ValueError("No models passed the forecast validation checks")
@@ -318,24 +346,23 @@ async def _run_forecast_pipeline(
     # ---------------------------------------------------------------------------
     # Write predictions to data-platform
 
-    logger.info("Writing to data platform")
+    with log_duration(logger, "Writing to data platform"):
+        async with Channel(settings.data_platform_host, settings.data_platform_port) as dp_channel:
+            dp_client = dp.DataPlatformDataServiceStub(dp_channel)
 
-    async with Channel(settings.data_platform_host, settings.data_platform_port) as dp_channel:
-        dp_client = dp.DataPlatformDataServiceStub(dp_channel)
-
-        await write_forecasts_to_data_platform(
-            client=dp_client,
-            forecasts=forecasts,
-            locations=locations,
-            t0=t0,
-            input_paths={
-                "nwp_ecmwf": settings.nwp_ecmwf_zarr_path,
-                "nwp_ukv": settings.nwp_ukv_zarr_path,
-                "satellite": settings.satellite_icechunk_path_5,
-                "satellite_15": settings.satellite_icechunk_path_15,
-            },
-            app_version=__version__,
-        )
+            await write_forecasts_to_data_platform(
+                client=dp_client,
+                forecasts=forecasts,
+                locations=locations,
+                t0=t0,
+                input_paths={
+                    "nwp_ecmwf": settings.nwp_ecmwf_zarr_path,
+                    "nwp_ukv": settings.nwp_ukv_zarr_path,
+                    "satellite": settings.satellite_icechunk_path_5,
+                    "satellite_15": settings.satellite_icechunk_path_15,
+                },
+                app_version=__version__,
+            )
 
     logger.info("Finished forecast")
 

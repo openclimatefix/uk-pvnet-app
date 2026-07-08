@@ -19,6 +19,14 @@ from pvnet_app.data.utils import slice_to_pvnet_spatial_area
 logger = logging.getLogger(__name__)
 
 
+def _ensure_lon_lat_contiguous(ds: xr.Dataset) -> xr.Dataset:
+    """Return a dataset whose longitude/latitude coords are contiguous."""
+    return ds.assign_coords(
+        longitude=(ds.longitude.dims, np.ascontiguousarray(ds.longitude.values)),
+        latitude=(ds.latitude.dims, np.ascontiguousarray(ds.latitude.values)),
+    )
+
+
 def download_data(source: str, destination: str) -> bool:
     """Download data from a source to a destination.
 
@@ -57,6 +65,9 @@ def regrid_nwp_data(
     if not needs_regridding:
         logger.info(f"No regridding required for {nwp_source} - skipping this step")
         return ds
+
+    ds = _ensure_lon_lat_contiguous(ds)
+    ds_target_coords = _ensure_lon_lat_contiguous(ds_target_coords)
 
     regridder = xe.Regridder(ds, ds_target_coords, method=method, unmapped_to_nan=True)
 
@@ -179,8 +190,6 @@ class NWPDownloader(ABC):
 
     def run(self) -> None:
         """Download, process, and save the NWP data."""
-        logger.info(f"Downloading and processing the {self.nwp_source} data")
-
         if self.source_path is None:
             logger.warning(f"Source file for {self.nwp_source} is not set. Skipping download.")
             return
@@ -193,12 +202,12 @@ class NWPDownloader(ABC):
             )
             return
 
-        ds = xr.open_zarr(self.destination_path).compute()
+        ds = xr.open_zarr(self.destination_path, decode_timedelta=True).compute()
 
         init_time = pd.to_datetime(ds.init_time.values[0])
         valid_times = init_time + pd.to_timedelta(ds.step)
         logger.info(
-            f"{self.nwp_source} has init-time {init_time} and valid times: {valid_times}",
+            f"{self.nwp_source} has init-time {init_time} and valid times:\n{valid_times}",
         )
 
         # Process the data to match the training data, then check the quality of the data, and
@@ -302,9 +311,6 @@ class UKVDownloader(NWPDownloader):
         Equal Area grid. We need to add longitudes and latitudes coords so we can regrid the data
         to the training grid.
         """
-        # This is for nwp-consumer>=1.0.0
-        logger.info("Adding lon-lat coords to the UKV data")
-
         # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
         laea = pyproj.Proj(
             proj="laea",

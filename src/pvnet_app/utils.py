@@ -1,7 +1,10 @@
 """General utility functions."""
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime
+from time import perf_counter
 
 import fsspec
 import pandas as pd
@@ -11,6 +14,19 @@ from ocf_data_sampler.numpy_sample.common_types import NumpyBatch
 from pvnet_app.models.registry import ModelSpec
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def log_duration(
+    logger: logging.Logger, activity: str, level: int = logging.INFO
+) -> Iterator[None]:
+    """Log an activity start and completion time."""
+    start = perf_counter()
+    logger.log(level, "%s", activity)
+    try:
+        yield
+    finally:
+        logger.log(level, "%s completed in %.2fs", activity, perf_counter() - start)
 
 
 def save_batch_to_s3(
@@ -28,14 +44,12 @@ def save_batch_to_s3(
         scratch_dir: The local directory to save the batch to before uploading
     """
     filename = f"{model_name}_latest_batch.pt"
-
     local_path = f"{scratch_dir}/{filename}"
     torch.save(batch, local_path)
 
     try:
         fs = fsspec.open(s3_directory).fs
         fs.put(local_path, f"{s3_directory}/{filename}")
-        logger.info(f"Saved first batch for model {model_name} to {s3_directory}/{filename}")
     except Exception as e:
         logger.error(f"Failed to save batch to {s3_directory}/{filename} with error {e}")
 
