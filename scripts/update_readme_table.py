@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
-from pvnet_app.model_input_config import load_yaml_config
+from pvnet_app.model_input_config import get_required_nwp_providers, load_yaml_config
 from pvnet_app.models.registry import HuggingFaceCommit, get_model_specs
 
 
@@ -51,32 +51,25 @@ def generate_table() -> str:
         )
         data_config = load_yaml_config(data_config_path)
 
-        providers = set()
-        if "nwp" in data_config["input_data"]:
-            for source in data_config["input_data"]["nwp"].values():
-                providers.add(source["provider"])
+        providers = get_required_nwp_providers([data_config])
 
-        uses_ecmwf = "ecmwf" in providers
-        uses_ukv = "ukv" in providers
-        uses_cloud = "cloudcasting" in providers
-        uses_sat = "satellite" in data_config["input_data"]
+        def yes_or_blank(value: bool) -> str:
+            return "yes" if value else "-"
 
         row = " | ".join(
             [
                 model_spec.name,
-                "yes" if uses_sat else "-",
-                "yes" if uses_ukv else "-",
-                "yes" if uses_ecmwf else "-",
-                "yes" if uses_cloud else "-",
+                yes_or_blank("satellite" in data_config["input_data"]),
+                yes_or_blank("ukv" in providers),
+                yes_or_blank("ecmwf" in providers),
+                yes_or_blank("cloudcasting" in providers),
                 f"[HF Link]({pvnet_link})",
                 f"[Summation HF Link]({summation_link})",
             ],
         )
         rows.append(row)
 
-    table = ""
-    for row in rows:
-        table += f"| {row} |\n"
+    table = "".join([f"| {row} |\n" for row in rows])
 
     return table
 

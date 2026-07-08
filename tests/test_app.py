@@ -14,7 +14,7 @@ from pvnet_app.models.registry import ModelSpec, get_model_specs
 from pvnet_app.settings import AppSettings
 
 
-def model_uses_satellite_data(model_spec: ModelSpec, hf_token: str) -> bool:
+def model_uses_satellite_data(model_spec: ModelSpec, hf_token: str | None) -> bool:
     """Determine if a model uses satellite data.
 
     Args:
@@ -43,7 +43,7 @@ async def check_number_of_forecasts(
     forecasters_by_name = {f.forecaster_name: f for f in forecasters}
 
     for model_spec in model_specs:
-        model_name = model_spec.name.replace("-", "_")
+        model_name = model_spec.name
         model_adjust = f"{model_name}_adjust"
         expected_valid_times = pd.date_range(
             t0 + pd.Timedelta("30min"),

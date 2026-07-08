@@ -46,12 +46,27 @@ def apply_adjuster_values(
     effective_capacity_watts: float,
 ) -> xr.DataArray:
     """Apply adjuster values to a forecast DataArray."""
-    adjuster_values_array = np.zeros(len(da_forecast.horizon_mins.values.tolist()), dtype=float)
-    for i, h in enumerate(da_forecast.horizon_mins.values.tolist()):
+    horizon_mins = da_forecast.horizon_mins.values.tolist()
+    adjuster_values_array = np.zeros(len(horizon_mins), dtype=float)
+    missing_horizon_mins: list[int] = []
+
+    for i, h in enumerate(horizon_mins):
         if h in adjuster_values:
             adjuster_values_array[i] = adjuster_values[h]
         else:
-            logger.warning(f"No adjuster value found for horizon_mins={h}; using 0.0 as default")
+            missing_horizon_mins.append(h)
+
+    if missing_horizon_mins:
+        if len(adjuster_values) == 0:
+            logger.info(
+                "No adjuster history found; using 0.0 for all horizon_mins=%s",
+                missing_horizon_mins,
+            )
+        else:
+            logger.warning(
+                "No adjuster values found for horizon_mins=%s; using 0.0 as default",
+                missing_horizon_mins,
+            )
 
     # Apply absolute limit to the adjuster
     absolute_limit = ADJUSTER_LIMIT_ABSOLUTE_WATTS / effective_capacity_watts

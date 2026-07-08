@@ -1,5 +1,7 @@
 """Functions to fetch, load, modify, and query PVNet model data configs."""
 
+import copy
+
 import yaml
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
@@ -47,6 +49,9 @@ def populate_config_with_data_filepaths(config: dict, run_data_dir: str) -> dict
         "cloudcasting": f"{run_data_dir}/{nwp_cloudcasting_path}",
     }
 
+    # Avoid modifying the original config
+    config = copy.deepcopy(config)
+
     # Set the GSP input path
     config["input_data"]["generation"]["zarr_path"] = f"{run_data_dir}/{generation_path}"
 
@@ -72,6 +77,9 @@ def overwrite_config_dropouts(config: dict) -> dict:
     Args:
         config: The data config
     """
+    # Avoid modifying the original config
+    config = copy.deepcopy(config)
+
     # Remove satellite dropout
     if "satellite" in config["input_data"]:
         satellite_config = config["input_data"]["satellite"]
@@ -124,16 +132,15 @@ def get_maximum_satellite_spatial_window_size(data_configs: list[dict]) -> int:
     return max_window_size
 
 
-def get_earliest_satellite_interval_start_minutes(data_configs: list[dict]) -> int:
-    """Return the earliest satellite start interval required by any of the model data configs."""
-    # Seed with zero since the start interval must be negative (i.e. in the past) and we want to
-    # find the most negative value
-    earliest_interval = 0
+def get_required_satellite_interval(data_configs: list[dict]) -> tuple[int, int]:
+    """Return the minimum satellite interval required to cover all intervals in the data configs."""
+    min_start_interval = float("inf")
+    max_end_interval = float("-inf")
     for conf in data_configs:
-        if "satellite" in conf["input_data"]:
-            start_interval = conf["input_data"]["satellite"]["interval_start_minutes"]
-            earliest_interval = min(earliest_interval, start_interval)
-    return int(earliest_interval)
+        if (sat_conf := conf["input_data"].get("satellite")) is not None:
+            min_start_interval = min(min_start_interval, sat_conf["interval_start_minutes"])
+            max_end_interval = max(max_end_interval, sat_conf["interval_end_minutes"])
+    return int(min_start_interval), int(max_end_interval)
 
 
 def fetch_model_data_config_paths(

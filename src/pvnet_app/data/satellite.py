@@ -17,6 +17,11 @@ from pvnet_app.data.gsp import get_gsp_locations
 
 logger = logging.getLogger(__name__)
 
+# The maximum gap size which will be filled via interpolation
+MAXIMUM_INTERPOLATION_GAP = pd.Timedelta("15min")
+# The assumed frequency of satellite image inputs required by all models
+IMAGE_FREQUENCY = pd.Timedelta("5min")
+
 
 def open_satellite_data(s3_icechunk_path: str, region: str) -> xr.Dataset | None:
     """Open the satellite data from the given s3 icechunk path.
@@ -94,7 +99,7 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
         max_gap: The maximum gap size which will be filled via interpolation.
     """
     # If any of these times are missing, we will try to interpolate them
-    dense_times = pd.date_range(ds.time.values.min(), ds.time.values.max(), freq="5min")
+    dense_times = pd.date_range(ds.time.min().item(), ds.time.max().item(), freq=IMAGE_FREQUENCY)
 
     # Create mask array of which timestamps are available
     timestamp_available = np.isin(dense_times, ds.time)
@@ -116,7 +121,7 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
         ds_interp = ds.interp(time=dense_times, method="linear", assume_sorted=True)
 
         # Find the timestamps which are within max gap size
-        max_gap_steps = int(max_gap / pd.Timedelta("5min")) - 1
+        max_gap_steps = int(max_gap / IMAGE_FREQUENCY) - 1
         valid_fill_times = fill_1d_bool_gaps(timestamp_available, max_gap_steps)
 
         # Mask the timestamps outside the max gap size
@@ -144,7 +149,7 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
 
 def extend_satellite_data_with_nans(
     ds: xr.Dataset,
-    t0: pd.Timestamp,
+    interval_end_datetime: pd.Timestamp,
     limit: pd.Timedelta | None = None,
 ) -> xr.Dataset:
     """Fill missing satellite timestamps with NaNs.
@@ -154,31 +159,31 @@ def extend_satellite_data_with_nans(
 
     Args:
         ds: The satellite data
-        t0: The init-time of the forecast
+        interval_end_datetime: The end of the required time interval of satellite data
         limit: The maximum time to extend the data with NaNs
     """
     # Find how delayed the satellite data is
     sat_max_time = pd.to_datetime(ds.time).max()
-    delay = t0 - sat_max_time
 
     if limit is None:
         limit = pd.Timedelta("3h")
 
-    if delay > pd.Timedelta(0):
-        logger.info(f"Filling most recent {delay} with NaNs")
+    if interval_end_datetime > sat_max_time:
+        missing_interval_length = interval_end_datetime - sat_max_time
+        logger.info(f"Filling most recent {missing_interval_length} with NaNs")
 
-        if delay > limit:
+        if missing_interval_length > limit:
             logger.warning(
-                f"The satellite data is delayed by more than {limit}. "
-                f"Will only infill {limit} forward from the latest satellite timestamp.",
+                f"The missing satellite interval length ({missing_interval_length}) is greater "
+                f"than the limit ({limit})",
             )
-        fill_timedelta = min(delay, limit)
+        fill_timedelta = min(missing_interval_length, limit)
 
         # We will fill the data with NaNs for these timestamps
         fill_times = pd.date_range(
-            sat_max_time + pd.Timedelta("5min"),
+            sat_max_time + IMAGE_FREQUENCY,
             sat_max_time + fill_timedelta,
-            freq="5min",
+            freq=IMAGE_FREQUENCY,
         )
 
         # Extend the data with NaNs
@@ -248,7 +253,7 @@ def check_model_satellite_inputs_available(
         return available
 
 
-def get_pvnet_satellite_spatial_bounds(
+def slice_to_pvnet_satellite_area(
     ds: xr.Dataset,
     width_pixels: int,
     height_pixels: int,
@@ -330,6 +335,7 @@ class SatelliteDownloader:
         s3_region: str,
         destination_path: str,
         interval_start_minutes: int,
+        interval_end_minutes: int,
         window_size_pixels: int,
     ) -> None:
         """Class to download and process satellite data."""
@@ -339,6 +345,7 @@ class SatelliteDownloader:
         self.s3_region = s3_region
         self.destination_path = destination_path
         self.start_interval = pd.Timedelta(f"{interval_start_minutes}min")
+        self.end_interval = pd.Timedelta(f"{interval_end_minutes}min")
         self.window_size_pixels = window_size_pixels
         self.valid_times = None
         self.sat_choice = None
@@ -353,7 +360,7 @@ class SatelliteDownloader:
             bool: Whether the data passes the quality checks
         """
         # Slice the data to the spatial extent used in PVNet
-        ds = get_pvnet_satellite_spatial_bounds(
+        ds = slice_to_pvnet_satellite_area(
             ds,
             width_pixels=self.window_size_pixels,
             height_pixels=self.window_size_pixels,
@@ -376,18 +383,14 @@ class SatelliteDownloader:
         ds = ds[["data"]]
 
         # Interpolate missing satellite timestamps
-        ds = interpolate_missing_satellite_timestamps(ds, max_gap=pd.Timedelta("15min"))
+        ds = interpolate_missing_satellite_timestamps(ds, max_gap=MAXIMUM_INTERPOLATION_GAP)
 
         # Store the available satellite timestamps before we extend with NaNs
         self.valid_times = pd.to_datetime(ds.time.values)
 
         # Extend the satellite data with NaNs if needed by the model and record the delay of most
         # recent non-nan timestamp
-        ds = extend_satellite_data_with_nans(ds, t0=self.t0)
-
-        # Add the top level area attribute to the data var(s). This is needed by ocf_data_sampler
-        for v in list(ds.data_vars.keys()):
-            ds[v].attrs["area"] = str(ds.attrs["area"])
+        ds = extend_satellite_data_with_nans(ds, interval_end_datetime=self.t0 + self.end_interval)
 
         return ds
 
@@ -434,16 +437,22 @@ class SatelliteDownloader:
             return
 
         # Select the source with the most recent data, and use 5-minute data if equal recency
-        best_source = max(ds_dict, key=lambda k: (ds_dict[k].time.max(), k == "5-min"))
+        best_source = max(ds_dict, key=lambda k: (ds_dict[k].time.max().item(), k == "5-min"))
         self.sat_choice = best_source
         logger.info(f"Using {best_source} satellite data")
 
         # Slice and load into memory for processing
+
+        # We slice the data to the required time window for the model, plus a buffer to allow for
+        # interpolation of missing timestamps
+        start_dt = self.t0 + self.start_interval - MAXIMUM_INTERPOLATION_GAP
+        end_dt = self.t0 + self.end_interval + MAXIMUM_INTERPOLATION_GAP
+
         ds = (
             ds_dict[best_source]
             .sortby("time")
             .drop_duplicates("time", keep="last")
-            .sel(time=slice(self.t0 + self.start_interval, self.t0))
+            .sel(time=slice(start_dt, end_dt))
             .load()
         )
 

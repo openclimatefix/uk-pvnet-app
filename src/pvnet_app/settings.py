@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
@@ -34,15 +35,18 @@ class AppSettings(BaseSettings):
 
     Other settings
 
+        - LOG_LEVEL: logging level for the application
         - SENTRY_DSN: link to sentry
+        - SENTRY_TRACES_SAMPLE_RATE: fraction of Sentry traces to keep, from 0.0 to 1.0
         - ENVIRONMENT: the environment this is running in.
         - DATA_PLATFORM_HOST: Hostname of the data platform gRPC server.
         - DATA_PLATFORM_PORT: Port of the data platform gRPC server.
         - HUGGINGFACE_TOKEN: Huggingface token, required if any of the models being run are in
           private repositories.
         - SAVE_BATCHES_DIR: If set, the batches will be saved to this path.
-        - SCRATCH_DIR: If set, the scratch directory will be used for temporary files. Else, the
-          system temp directory will be used.
+        - SCRATCH_DIR: If set, this directory is used as the parent for per-run scratch
+          directories named from the resolved forecast init time. These per-run directories are not
+          cleaned up by the app. Else, the system temp directory will be used.
     """
 
     # Input data paths
@@ -65,6 +69,7 @@ class AppSettings(BaseSettings):
     # Other settings
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     sentry_dsn: str | None = None
+    sentry_traces_sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
     environment: str = "local"
     data_platform_host: str
     data_platform_port: int = 50051
