@@ -273,12 +273,9 @@ def build_forecast_creation_request(
     location_id = int(da_forecast.location_id.values)
     horizons_mins = da_forecast.horizon_mins.values.tolist()
 
-    if location_id != 0:
-        allowed_plevels = REGIONAL_ALLOWED_PLEVELS
-    else:
-        allowed_plevels = NATIONAL_ALLOWED_PLEVELS
+    allowed_plevels = NATIONAL_ALLOWED_PLEVELS if location_id == 0 else REGIONAL_ALLOWED_PLEVELS
 
-    # If the regional and summation models output different p-levels, then this DataArray will have 
+    # If the regional and summation models output different p-levels, then this DataArray will have
     # NaNs for the missing p-levels for this location. Drop the p-levels with NaNs
     da_forecast = da_forecast.dropna(dim="output_label", how="any")
 
@@ -287,8 +284,6 @@ def build_forecast_creation_request(
     forecast_array = (
         da_forecast.sel(output_label=plevels).transpose("valid_times_utc", "output_label")
     ).values
-
-
 
     forecast_value_requests = [
         _build_forecast_value(
