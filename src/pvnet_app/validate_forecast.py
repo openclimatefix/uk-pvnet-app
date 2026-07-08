@@ -13,15 +13,11 @@ logger = logging.getLogger(__name__)
 # significantly above the capacity
 NATIONAL_RELATIVE_MAX_FORECAST: float = 1.0
 
-# A forecast fails validation if the national forecast is above this absolute value in MW
-# Note: The all time peak generation as of 2026-07-06 was ~16.3 GW
-#       See https://www.solar.sheffield.ac.uk/pvlive/
-NATIONAL_ABSOLUTE_MAX_FORECAST_MW: int = 20_000
-
 
 def check_forecast_max(
     national_forecast_mw: xr.DataArray,
     national_capacity_mw: float,
+    national_max_forecast_mw: float,
     model_name: str,
 ) -> bool:
     """Check that the forecast doesn't exceed some limits.
@@ -32,6 +28,7 @@ def check_forecast_max(
     Args:
         national_forecast_mw: The national forecast values (in MW)
         national_capacity_mw: The national PV capacity (in MW)
+        national_max_forecast_mw: The absolute national forecast limit in MW
         model_name: The name of the model that generated the forecast
     """
     forecast_okay = True
@@ -48,10 +45,10 @@ def check_forecast_max(
         forecast_okay = False
 
     # Check forecast doesn't exceed absolute limit
-    if max_forecast_mw > NATIONAL_ABSOLUTE_MAX_FORECAST_MW:
+    if max_forecast_mw > national_max_forecast_mw:
         logger.warning(
             f"{model_name}: The maximum of the national forecast is {max_forecast_mw} which "
-            f"exceeds the limit of {NATIONAL_ABSOLUTE_MAX_FORECAST_MW} MW."
+            f"exceeds the limit of {national_max_forecast_mw} MW."
         )
         forecast_okay = False
 
@@ -142,6 +139,7 @@ def validate_forecast(
     national_capacity_mw: float,
     zig_zag_warning_threshold_mw: float,
     zig_zag_error_threshold_mw: float,
+    national_max_forecast_mw: float,
     sun_elevation_lower_limit: float,
     model_name: str,
 ) -> bool:
@@ -157,6 +155,7 @@ def validate_forecast(
         national_capacity_mw: The national PV capacity (in MW).
         zig_zag_warning_threshold_mw: The threshold in MW for zig-zag check warning.
         zig_zag_error_threshold_mw:  The threshold in MW for zig-zag check failure.
+        national_max_forecast_mw: The absolute national forecast limit in MW.
         sun_elevation_lower_limit: The lower limit for the sun elevation (in degrees). The forecast
             values must be positive when the sun is above this angle.
         model_name: The name of the model that generated the forecast.
@@ -168,6 +167,7 @@ def validate_forecast(
     forecast_max_okay = check_forecast_max(
         national_forecast_mw=national_forecast_mw,
         national_capacity_mw=national_capacity_mw,
+        national_max_forecast_mw=national_max_forecast_mw,
         model_name=model_name,
     )
 

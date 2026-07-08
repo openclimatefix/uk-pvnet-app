@@ -11,12 +11,12 @@ class AppSettings(BaseSettings):
 
     Input data paths
 
-        - NWP_UKV_ZARR_PATH: Path to the UKV NWP data in zarr format
-        - NWP_ECMWF_ZARR_PATH: Path to the ECMWF NWP data in zarr format
-        - CLOUDCASTING_ZARR_PATH: Path to the Cloudcasting data in zarr format
-        - SATELLITE_ICECHUNK_PATH_5: Path on s3 to the 5-minute satellite icechunk data
-        - SATELLITE_ICECHUNK_PATH_15: Path on s3 to the 15-minute satellite icechunk data
-        - SATELLITE_S3_REGION: The AWS region for the satellite data S3 bucket
+        - NWP_UKV_ZARR_PATH: Path to the UKV NWP data in zarr format.
+        - NWP_ECMWF_ZARR_PATH: Path to the ECMWF NWP data in zarr format.
+        - CLOUDCASTING_ZARR_PATH: Path to the Cloudcasting data in zarr format.
+        - SATELLITE_ICECHUNK_PATH_5: Path on s3 to the 5-minute satellite icechunk data.
+        - SATELLITE_ICECHUNK_PATH_15: Path on s3 to the 15-minute satellite icechunk data.
+        - SATELLITE_S3_REGION: The AWS region for the satellite data S3 bucket.
 
     Options for choosing which models to run and how to validate forecasts
 
@@ -28,17 +28,18 @@ class AppSettings(BaseSettings):
           "any" it will raise an exception if any model fails. If set to "critical" it will raise
           an exception if any critical model fails. If not set, it will not raise an exception.
 
-        - FORECAST_VALIDATE_ZIG_ZAG_WARNING_THRESHOLD: threshold for forecast zig-zag warning
-        - FORECAST_VALIDATE_ZIG_ZAG_ERROR_THRESHOLD: threshold for forecast zig-zag error
-        - FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT: when the solar elevation is above this,
-          we expect positive forecast values
+        - FORECAST_VALIDATE_ZIG_ZAG_WARNING_THRESHOLD: Threshold for forecast zig-zag warning.
+        - FORECAST_VALIDATE_ZIG_ZAG_ERROR_THRESHOLD: Threshold for forecast zig-zag error.
+        - FORECAST_VALIDATE_NATIONAL_MAX_MW: Threshold for maximum allowed national forecast in MW
+        - FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT: When the solar elevation is above this,
+          we expect positive forecast values.
 
     Other settings
 
-        - LOG_LEVEL: logging level for the application
-        - SENTRY_DSN: link to sentry
-        - SENTRY_TRACES_SAMPLE_RATE: fraction of Sentry traces to keep, from 0.0 to 1.0
-        - ENVIRONMENT: the environment this is running in.
+        - LOG_LEVEL: Logging level for the application.
+        - SENTRY_DSN: Link to Sentry.
+        - SENTRY_TRACES_SAMPLE_RATE: Fraction of Sentry traces to keep, from 0.0 to 1.0
+        - ENVIRONMENT: The environment this is running in.
         - DATA_PLATFORM_HOST: Hostname of the data platform gRPC server.
         - DATA_PLATFORM_PORT: Port of the data platform gRPC server.
         - HUGGINGFACE_TOKEN: Huggingface token, required if any of the models being run are in
@@ -64,6 +65,7 @@ class AppSettings(BaseSettings):
 
     forecast_validate_zig_zag_warning_threshold: float = 250.0
     forecast_validate_zig_zag_error_threshold: float = 500.0
+    forecast_validate_national_max_mw: float = 20_000.0
     forecast_validate_sun_elevation_lower_limit: float = 10.0
 
     # Other settings

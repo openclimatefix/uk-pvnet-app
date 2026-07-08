@@ -44,6 +44,7 @@ def apply_adjuster_values(
     da_forecast: xr.DataArray,
     adjuster_values: dict[int, float],
     effective_capacity_watts: float,
+    model_name: str,
 ) -> xr.DataArray:
     """Apply adjuster values to a forecast DataArray."""
     horizon_mins = da_forecast.horizon_mins.values.tolist()
@@ -59,12 +60,14 @@ def apply_adjuster_values(
     if missing_horizon_mins:
         if len(adjuster_values) == 0:
             logger.info(
-                "No adjuster history found; using 0.0 for all horizon_mins=%s",
+                "%s: no adjuster history found; using 0.0 for all horizon_mins=%s",
+                model_name,
                 missing_horizon_mins,
             )
         else:
             logger.warning(
-                "No adjuster values found for horizon_mins=%s; using 0.0 as default",
+                "%s: no adjuster values found for horizon_mins=%s; using 0.0 as default",
+                model_name,
                 missing_horizon_mins,
             )
 
@@ -95,6 +98,7 @@ async def calculate_adjusted_forecast(
     init_time_utc: pd.Timestamp,
     da_forecast: xr.DataArray,
     forecaster: dp.Forecaster,
+    model_name: str,
 ) -> xr.DataArray:
     """Make an adjusted forecast based on week average deltas."""
     adjuster_values = await fetch_adjuster_values(
@@ -108,6 +112,7 @@ async def calculate_adjusted_forecast(
         da_forecast=da_forecast,
         adjuster_values=adjuster_values,
         effective_capacity_watts=location.effective_capacity_watts,
+        model_name=model_name,
     )
 
     return da_adjusted_forecast
