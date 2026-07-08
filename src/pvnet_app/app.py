@@ -27,7 +27,7 @@ from pvnet_app.consts import (
 )
 from pvnet_app.data.batch_validation import get_batch_validation_error
 from pvnet_app.data.gsp import create_null_generation_data
-from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
+from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, NWPDownloader, UKVDownloader
 from pvnet_app.data.satellite import SatelliteDownloader
 from pvnet_app.data_platform import (
     extract_location_capacities_mwp,
@@ -184,30 +184,26 @@ async def _run_forecast_pipeline(
     ds_gen = create_null_generation_data(t0=t0, capacities_mwp=capacities_mwp)
     ds_gen.to_zarr(f"{scratch_dir}/{generation_path}")
 
-    data_downloaders = []
+    named_downloaders: list[tuple[str, SatelliteDownloader | NWPDownloader]] = []
 
     # --- Try to download satellite data if any models require it
     if any("satellite" in conf["input_data"] for conf in data_configs):
-        with log_duration(logger, "Downloading satellite data"):
-            # Only download and check the satellite data which is required by the models
-            interval_start_minutes, interval_end_minutes = get_required_satellite_interval(
-                data_configs
-            )
-            window_size = get_maximum_satellite_spatial_window_size(data_configs)
+        # Only download and check the satellite data which is required by the models
+        interval_start_minutes, interval_end_minutes = get_required_satellite_interval(data_configs)
+        window_size = get_maximum_satellite_spatial_window_size(data_configs)
 
-            sat_downloader = SatelliteDownloader(
-                t0=t0,
-                source_path_5=settings.satellite_icechunk_path_5,
-                source_path_15=settings.satellite_icechunk_path_15,
-                s3_region=settings.satellite_s3_region,
-                destination_path=f"{scratch_dir}/{sat_path}",
-                interval_start_minutes=interval_start_minutes,
-                interval_end_minutes=interval_end_minutes,
-                window_size_pixels=window_size,
-            )
-            sat_downloader.run()
+        sat_downloader = SatelliteDownloader(
+            t0=t0,
+            source_path_5=settings.satellite_icechunk_path_5,
+            source_path_15=settings.satellite_icechunk_path_15,
+            s3_region=settings.satellite_s3_region,
+            destination_path=f"{scratch_dir}/{sat_path}",
+            interval_start_minutes=interval_start_minutes,
+            interval_end_minutes=interval_end_minutes,
+            window_size_pixels=window_size,
+        )
 
-        data_downloaders.append(sat_downloader)
+        named_downloaders.append(("satellite", sat_downloader))
 
     # --- Try to download NWP data if any models require it
     if any("nwp" in conf["input_data"] for conf in data_configs):
@@ -216,37 +212,37 @@ async def _run_forecast_pipeline(
         nwp_window_sizes = get_maximum_nwp_spatial_window_sizes(data_configs)
 
         if "ukv" in required_providers:
-            with log_duration(logger, "Downloading UKV data"):
-                ukv_downloader = UKVDownloader(
-                    source_path=settings.nwp_ukv_zarr_path,
-                    destination_path=f"{scratch_dir}/{nwp_ukv_path}",
-                    window_size_pixels=nwp_window_sizes["ukv"],
-                )
-                ukv_downloader.run()
+            ukv_downloader = UKVDownloader(
+                source_path=settings.nwp_ukv_zarr_path,
+                destination_path=f"{scratch_dir}/{nwp_ukv_path}",
+                window_size_pixels=nwp_window_sizes["ukv"],
+            )
 
-            data_downloaders.append(ukv_downloader)
+            named_downloaders.append(("UKV", ukv_downloader))
 
         if "ecmwf" in required_providers:
-            with log_duration(logger, "Downloading ECMWF data"):
-                ecmwf_downloader = ECMWFDownloader(
-                    source_path=settings.nwp_ecmwf_zarr_path,
-                    destination_path=f"{scratch_dir}/{nwp_ecmwf_path}",
-                    window_size_pixels=nwp_window_sizes["ecmwf"],
-                )
-                ecmwf_downloader.run()
+            ecmwf_downloader = ECMWFDownloader(
+                source_path=settings.nwp_ecmwf_zarr_path,
+                destination_path=f"{scratch_dir}/{nwp_ecmwf_path}",
+                window_size_pixels=nwp_window_sizes["ecmwf"],
+            )
 
-            data_downloaders.append(ecmwf_downloader)
+            named_downloaders.append(("ECMWF", ecmwf_downloader))
 
         if "cloudcasting" in required_providers:
-            with log_duration(logger, "Downloading cloudcasting data"):
-                cloudcasting_downloader = CloudcastingDownloader(
-                    source_path=settings.cloudcasting_zarr_path,
-                    destination_path=f"{scratch_dir}/{nwp_cloudcasting_path}",
-                    window_size_pixels=nwp_window_sizes["cloudcasting"],
-                )
-                cloudcasting_downloader.run()
+            cloudcasting_downloader = CloudcastingDownloader(
+                source_path=settings.cloudcasting_zarr_path,
+                destination_path=f"{scratch_dir}/{nwp_cloudcasting_path}",
+                window_size_pixels=nwp_window_sizes["cloudcasting"],
+            )
 
-            data_downloaders.append(cloudcasting_downloader)
+            named_downloaders.append(("cloudcasting", cloudcasting_downloader))
+
+    # --- Run all downloads concurrently in threads
+    with log_duration(logger, "Downloading all input data"):
+        await _run_downloaders_concurrently(named_downloaders)
+
+    data_downloaders = [d for _, d in named_downloaders]
 
     # ---------------------------------------------------------------------------
     # Set up models
@@ -373,6 +369,33 @@ async def _run_forecast_pipeline(
             model_specs=model_specs,
             raise_if_missing=settings.raise_model_failure,
         )
+
+
+def _run_downloader_with_timing(name: str, downloader: SatelliteDownloader | NWPDownloader) -> None:
+    """Run a data downloader, logging its duration. Used as a thread target."""
+    with log_duration(logger, f"Downloading {name} data"):
+        downloader.run()
+
+
+async def _run_downloaders_concurrently(
+    named_downloaders: list[tuple[str, SatelliteDownloader | NWPDownloader]],
+) -> None:
+    """Run all data downloaders concurrently in threads.
+
+    Fails fast if any downloader raises, but only after all have finished, so no
+    thread is left writing to the scratch directory during teardown.
+
+    Raises:
+        ExceptionGroup: If one or more downloaders fail
+    """
+    results = await asyncio.gather(
+        *(asyncio.to_thread(_run_downloader_with_timing, name, d) for name, d in named_downloaders),
+        return_exceptions=True,
+    )
+
+    errors = [r for r in results if isinstance(r, Exception)]
+    if errors:
+        raise ExceptionGroup("Failed downloading input data", errors)
 
 
 def main() -> None:
