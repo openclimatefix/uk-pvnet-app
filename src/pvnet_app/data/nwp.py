@@ -3,6 +3,7 @@
 import logging
 import shutil
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from importlib.resources import files
 from typing import override
 
@@ -15,6 +16,11 @@ import xesmf as xe
 from ocf_data_sampler.config.load import load_yaml_configuration
 
 from pvnet_app.data.utils import slice_to_pvnet_spatial_area
+
+# ESMF binds to whichever thread first initialises it, and every subsequent call
+# must come from that same thread. All xesmf work is therefore funnelled through
+# this single persistent thread, regardless of which thread the caller is on.
+_ESMF_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="esmf")
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +56,27 @@ def regrid_nwp_data(
 ) -> xr.Dataset:
     """This function regrids the input NWP data to the grid of the target path.
 
+    The regridding is done using xESMF which uses ESMF under the hood. ESMF is not thread-safe so
+    all regridding is done on a single thread. This function will block until the regridding is
+    complete.
+
     Args:
         ds: The NWP data to regrid
         ds_target_coords: The target grid dataset
         method: The regridding method to use
         nwp_source: The source of the NWP data (only used for logging messages)
     """
+    return _ESMF_EXECUTOR.submit(
+        _regrid_nwp_data_on_esmf_thread, ds, ds_target_coords, method, nwp_source
+    ).result()
+
+
+def _regrid_nwp_data_on_esmf_thread(
+    ds: xr.Dataset,
+    ds_target_coords: xr.Dataset,
+    method: str,
+    nwp_source: str,
+) -> xr.Dataset:
     # Check if regridding step needs to be done
     needs_regridding = not (
         ds.latitude.equals(ds_target_coords.latitude)

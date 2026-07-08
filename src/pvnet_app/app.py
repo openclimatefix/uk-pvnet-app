@@ -221,22 +221,20 @@ async def _run_forecast_pipeline(
             named_downloaders.append(("UKV", ukv_downloader))
 
         if "ecmwf" in required_providers:
-            with log_duration(logger, "Downloading ECMWF data"):
-                ecmwf_downloader = ECMWFDownloader(
-                    source_path=settings.nwp_ecmwf_zarr_path,
-                    destination_path=f"{scratch_dir}/{nwp_ecmwf_path}",
-                    window_size_pixels=nwp_window_sizes["ecmwf"],
-                )
+            ecmwf_downloader = ECMWFDownloader(
+                source_path=settings.nwp_ecmwf_zarr_path,
+                destination_path=f"{scratch_dir}/{nwp_ecmwf_path}",
+                window_size_pixels=nwp_window_sizes["ecmwf"],
+            )
 
             named_downloaders.append(("ECMWF", ecmwf_downloader))
 
         if "cloudcasting" in required_providers:
-            with log_duration(logger, "Downloading cloudcasting data"):
-                cloudcasting_downloader = CloudcastingDownloader(
-                    source_path=settings.cloudcasting_zarr_path,
-                    destination_path=f"{scratch_dir}/{nwp_cloudcasting_path}",
-                    window_size_pixels=nwp_window_sizes["cloudcasting"],
-                )
+            cloudcasting_downloader = CloudcastingDownloader(
+                source_path=settings.cloudcasting_zarr_path,
+                destination_path=f"{scratch_dir}/{nwp_cloudcasting_path}",
+                window_size_pixels=nwp_window_sizes["cloudcasting"],
+            )
 
             named_downloaders.append(("cloudcasting", cloudcasting_downloader))
 
