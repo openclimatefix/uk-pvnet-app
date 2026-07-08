@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import tempfile
@@ -93,9 +94,10 @@ async def run_app(
     logger.info(f"Using `pvnet_app` library version: {__version__}")
     logger.info(f"Using device: {device}")
     logger.info(f"Making forecast for init time: {t0}")
+    resolved_settings = settings.model_dump(exclude={"huggingface_token", "sentry_dsn"})
     logger.info(
-        "Resolved app settings: %s",
-        settings.model_dump(exclude={"huggingface_token", "sentry_dsn"}),
+        "Resolved app settings:\n%s",
+        json.dumps(resolved_settings, indent=2, sort_keys=True),
     )
 
     # If a scratch directory is configured, treat it as the parent directory for persistent

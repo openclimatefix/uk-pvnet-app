@@ -75,7 +75,7 @@ class PVNetForecaster:
         t0: pd.Timestamp,
         device: torch.device,
         capacities: dict[int, float],
-        hf_token: str | None,
+        hf_token: str | None = None,
     ) -> None:
         """Class for making and compiling solar forecasts from for all GB GSPs and national total.
 
@@ -124,7 +124,7 @@ class PVNetForecaster:
         summation_repo: str | None,
         summation_commit: str | None,
         device: torch.device,
-        hf_token: str | None,
+        hf_token: str | None = None,
     ) -> tuple[PVNetBaseModel, SummationBaseModel]:
         """Load the regional and summation models.
 

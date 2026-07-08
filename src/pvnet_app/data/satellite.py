@@ -99,7 +99,7 @@ def interpolate_missing_satellite_timestamps(ds: xr.Dataset, max_gap: pd.Timedel
         max_gap: The maximum gap size which will be filled via interpolation.
     """
     # If any of these times are missing, we will try to interpolate them
-    dense_times = pd.date_range(ds.time.min(), ds.time.max(), freq=IMAGE_FREQUENCY)
+    dense_times = pd.date_range(ds.time.min().item(), ds.time.max().item(), freq=IMAGE_FREQUENCY)
 
     # Create mask array of which timestamps are available
     timestamp_available = np.isin(dense_times, ds.time)
