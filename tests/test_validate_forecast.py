@@ -11,6 +11,8 @@ from pvnet_app.validate_forecast import (
     validate_forecast,
 )
 
+national_max_forecast_mw = 20_000
+
 
 def make_forecast_dataarray(
     forecast_values: list[float],
@@ -50,6 +52,7 @@ def test_validate_forecast_ok():
     assert check_forecast_max(
         national_forecast_mw=national_forecast_mw,
         national_capacity_mw=national_capacity_mw,
+        national_max_forecast_mw=national_max_forecast_mw,
         model_name="test_model",
     )
 
@@ -71,6 +74,7 @@ def test_validate_forecast_ok():
         national_capacity_mw=national_capacity_mw,
         zig_zag_warning_threshold_mw=zig_zag_warning_threshold_mw,
         zig_zag_error_threshold_mw=zig_zag_error_threshold_mw,
+        national_max_forecast_mw=national_max_forecast_mw,
         sun_elevation_lower_limit=sun_elevation_lower_limit,
         model_name="test_model",
     )
@@ -89,6 +93,7 @@ def test_validate_forecast_above_110percent():
         national_capacity_mw=50,
         zig_zag_warning_threshold_mw=500,
         zig_zag_error_threshold_mw=1000,
+        national_max_forecast_mw=national_max_forecast_mw,
         sun_elevation_lower_limit=10,
         model_name="test_model",
     )
@@ -112,6 +117,7 @@ def test_validate_forecast_over_20gw():
         national_capacity_mw=national_capacity_mw,
         zig_zag_warning_threshold_mw=500,
         zig_zag_error_threshold_mw=1000,
+        national_max_forecast_mw=national_max_forecast_mw,
         sun_elevation_lower_limit=10,
         model_name="test_model",
     )
@@ -138,6 +144,7 @@ def test_validate_forecast_no_fluctuations(caplog):
             national_capacity_mw=national_capacity_mw,
             zig_zag_warning_threshold_mw=500,
             zig_zag_error_threshold_mw=1000,
+            national_max_forecast_mw=national_max_forecast_mw,
             sun_elevation_lower_limit=10,
             model_name="test_model",
         )
@@ -170,6 +177,7 @@ def test_validate_forecast_with_zigzag_warning(caplog):
             national_capacity_mw=national_capacity_mw,
             zig_zag_warning_threshold_mw=40,
             zig_zag_error_threshold_mw=1000,
+            national_max_forecast_mw=national_max_forecast_mw,
             sun_elevation_lower_limit=10,
             model_name="test_model",
         )
@@ -203,6 +211,7 @@ def test_validate_forecast_with_zigzag_failure(caplog):
             national_capacity_mw=national_capacity_mw,
             zig_zag_warning_threshold_mw=10,
             zig_zag_error_threshold_mw=40,
+            national_max_forecast_mw=national_max_forecast_mw,
             sun_elevation_lower_limit=10,
             model_name="test_model",
         )
@@ -236,6 +245,7 @@ def test_validate_forecast_sun_elevation_check(caplog):
             national_capacity_mw=national_capacity_mw,
             zig_zag_warning_threshold_mw=10,
             zig_zag_error_threshold_mw=40,
+            national_max_forecast_mw=national_max_forecast_mw,
             sun_elevation_lower_limit=10,
             model_name="test_model",
         )

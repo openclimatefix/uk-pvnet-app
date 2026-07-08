@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections import defaultdict
 
 import fsspec
 import numpy as np
@@ -24,6 +25,37 @@ NATIONAL_ALLOWED_PLEVELS: tuple[str, ...] = ("p02", "p10", "p25", "p50", "p75", 
 REGIONAL_ALLOWED_PLEVELS: tuple[str, ...] = ("p10", "p50", "p90")
 # Maximum number of concurrent forecast writes to the data-platform
 MAX_INFLIGHT_FORECAST_WRITES: int = 32
+
+
+def _format_horizon_ranges(horizons_mins: list[int]) -> str:
+    """Format sorted horizon minutes as compact ranges."""
+    if not horizons_mins:
+        return "[]"
+
+    sorted_horizons = sorted(horizons_mins)
+    ranges: list[str] = []
+    range_start = sorted_horizons[0]
+    previous = sorted_horizons[0]
+
+    for horizon in sorted_horizons[1:]:
+        if horizon - previous == 30:
+            previous = horizon
+            continue
+
+        if range_start == previous:
+            ranges.append(str(range_start))
+        else:
+            ranges.append(f"{range_start}-{previous}")
+
+        range_start = horizon
+        previous = horizon
+
+    if range_start == previous:
+        ranges.append(str(range_start))
+    else:
+        ranges.append(f"{range_start}-{previous}")
+
+    return ", ".join(ranges)
 
 
 async def fetch_locations(
@@ -152,7 +184,7 @@ async def build_input_metadata(
                 if path.endswith(".zarr"):
                     modified_date = fs.modified(f"{path}/.zattrs")
                 elif path.endswith(".icechunk"):
-                    modified_date = fs.modified(f"{path}/refs/branch.main")
+                    modified_date = fs.modified(f"{path}/refs/branch.main/ref.json")
                 else:
                     logger.warning(f"Unknown file type for {name}: {path}; skipping")
                     continue
@@ -207,6 +239,7 @@ async def build_multi_forecast_creation_request(
         init_time_utc=init_time_utc,
         da_forecast=da_forecast.sel(location_id=0),
         forecaster=forecaster,  # We get the adjuster values for the original forecaster
+        model_name=model_tag,
     )
 
     request = build_forecast_creation_request(
@@ -226,8 +259,7 @@ def _build_forecast_value(
     horizon_mins: int,
     pvalues: np.ndarray,
     plevels: list[str],
-    forecaster_name: str,
-    location_id: int,
+    clipped_horizons_by_plevels: dict[tuple[str, ...], list[int]],
 ) -> dp.CreateForecastRequestForecastValue:
 
     if len(pvalues) != len(plevels):
@@ -237,12 +269,8 @@ def _build_forecast_value(
         raise ValueError("p50 must be in plevels")
 
     if (pvalues > DATAPLATFORM_MAX_VALUE).any():
-        high_plevels = np.array(plevels)[pvalues > DATAPLATFORM_MAX_VALUE].tolist()
-        logger.warning(
-            f"p-levels={high_plevels} exceed {DATAPLATFORM_MAX_VALUE} for model="
-            f"{forecaster_name}, location_id={location_id}, horizon_mins={horizon_mins}; "
-            f"clipping to {DATAPLATFORM_MAX_VALUE}",
-        )
+        high_plevels = tuple(np.array(plevels)[pvalues > DATAPLATFORM_MAX_VALUE].tolist())
+        clipped_horizons_by_plevels[high_plevels].append(horizon_mins)
         pvalues = pvalues.clip(None, DATAPLATFORM_MAX_VALUE)
 
     return dp.CreateForecastRequestForecastValue(
@@ -285,16 +313,30 @@ def build_forecast_creation_request(
         da_forecast.sel(output_label=plevels).transpose("valid_times_utc", "output_label")
     ).values
 
+    clipped_horizons_by_plevels: dict[tuple[str, ...], list[int]] = defaultdict(list)
+
     forecast_value_requests = [
         _build_forecast_value(
             horizon_mins=h,
             pvalues=pvalues,
             plevels=plevels,
-            forecaster_name=forecaster.forecaster_name,
-            location_id=location_id,
+            clipped_horizons_by_plevels=clipped_horizons_by_plevels,
         )
         for h, pvalues in zip(horizons_mins, forecast_array, strict=True)
     ]
+
+    if clipped_horizons_by_plevels:
+        clipping_summaries = [
+            f"p-levels={list(high_plevels)} horizon_mins={_format_horizon_ranges(clipped_horizons)}"
+            for high_plevels, clipped_horizons in clipped_horizons_by_plevels.items()
+        ]
+        logger.warning(
+            "Clipped forecast values above %s for model=%s, location_id=%s: %s",
+            DATAPLATFORM_MAX_VALUE,
+            forecaster.forecaster_name,
+            location_id,
+            "; ".join(clipping_summaries),
+        )
 
     return dp.CreateForecastRequest(
         forecaster=forecaster,

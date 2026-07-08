@@ -325,6 +325,7 @@ async def _run_forecast_pipeline(
                 national_capacity_mw=capacities_mwp[0],
                 zig_zag_warning_threshold_mw=settings.forecast_validate_zig_zag_warning_threshold,
                 zig_zag_error_threshold_mw=settings.forecast_validate_zig_zag_error_threshold,
+                national_max_forecast_mw=settings.forecast_validate_national_max_mw,
                 sun_elevation_lower_limit=settings.forecast_validate_sun_elevation_lower_limit,
                 model_name=model_name,
             )
