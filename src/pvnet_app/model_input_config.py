@@ -1,7 +1,8 @@
 """Functions to fetch, load, modify, and query PVNet model data configs."""
 
-import yaml
 import copy
+
+import yaml
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
 from pvnet_app.consts import (
@@ -49,7 +50,7 @@ def populate_config_with_data_filepaths(config: dict, run_data_dir: str) -> dict
     }
 
     # Avoid modifying the original config
-    config = copy.deepcopy(config)  
+    config = copy.deepcopy(config)
 
     # Set the GSP input path
     config["input_data"]["generation"]["zarr_path"] = f"{run_data_dir}/{generation_path}"
@@ -77,7 +78,7 @@ def overwrite_config_dropouts(config: dict) -> dict:
         config: The data config
     """
     # Avoid modifying the original config
-    config = copy.deepcopy(config)  
+    config = copy.deepcopy(config)
 
     # Remove satellite dropout
     if "satellite" in config["input_data"]:

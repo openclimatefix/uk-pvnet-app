@@ -1,0 +1,33 @@
+name: README Consistency
+
+on:
+  push:
+    branches-ignore: ['main']
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  readme-consistency:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install system deps for xesmf/esmpy
+        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev
+
+      - name: Install project deps
+        run: uv sync --inexact
+
+      - name: Regenerate README table
+        env:
+          HUGGINGFACE_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: uv run python scripts/update_readme_table.py
+
+      - name: Fail if README changed
+        run: git diff --exit-code README.md

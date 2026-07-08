@@ -7,11 +7,11 @@ import os
 import tempfile
 from datetime import datetime
 from importlib.metadata import version
-from typing import TYPE_CHECKING
 
 import pandas as pd
 import sentry_sdk
 import torch
+import xarray as xr
 from grpclib.client import Channel
 from ocf import dp
 
@@ -34,9 +34,9 @@ from pvnet_app.data_platform import (
 from pvnet_app.forecaster import PVNetForecaster
 from pvnet_app.model_input_config import (
     fetch_model_data_config_paths,
-    get_required_satellite_interval,
     get_maximum_satellite_spatial_window_size,
     get_required_nwp_providers,
+    get_required_satellite_interval,
     load_yaml_config,
 )
 from pvnet_app.models.registry import get_model_specs
@@ -44,18 +44,9 @@ from pvnet_app.settings import AppSettings
 from pvnet_app.utils import check_model_runs_finished, resolve_t0, save_batch_to_s3
 from pvnet_app.validate_forecast import validate_forecast
 
-
-import xarray as xr
-
 __version__ = version("pvnet-app")
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# GLOBAL SETTINGS
-
-# Model will use GPU if available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ---------------------------------------------------------------------------
 # APP MAIN
@@ -81,6 +72,7 @@ async def run_app(
     logging.basicConfig(
         level=getattr(logging, settings.log_level),
         format="[%(asctime)s] {%(pathname)s:%(lineno)d} %(levelname)s - %(message)s",
+        force=True,
     )
 
     # Turn off logs from aiobotocore
@@ -89,31 +81,40 @@ async def run_app(
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
         environment=settings.environment,
-        traces_sample_rate=1,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
     )
     sentry_sdk.set_tag("app_name", "pvnet_app")
     sentry_sdk.set_tag("version", __version__)
 
     t0 = resolve_t0(t0)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     logger.info(f"Using `pvnet` library version: {version('pvnet')}")
     logger.info(f"Using `pvnet_app` library version: {__version__}")
+    logger.info(f"Using device: {device}")
     logger.info(f"Making forecast for init time: {t0}")
-    logger.info(f"Running critical models only: {settings.run_critical_models_only}")
+    logger.info(
+        "Resolved app settings: %s",
+        settings.model_dump(exclude={"huggingface_token", "sentry_dsn"}),
+    )
 
-    # If a scratch directory is configured, use it. Otherwise, create a temporary directory which
-    # will be deleted after the forecast is complete.
+    # If a scratch directory is configured, treat it as the parent directory for persistent
+    # per-run workspaces. Otherwise, create a temporary directory which will be deleted after the
+    # forecast is complete.
     if settings.scratch_dir is not None:
-        # Create the scratch directory if it doesn't exist. If it does exist, raise an error to
-        # avoid clashing with data from a previous run.
-        os.makedirs(settings.scratch_dir, exist_ok=False)
-        dir_context = contextlib.nullcontext(settings.scratch_dir)
+        os.makedirs(settings.scratch_dir, exist_ok=True)
+        t0_dirname = t0.strftime("%Y%m%dT%H%M%SZ")
+        run_scratch_dir = tempfile.mkdtemp(
+            prefix=f"pvnet-app-{t0_dirname}-",
+            dir=settings.scratch_dir,
+        )
+        dir_context = contextlib.nullcontext(run_scratch_dir)
     else:
         dir_context = tempfile.TemporaryDirectory(prefix="pvnet-app-")
 
     with dir_context as scratch_dir:
         logger.info(f"Using scratch directory: {scratch_dir}")
-        return await _run_forecast_pipeline(settings, t0, scratch_dir, write_predictions)
+        return await _run_forecast_pipeline(settings, t0, scratch_dir, write_predictions, device)
 
 
 async def _run_forecast_pipeline(
@@ -121,6 +122,7 @@ async def _run_forecast_pipeline(
     t0: pd.Timestamp,
     scratch_dir: str,
     write_predictions: bool,
+    device: torch.device,
 ) -> dict | None:
     """Run the forecast pipeline for all configured models.
 
@@ -133,6 +135,7 @@ async def _run_forecast_pipeline(
         scratch_dir: Directory for downloaded inputs and temporary files
         write_predictions: If True, write forecasts to the data platform. If
             False, skip the write and return the forecasters for local testing
+        device: Device to run the models on
     """
     # ---------------------------------------------------------------------------
     # Basic set up

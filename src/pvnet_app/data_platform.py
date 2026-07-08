@@ -228,10 +228,10 @@ def _build_forecast_value(
     forecaster_name: str,
     location_id: int,
 ) -> dp.CreateForecastRequestForecastValue:
-    
+
     if len(pvalues) != len(plevels):
         raise ValueError("pvalues and plevels must have the same length")
-    
+
     if "p50" not in plevels:
         raise ValueError("p50 must be in plevels")
 

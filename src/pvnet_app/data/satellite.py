@@ -443,7 +443,7 @@ class SatelliteDownloader:
 
         # Slice and load into memory for processing
 
-        # We slice the data to the required time window for the model, plus a buffer to allow for 
+        # We slice the data to the required time window for the model, plus a buffer to allow for
         # interpolation of missing timestamps
         start_dt = self.t0 + self.start_interval - MAXIMUM_INTERPOLATION_GAP
         end_dt = self.t0 + self.end_interval + MAXIMUM_INTERPOLATION_GAP
