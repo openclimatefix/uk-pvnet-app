@@ -27,6 +27,9 @@ async def test_save_to_generation_to_data_platform(
     For gsp_id 0, we expect 2 forecasts, one normal and one with the adjusted values
     For gsp_id 1, we expect 1 forecast, only the normal one
 
+    UK National (gsp_id 0) saves all 7 plevels (p2, p10, p25, p50, p75, p90, p98);
+    every other GSP saves only p10, p50 and p90.
+
     In this test we
     1. select up locations gsp 0 and gsp 1
     2. add some fake generation data for gsp 0 on 2024-12-31
@@ -118,6 +121,7 @@ async def test_save_to_generation_to_data_platform(
     forecast_data["gsp_id"] = 0
     forecast_data["output_label"] = "forecast_fraction"
 
+    # p10 and p90 are saved for every GSP (National and non-National)
     forecast_data_p10 = forecast_data.copy()
     forecast_data_p10["solar_generation_mw"] = [0.3] * 24
     forecast_data_p10["output_label"] = "forecast_fraction_plevel_10"
@@ -126,15 +130,32 @@ async def test_save_to_generation_to_data_platform(
     forecast_data_p90["solar_generation_mw"] = [0.7] * 24
     forecast_data_p90["output_label"] = "forecast_fraction_plevel_90"
 
-    forecast_data = pd.concat(
+    # non-National GSPs (gsp 1) only get p50, p10 and p90
+    forecast_data_gsp1 = pd.concat(
         [forecast_data, forecast_data_p10, forecast_data_p90],
         ignore_index=True,
     )
-
-    # add gsp 1 data
-    forecast_data_gsp1 = forecast_data.copy()
     forecast_data_gsp1["gsp_id"] = 1
-    forecast_data = pd.concat([forecast_data, forecast_data_gsp1], ignore_index=True)
+
+    # National (gsp 0) additionally gets p2, p25, p75 and p98
+    extra_national_plevels = {
+        "forecast_fraction_plevel_02": 0.1,
+        "forecast_fraction_plevel_25": 0.4,
+        "forecast_fraction_plevel_75": 0.6,
+        "forecast_fraction_plevel_98": 0.9,
+    }
+    extra_national_data = []
+    for label, fraction in extra_national_plevels.items():
+        df = forecast_data.copy()
+        df["solar_generation_mw"] = [fraction] * 24
+        df["output_label"] = label
+        extra_national_data.append(df)
+
+    forecast_data = pd.concat(
+        [forecast_data, forecast_data_p10, forecast_data_p90,
+         *extra_national_data, forecast_data_gsp1],
+        ignore_index=True,
+    )
 
     forecast_data = forecast_data.set_index(["target_datetime_utc", "gsp_id", "output_label"])
     forecast_data_da = forecast_data.to_xarray().to_dataarray()
@@ -164,8 +185,8 @@ async def test_save_to_generation_to_data_platform(
         get_latest_forecasts_request,
     )
     assert len(get_latest_forecasts_response.forecasts) == 1
-    forecast = get_latest_forecasts_response.forecasts[0]
-    assert forecast.forecaster.forecaster_name == "test_model"
+    forecast_gsp1 = get_latest_forecasts_response.forecasts[0]
+    assert forecast_gsp1.forecaster.forecaster_name == "test_model"
 
     # check: There is a forecast object for gsp_id 0
     get_latest_forecasts_request = dp.GetLatestForecastsRequest(
@@ -187,6 +208,21 @@ async def test_save_to_generation_to_data_platform(
         end_timestamp_utc=datetime.datetime(2025, 1, 2, tzinfo=datetime.UTC),
     )
 
+    # check: non-National GSP (gsp 1) only carries p10 and p90, not the extra plevels
+    forecast_response_gsp1 = await client.get_forecast_as_timeseries(
+        dp.GetForecastAsTimeseriesRequest(
+            energy_source=dp.EnergySource.SOLAR,
+            location_uuid=location_uuid_1,
+            forecaster=forecast_gsp1.forecaster,
+            time_window=time_window,
+        ),
+    )
+    assert len(forecast_response_gsp1.values) == 24
+    for value in forecast_response_gsp1.values:
+        assert set(value.other_statistics_fractions.keys()) == {"p10", "p90"}
+        assert np.isclose(value.other_statistics_fractions["p10"], 0.3)
+        assert np.isclose(value.other_statistics_fractions["p90"], 0.7)
+
     # check: the number of forecast values for non-adjusted forecast
     forecast_response = await client.get_forecast_as_timeseries(
         dp.GetForecastAsTimeseriesRequest(
@@ -197,7 +233,14 @@ async def test_save_to_generation_to_data_platform(
         ),
     )
     for value in forecast_response.values:
+        # National forecast carries all 7 plevels with their raw values
         assert value.p50_value_fraction == 0.5
+        assert np.isclose(value.other_statistics_fractions["p02"], 0.1)
+        assert np.isclose(value.other_statistics_fractions["p10"], 0.3)
+        assert np.isclose(value.other_statistics_fractions["p25"], 0.4)
+        assert np.isclose(value.other_statistics_fractions["p75"], 0.6)
+        assert np.isclose(value.other_statistics_fractions["p90"], 0.7)
+        assert np.isclose(value.other_statistics_fractions["p98"], 0.9)
     assert len(forecast_response.values) == 24
 
     # 7. check: the number of forecast values, for adjuster forecast
@@ -214,14 +257,19 @@ async def test_save_to_generation_to_data_platform(
     # the observed values are 0.5, 0.51, 0.52, ...
     # the deltas are 0, -0.01, -0.02, ...
     # limited to 10% of 0.5 = 0.05, so we should be limited to 0.5 +/- 0.05
-    # Also there are checks for p10 and p90
+    # Also there are checks for all 7 plevels
     for count, value in enumerate(forecast_response.values):
         # p50
         new_value = 0.5 + 0.01 * count
         if new_value > 0.55:
             new_value = 0.55
-
         assert np.isclose(value.p50_value_fraction, new_value, atol=1e-4)
+
+        # p02
+        new_value_p02 = 0.1 + 0.01 * count
+        if new_value_p02 > 0.15:
+            new_value_p02 = 0.15
+        assert np.isclose(value.other_statistics_fractions["p02"], new_value_p02)
 
         # p10
         new_value_p10 = 0.3 + 0.01 * count
@@ -229,11 +277,29 @@ async def test_save_to_generation_to_data_platform(
             new_value_p10 = 0.35
         assert np.isclose(value.other_statistics_fractions["p10"], new_value_p10)
 
+        # p25
+        new_value_p25 = 0.4 + 0.01 * count
+        if new_value_p25 > 0.45:
+            new_value_p25 = 0.45
+        assert np.isclose(value.other_statistics_fractions["p25"], new_value_p25)
+
+        # p75
+        new_value_p75 = 0.6 + 0.01 * count
+        if new_value_p75 > 0.65:
+            new_value_p75 = 0.65
+        assert np.isclose(value.other_statistics_fractions["p75"], new_value_p75)
+
         # p90
         new_value_p90 = 0.7 + 0.01 * count
         if new_value_p90 > 0.75:
             new_value_p90 = 0.75
         assert np.isclose(value.other_statistics_fractions["p90"], new_value_p90)
+
+        # p98
+        new_value_p98 = 0.9 + 0.01 * count
+        if new_value_p98 > 0.95:
+            new_value_p98 = 0.95
+        assert np.isclose(value.other_statistics_fractions["p98"], new_value_p98)
 
     assert len(forecast_response.values) == 24
 

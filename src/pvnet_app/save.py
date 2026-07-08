@@ -118,28 +118,37 @@ def map_values_da_to_dp_requests(
 
     # Reduce singular dimensions
     gsp_normed_da = gsp_normed_da.squeeze(drop=True)
+
     p50s = gsp_normed_da.sel(output_label="forecast_fraction").values.astype(float)
-    p10s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_10").values.astype(float)
-    p90s = gsp_normed_da.sel(output_label="forecast_fraction_plevel_90").values.astype(float)
+
+    # UK National (gsp_id=0) gets all 7 plevels; every other GSP keeps p10/p90 only
+    plevels = [2, 10, 25, 75, 90, 98] if gsp_id == 0 else [10, 90]
+    plevel_series = {
+        p: gsp_normed_da.sel(
+            output_label=f"forecast_fraction_plevel_{p:02}",
+        ).values.astype(float)
+        for p in plevels
+    }
 
     forecast_values = []
     max_value = 1.09
-    for h, p50, p10, p90 in zip(horizons_mins, p50s, p10s, p90s, strict=True):
-        if p90 >= max_value:
-            logger.warning(
-                f"p90 value {p90} exceeds {max_value} for model={model_tag}, gsp_id={gsp_id}, "
-                f" horizon_mins={h}; clamping to {max_value}",
-            )
-            p90 = max_value
+    for i, h in enumerate(horizons_mins):
+        other_statistics_fractions = {f"p{p:02}": series[i] for p, series in plevel_series.items()}
+
+        for key, val in list(other_statistics_fractions.items()):
+            if val >= max_value:
+                logger.warning(
+                    f"{key} value {val} exceeds {max_value} for model={model_tag}, "
+                    f"gsp_id={gsp_id}, horizon_mins={h}; clamping to {max_value}",
+                )
+                other_statistics_fractions[key] = max_value
+
         forecast_values.append(
             dp.CreateForecastRequestForecastValue(
                 horizon_mins=h,
-                p50_fraction=p50,
+                p50_fraction=p50s[i],
                 metadata=Struct().from_pydict({}),
-                other_statistics_fractions={
-                    "p10": p10,
-                    "p90": p90,
-                },
+                other_statistics_fractions=other_statistics_fractions,
             ),
         )
 
