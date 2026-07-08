@@ -35,6 +35,7 @@ from pvnet_app.data_platform import (
 from pvnet_app.forecaster import PVNetForecaster
 from pvnet_app.model_input_config import (
     fetch_model_data_config_paths,
+    get_maximum_nwp_spatial_window_sizes,
     get_maximum_satellite_spatial_window_size,
     get_required_nwp_providers,
     get_required_satellite_interval,
@@ -198,11 +199,13 @@ async def _run_forecast_pipeline(
 
         # Only download the NWP sources which are required by the models
         required_providers = get_required_nwp_providers(data_configs)
+        nwp_window_sizes = get_maximum_nwp_spatial_window_sizes(data_configs)
 
         if "ukv" in required_providers:
             ukv_downloader = UKVDownloader(
                 source_path=settings.nwp_ukv_zarr_path,
                 destination_path=f"{scratch_dir}/{nwp_ukv_path}",
+                window_size_pixels=nwp_window_sizes["ukv"],
             )
             ukv_downloader.run()
 
@@ -212,6 +215,7 @@ async def _run_forecast_pipeline(
             ecmwf_downloader = ECMWFDownloader(
                 source_path=settings.nwp_ecmwf_zarr_path,
                 destination_path=f"{scratch_dir}/{nwp_ecmwf_path}",
+                window_size_pixels=nwp_window_sizes["ecmwf"],
             )
             ecmwf_downloader.run()
 
@@ -221,6 +225,7 @@ async def _run_forecast_pipeline(
             cloudcasting_downloader = CloudcastingDownloader(
                 source_path=settings.cloudcasting_zarr_path,
                 destination_path=f"{scratch_dir}/{nwp_cloudcasting_path}",
+                window_size_pixels=nwp_window_sizes["cloudcasting"],
             )
             cloudcasting_downloader.run()
 

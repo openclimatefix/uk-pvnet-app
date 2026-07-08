@@ -1,5 +1,6 @@
 """Functions to get GSP data from the data platform."""
 
+from functools import cache
 from importlib.resources import files
 
 import numpy as np
@@ -7,6 +8,7 @@ import pandas as pd
 import xarray as xr
 
 
+@cache
 def get_gsp_locations() -> pd.DataFrame:
     """Load the GSP locations metadata."""
     return pd.read_csv(

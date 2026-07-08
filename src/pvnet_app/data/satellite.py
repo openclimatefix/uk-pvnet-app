@@ -8,12 +8,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from ocf_data_sampler.config.load import load_yaml_configuration
-from ocf_data_sampler.load.utils import make_spatial_coords_increasing
-from ocf_data_sampler.select.geospatial import convert_coordinates
-from ocf_data_sampler.select.location import Location
-from ocf_data_sampler.select.select_spatial_slice import select_spatial_slice_pixels_multiple
 
-from pvnet_app.data.gsp import get_gsp_locations
+from pvnet_app.data.utils import slice_to_pvnet_spatial_area
 
 logger = logging.getLogger(__name__)
 
@@ -253,48 +249,6 @@ def check_model_satellite_inputs_available(
         return available
 
 
-def slice_to_pvnet_satellite_area(
-    ds: xr.Dataset,
-    width_pixels: int,
-    height_pixels: int,
-) -> xr.Dataset:
-    """Get the spatial extent of the satellite data used in PVNet.
-
-    Args:
-        ds: The satellite data
-        width_pixels: The width of the spatial slice in pixels
-        height_pixels: The height of the spatial slice in pixels
-
-    Returns:
-        xr.Dataset: The spatial slice of the dataset used by PVNet
-    """
-    # Cut down the slice for efficiency and reorder the coordinates if needed
-    ds = make_spatial_coords_increasing(
-        ds,
-        x_coord="x_geostationary",
-        y_coord="y_geostationary",
-    )
-
-    # We will loop over all the GSP locations and find the min and max x and y coordinates
-    # This gives us a bounding box used by PVNet
-    df_locs = get_gsp_locations().loc[1:]
-
-    geo_xs, geo_ys = convert_coordinates(
-        x=df_locs.longitude.values,
-        y=df_locs.latitude.values,
-        from_coords="lon_lat",
-        target_coords="geostationary",
-        area_string=str(ds.attrs["area"]),
-    )
-
-    # Add the projection to the locations objects
-    locations = []
-    for x, y, loc_id in zip(geo_xs, geo_ys, df_locs.index.values, strict=True):
-        locations.append(Location(x=x, y=y, coord_system="geostationary", id=loc_id))
-
-    return select_spatial_slice_pixels_multiple(ds, locations, width_pixels, height_pixels)
-
-
 def contains_too_many_of_value(ds: xr.Dataset, value: float, threshold: float) -> bool:
     """Check if the input data contains more than a certain fraction of a given value.
 
@@ -359,13 +313,6 @@ class SatelliteDownloader:
         Returns:
             bool: Whether the data passes the quality checks
         """
-        # Slice the data to the spatial extent used in PVNet
-        ds = slice_to_pvnet_satellite_area(
-            ds,
-            width_pixels=self.window_size_pixels,
-            height_pixels=self.window_size_pixels,
-        )
-
         too_many_nans = contains_too_many_of_value(ds, value=np.nan, threshold=0.05)
 
         return not too_many_nans
@@ -441,8 +388,6 @@ class SatelliteDownloader:
         self.sat_choice = best_source
         logger.info(f"Using {best_source} satellite data")
 
-        # Slice and load into memory for processing
-
         # We slice the data to the required time window for the model, plus a buffer to allow for
         # interpolation of missing timestamps
         start_dt = self.t0 + self.start_interval - MAXIMUM_INTERPOLATION_GAP
@@ -453,12 +398,21 @@ class SatelliteDownloader:
             .sortby("time")
             .drop_duplicates("time", keep="last")
             .sel(time=slice(start_dt, end_dt))
-            .load()
         )
 
         if len(ds.time) == 0:
             logger.warning("No satellite data available in recent window.")
             return
+        
+        # Slice the data to the spatial extent used in PVNet
+        ds = slice_to_pvnet_spatial_area(
+            ds,
+            width_pixels=self.window_size_pixels,
+            height_pixels=self.window_size_pixels,
+        )
+
+        # Load into memory for processing
+        ds = ds.load()
 
         if self.data_is_okay(ds):
             ds = self.process(ds)
