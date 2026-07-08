@@ -246,7 +246,7 @@ async def _run_forecast_pipeline(
                 )
                 cloudcasting_downloader.run()
 
-                data_downloaders.append(cloudcasting_downloader)
+            data_downloaders.append(cloudcasting_downloader)
 
     # ---------------------------------------------------------------------------
     # Set up models
