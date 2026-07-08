@@ -332,7 +332,7 @@ class SatelliteDownloader:
         t0: pd.Timestamp,
         source_path_5: str | None,
         source_path_15: str | None,
-        s3_region: str,
+        s3_region: str | None,
         destination_path: str,
         interval_start_minutes: int,
         interval_end_minutes: int,
