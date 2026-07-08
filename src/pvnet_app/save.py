@@ -135,12 +135,13 @@ def map_values_da_to_dp_requests(
     for i, h in enumerate(horizons_mins):
         other_statistics_fractions = {f"p{p:02}": series[i] for p, series in plevel_series.items()}
 
-        if other_statistics_fractions["p90"] >= max_value:
-            logger.warning(
-                f"p90 value {other_statistics_fractions['p90']} exceeds {max_value} for "
-                f"model={model_tag}, gsp_id={gsp_id}, horizon_mins={h}; clamping to {max_value}",
-            )
-            other_statistics_fractions["p90"] = max_value
+        for key, val in list(other_statistics_fractions.items()):
+            if val >= max_value:
+                logger.warning(
+                    f"{key} value {val} exceeds {max_value} for model={model_tag}, "
+                    f"gsp_id={gsp_id}, horizon_mins={h}; clamping to {max_value}",
+                )
+                other_statistics_fractions[key] = max_value
 
         forecast_values.append(
             dp.CreateForecastRequestForecastValue(
