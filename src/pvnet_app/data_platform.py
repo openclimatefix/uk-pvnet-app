@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 # currently only supports values up to this limit.
 DATAPLATFORM_MAX_VALUE: float = 1.09
 # Only allow these p-levels to be written to the data-platform
-ALLOWED_PLEVELS: tuple[str, ...] = ("p10", "p50", "p90")
+NATIONAL_ALLOWED_PLEVELS: tuple[str, ...] = ("p02", "p10", "p25", "p50", "p75", "p90", "p98")
+REGIONAL_ALLOWED_PLEVELS: tuple[str, ...] = ("p10", "p50", "p90")
 # Maximum number of concurrent forecast writes to the data-platform
 MAX_INFLIGHT_FORECAST_WRITES: int = 32
 
@@ -272,8 +273,14 @@ def build_forecast_creation_request(
     location_id = int(da_forecast.location_id.values)
     horizons_mins = da_forecast.horizon_mins.values.tolist()
 
+    allowed_plevels = NATIONAL_ALLOWED_PLEVELS if location_id == 0 else REGIONAL_ALLOWED_PLEVELS
+
+    # If the regional and summation models output different p-levels, then this DataArray will have
+    # NaNs for the missing p-levels for this location. Drop the p-levels with NaNs
+    da_forecast = da_forecast.dropna(dim="output_label", how="any")
+
     # Filter the p-levels to the allowed set
-    plevels = [level for level in ALLOWED_PLEVELS if level in da_forecast.output_label.values]
+    plevels = [level for level in allowed_plevels if level in da_forecast.output_label.values]
     forecast_array = (
         da_forecast.sel(output_label=plevels).transpose("valid_times_utc", "output_label")
     ).values

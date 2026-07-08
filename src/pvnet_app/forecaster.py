@@ -45,7 +45,7 @@ def preds_to_dataarray(
 ) -> xr.DataArray:
     """Put numpy array of predictions into a dataarray."""
     if output_quantiles is not None:
-        output_labels = [f"p{int(q * 100):02}" for q in output_quantiles]
+        output_labels = [f"p{round(q * 100):02}" for q in output_quantiles]
     else:
         output_labels = ["p50"]
         preds = preds[..., np.newaxis]
@@ -121,8 +121,8 @@ class PVNetForecaster:
         self,
         pvnet_repo: str,
         pvnet_commit: str,
-        summation_repo: str | None,
-        summation_commit: str | None,
+        summation_repo: str,
+        summation_commit: str,
         device: torch.device,
         hf_token: str | None = None,
     ) -> tuple[PVNetBaseModel, SummationBaseModel]:
