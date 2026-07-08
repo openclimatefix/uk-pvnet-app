@@ -137,7 +137,7 @@ async def _run_forecast_pipeline(
         t0: The forecast init-time. Must be in naive-UTC and floored to 30 minutes
         scratch_dir: Directory for downloaded inputs and temporary files
         write_predictions: If True, write forecasts to the data platform. If
-            False, skip the write and return the forecasters for local testing
+            False, skip the write and return the forecasts for local testing
         device: Device to run the models on
     """
     # ---------------------------------------------------------------------------
