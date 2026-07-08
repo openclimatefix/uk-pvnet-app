@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
 
 # --- Use conda to install required binaries into venv --- #
 FROM quay.io/condaforge/miniforge3:latest AS build-venv
