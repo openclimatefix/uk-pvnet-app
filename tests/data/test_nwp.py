@@ -58,12 +58,14 @@ def test_check_model_nwp_inputs_available(
     ukv_downloader = UKVDownloader(
         source_path=source_ukv_path,
         destination_path=f"{tmp_path}/ukv.zarr",
+        window_size_pixels=2,
     )
     ukv_downloader.run()
 
     ecmwf_downloader = ECMWFDownloader(
         source_path=source_ecmwf_path,
         destination_path=f"{tmp_path}/ecmwf.zarr",
+        window_size_pixels=2,
     )
     ecmwf_downloader.run()
 
@@ -75,12 +77,14 @@ def test_check_model_nwp_inputs_available(
     ukv_downloader = UKVDownloader(
         source_path="empty_ukv_path.zarr",
         destination_path="dummy.zarr",
+        window_size_pixels=2,
     )
     ukv_downloader.run()
 
     ecmwf_downloader = ECMWFDownloader(
         source_path="empty_ecmwf_path.zarr",
         destination_path="dummy.zarr",
+        window_size_pixels=2,
     )
     ecmwf_downloader.run()
 
@@ -100,12 +104,14 @@ def test_check_model_nwp_inputs_available(
     ukv_downloader = UKVDownloader(
         source_path=source_ukv_path,
         destination_path=f"{tmp_path}/short_ukv.zarr",
+        window_size_pixels=2,
     )
     ukv_downloader.run()
 
     ecmwf_downloader = ECMWFDownloader(
         source_path=source_ecmwf_path,
         destination_path=f"{tmp_path}/short_ecmwf.zarr",
+        window_size_pixels=2,
     )
     ecmwf_downloader.run()
 

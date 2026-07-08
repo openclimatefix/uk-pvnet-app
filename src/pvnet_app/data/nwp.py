@@ -14,6 +14,8 @@ import xarray as xr
 import xesmf as xe
 from ocf_data_sampler.config.load import load_yaml_configuration
 
+from pvnet_app.data.utils import slice_to_pvnet_spatial_area
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +36,7 @@ def download_data(source: str, destination: str) -> bool:
 
 def regrid_nwp_data(
     ds: xr.Dataset,
-    target_coords_path: str,
+    ds_target_coords: xr.Dataset,
     method: str,
     nwp_source: str,
 ) -> xr.Dataset:
@@ -42,13 +44,10 @@ def regrid_nwp_data(
 
     Args:
         ds: The NWP data to regrid
-        target_coords_path: The path to the target grid
+        ds_target_coords: The target grid dataset
         method: The regridding method to use
         nwp_source: The source of the NWP data (only used for logging messages)
     """
-    # These are the coords we are aiming for
-    ds_target_coords = xr.load_dataset(target_coords_path)
-
     # Check if regridding step needs to be done
     needs_regridding = not (
         ds.latitude.equals(ds_target_coords.latitude)
@@ -59,18 +58,9 @@ def regrid_nwp_data(
         logger.info(f"No regridding required for {nwp_source} - skipping this step")
         return ds
 
-    logger.info(f"Regridding {nwp_source} to expected grid to {target_coords_path}")
+    regridder = xe.Regridder(ds, ds_target_coords, method=method, unmapped_to_nan=True)
 
-    regridder = xe.Regridder(ds, ds_target_coords, method=method)
-
-    # Regrid in a loop to keep RAM usage lower
-    ds_list = []
-    for step in ds.step:
-        # Copy to make sure the data is C-contiguous for efficient regridding
-        ds_step = ds.sel(step=step).copy(deep=True)
-        ds_list.append(regridder(ds_step))
-
-    return xr.concat(ds_list, dim="step")
+    return regridder(ds)
 
 
 def check_model_nwp_inputs_available(
@@ -136,13 +126,19 @@ class NWPDownloader(ABC):
     nwp_source: str
     save_chunk_dict: dict[str, int]
 
-    def __init__(self, source_path: str | None, destination_path: str) -> None:
+    def __init__(
+        self,
+        source_path: str | None,
+        destination_path: str,
+        window_size_pixels: int | None = None,
+    ) -> None:
         """Initialise the NWP downloader."""
         self.source_path = source_path
         self.destination_path = destination_path
         # Initially no valid times are available. This will only change is the data can be
         # downloaded, processed, and saved successfully
         self.valid_times = None
+        self.window_size_pixels = window_size_pixels
 
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
@@ -205,17 +201,19 @@ class NWPDownloader(ABC):
             f"{self.nwp_source} has init-time {init_time} and valid times: {valid_times}",
         )
 
-        # Check the data is okay before processing
-        if not self.data_is_okay(ds):
-            logger.warning(f"{self.nwp_source} NWP data did not pass quality checks.")
-            return
-
+        # Process the data to match the training data, then check the quality of the data, and
+        # resave if it passes
         ds = self.process(ds)
-        self.resave(ds)
 
-        # Only store the valid_times if the NWP data has been successfully downloaded,
-        # quality checked, and processed. Else valid_times will be None
-        self.valid_times = valid_times
+        if self.data_is_okay(ds):
+            self.resave(ds)
+
+            # Only store the valid_times if the NWP data has been successfully downloaded,
+            # quality checked, and processed. Else valid_times will be None
+            self.valid_times = valid_times
+
+        else:
+            logger.warning(f"{self.nwp_source} NWP data did not pass quality checks.")
 
     def check_model_inputs_available(
         self,
@@ -248,6 +246,15 @@ class ECMWFDownloader(NWPDownloader):
 
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
+
+        if self.window_size_pixels is not None:
+            # Slice the data to the spatial extent used in PVNet
+            ds = slice_to_pvnet_spatial_area(
+                ds,
+                width_pixels=self.window_size_pixels,
+                height_pixels=self.window_size_pixels,
+            )
+
         return ds
 
 
@@ -261,17 +268,28 @@ class UKVDownloader(NWPDownloader):
         "y_osgb": 100,
     }
 
-    @staticmethod
-    def regrid(ds: xr.Dataset) -> xr.Dataset:
+    def regrid(self, ds: xr.Dataset) -> xr.Dataset:
         """Regrid the UKV data to the target grid.
 
         In production the UKV data is on a different grid structure to the training data. The
-        training data from CEDA is on a regular OSGB grid. The production data is on some other
-        curvilinear grid.
+        training data from CEDA is on a regular OSGB grid. The production data is on a Lambert
+        Azimuthal Equal Area grid
         """
+        ds_target_coords = xr.load_dataset(
+            files("pvnet_app.data").joinpath("nwp_ukv_target_coords.nc")
+        )
+
+        if self.window_size_pixels is not None:
+            # Slice the data to the spatial extent used in PVNet
+            ds_target_coords = slice_to_pvnet_spatial_area(
+                ds_target_coords,
+                width_pixels=self.window_size_pixels,
+                height_pixels=self.window_size_pixels,
+            )
+
         return regrid_nwp_data(
             ds=ds,
-            target_coords_path=files("pvnet_app.data").joinpath("nwp_ukv_target_coords.nc"),
+            ds_target_coords=ds_target_coords,
             method="bilinear",
             nwp_source="UKV",
         )
@@ -325,6 +343,8 @@ class UKVDownloader(NWPDownloader):
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         ds = self.add_lon_lat_coords(ds)
+        # The regrid step also slices the data to the spatial extent used in PVNet if
+        # self.window_size_pixels is not None
         ds = self.regrid(ds)
         return ds
 
@@ -342,4 +362,12 @@ class CloudcastingDownloader(NWPDownloader):
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         # The cloudcasting data needs no changes
+        if self.window_size_pixels is not None:
+            # Slice the data to the spatial extent used in PVNet
+            ds = slice_to_pvnet_spatial_area(
+                ds,
+                width_pixels=self.window_size_pixels,
+                height_pixels=self.window_size_pixels,
+            )
+
         return ds

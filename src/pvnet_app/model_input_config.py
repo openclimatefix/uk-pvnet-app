@@ -132,6 +132,20 @@ def get_maximum_satellite_spatial_window_size(data_configs: list[dict]) -> int:
     return max_window_size
 
 
+def get_maximum_nwp_spatial_window_sizes(data_configs: list[dict]) -> dict[str, int]:
+    """Return the max NWP spatial window sizes required for each source."""
+    max_window_sizes = {}
+    for conf in data_configs:
+        if "nwp" in conf["input_data"]:
+            for source_name, source in conf["input_data"]["nwp"].items():
+                window_size = source["image_size_pixels_height"]
+                if source_name not in max_window_sizes:
+                    max_window_sizes[source_name] = window_size
+                else:
+                    max_window_sizes[source_name] = max(max_window_sizes[source_name], window_size)
+    return max_window_sizes
+
+
 def get_required_satellite_interval(data_configs: list[dict]) -> tuple[int, int]:
     """Return the minimum satellite interval required to cover all intervals in the data configs."""
     min_start_interval = float("inf")
