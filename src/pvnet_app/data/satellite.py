@@ -324,8 +324,6 @@ class SatelliteDownloader:
         Returns:
             xr.Dataset: The processed satellite data
         """
-        # Filter out unused variables
-        ds = ds[["data"]]
 
         # Interpolate missing satellite timestamps
         ds = interpolate_missing_satellite_timestamps(ds, max_gap=MAXIMUM_INTERPOLATION_GAP)
@@ -401,6 +399,9 @@ class SatelliteDownloader:
         if len(ds.time) == 0:
             logger.warning("No satellite data available in recent window.")
             return
+
+        # Filter out unused variables
+        ds = ds[["data"]]
 
         # Slice the data to the spatial extent used in PVNet
         ds = slice_to_pvnet_spatial_area(

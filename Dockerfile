@@ -33,7 +33,8 @@ RUN uv sync --no-editable --no-dev --compile-bytecode --inexact
 # --- Runtime image --- #
 FROM python:3.12-slim
 
-# Copy the venv in multiple layers so the largest binary dependencies can be pulled separately.
+# Copy the venv in multiple layers so the layers can be pulled in parallel and so be downloaded 
+# faster
 COPY --from=build-app \
     --exclude=lib/python3.12/site-packages/torch \
     --exclude=lib/python3.12/site-packages/torch/** \
