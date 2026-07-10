@@ -324,7 +324,6 @@ class SatelliteDownloader:
         Returns:
             xr.Dataset: The processed satellite data
         """
-
         # Interpolate missing satellite timestamps
         ds = interpolate_missing_satellite_timestamps(ds, max_gap=MAXIMUM_INTERPOLATION_GAP)
 

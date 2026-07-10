@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from collections import defaultdict
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import fsspec
 import numpy as np
