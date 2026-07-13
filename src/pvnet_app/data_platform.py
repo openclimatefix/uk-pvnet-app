@@ -346,8 +346,8 @@ def build_forecast_creation_request(
         init_time_utc=convert_to_utc_datetime(init_time_utc),
         values=forecast_value_requests,
         metadata=metadata,
-        # Floor the created timestamp to the nearest second to avoid issues in the data-platform
-        created_timestamp_utc=datetime.now(UTC).replace(microsecond=0),
+        # Floor the created timestamp to last minute to avoid issues in the data-platform
+        created_timestamp_utc=datetime.now(UTC).replace(second=0, microsecond=0),
     )
 
 
