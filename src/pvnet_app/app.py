@@ -60,7 +60,7 @@ async def run_app(
     settings: AppSettings,
     t0: str | datetime | pd.Timestamp | None = None,
     write_predictions: bool = True,
-) -> None | dict[str, xr.DataArray]:
+) -> dict[str, xr.DataArray] | None:
     """Set up the app environment and run a forecast.
 
     Handles Sentry, init-time resolution, and the scratch directory, then
