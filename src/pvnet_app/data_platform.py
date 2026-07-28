@@ -1,0 +1,424 @@
+"""Functions to load and save from data-platform."""
+
+import asyncio
+import logging
+from collections import defaultdict
+from datetime import UTC, datetime
+
+import fsspec
+import numpy as np
+import pandas as pd
+import xarray as xr
+from betterproto.lib.google.protobuf import Struct, Value
+from ocf import dp
+
+from pvnet_app.adjuster import calculate_adjusted_forecast
+from pvnet_app.consts import forecast_version
+from pvnet_app.utils import convert_to_utc_datetime
+
+logger = logging.getLogger(__name__)
+
+# Forecast values above this will be clipped before writing to the data-platform. Data-platform
+# currently only supports values up to this limit.
+DATAPLATFORM_MAX_VALUE: float = 1.09
+# Only allow these p-levels to be written to the data-platform
+NATIONAL_ALLOWED_PLEVELS: tuple[str, ...] = ("p02", "p10", "p25", "p50", "p75", "p90", "p98")
+REGIONAL_ALLOWED_PLEVELS: tuple[str, ...] = ("p10", "p50", "p90")
+# Maximum number of concurrent forecast writes to the data-platform
+MAX_INFLIGHT_FORECAST_WRITES: int = 32
+
+
+def _format_horizon_ranges(horizons_mins: list[int]) -> str:
+    """Format sorted horizon minutes as compact ranges."""
+    if not horizons_mins:
+        return "[]"
+
+    sorted_horizons = sorted(horizons_mins)
+    ranges: list[str] = []
+    range_start = sorted_horizons[0]
+    previous = sorted_horizons[0]
+
+    for horizon in sorted_horizons[1:]:
+        if horizon - previous == 30:
+            previous = horizon
+            continue
+
+        if range_start == previous:
+            ranges.append(str(range_start))
+        else:
+            ranges.append(f"{range_start}-{previous}")
+
+        range_start = horizon
+        previous = horizon
+
+    if range_start == previous:
+        ranges.append(str(range_start))
+    else:
+        ranges.append(f"{range_start}-{previous}")
+
+    return ", ".join(ranges)
+
+
+async def fetch_locations(
+    client: dp.DataPlatformDataServiceStub,
+) -> dict[int, dp.ListLocationsResponseLocationSummary]:
+    """Fetch all UK locations from data platform."""
+    # Get the UK national location
+    national_locations = (
+        await client.list_locations(
+            dp.ListLocationsRequest(
+                location_type_filter=dp.LocationType.NATION,
+                energy_source_filter=dp.EnergySource.SOLAR,
+                location_names_filter=["uk"],
+            ),
+        )
+    ).locations
+
+    if len(national_locations) != 1:
+        raise ValueError(f"Expected exactly one location for UK nation, got: {national_locations}")
+
+    national_location = national_locations[0]
+
+    # Get all GSPs within the UK nation
+    locations = (
+        await client.list_locations(
+            dp.ListLocationsRequest(
+                location_type_filter=dp.LocationType.GSP,
+                energy_source_filter=dp.EnergySource.SOLAR,
+                # TODO: We should filter specifically within the UK, but the current locations in
+                # the data-platform don't allow this yet. See commented line below for future use.
+                # enclosing_location_uuid_filter=national_location.location_uuid,
+            ),
+        )
+    ).locations
+
+    locations_lookup = {0: national_location}
+    for loc in locations:
+        location_id = int(loc.metadata.fields["gsp_id"].number_value)
+        if location_id in locations_lookup:
+            raise ValueError(f"Duplicate GSP ID {location_id} found in locations")
+        locations_lookup[location_id] = loc
+
+    return locations_lookup
+
+
+def extract_location_capacities_mwp(
+    locations: dict[int, dp.ListLocationsResponseLocationSummary],
+) -> dict[int, float]:
+    """Extract capacities in MW from location summaries."""
+    capacities_mwp = {
+        loc_id: loc.effective_capacity_watts / 1e6 for loc_id, loc in locations.items()
+    }
+
+    if (national_capacity_mwp := capacities_mwp[0]) <= 0:
+        raise ValueError(
+            "Expected positive national capacity for location_id=0, "
+            f"got {national_capacity_mwp} MW",
+        )
+
+    return capacities_mwp
+
+
+async def fetch_or_create_forecaster(
+    client: dp.DataPlatformDataServiceStub,
+    model_tag: str,
+) -> dp.Forecaster:
+    """Create the current forecaster if it does not exist."""
+    forecasters = (
+        await client.list_forecasters(
+            dp.ListForecastersRequest(forecaster_names_filter=[model_tag]),
+        )
+    ).forecasters
+
+    # Forecaster does not exist, create it
+    if len(forecasters) == 0:
+        create_forecaster_response = await client.create_forecaster(
+            dp.CreateForecasterRequest(name=model_tag, version=forecast_version),
+        )
+        return create_forecaster_response.forecaster
+
+    else:
+        filtered_forecasters = [f for f in forecasters if f.forecaster_version == forecast_version]
+
+        # Forecaster version does not exist, update it
+        if len(filtered_forecasters) == 0:
+            update_forecaster_response = await client.update_forecaster(
+                dp.UpdateForecasterRequest(name=model_tag, new_version=forecast_version),
+            )
+            return update_forecaster_response.forecaster
+
+        # Forecaster exists
+        else:
+            return filtered_forecasters[0]
+
+
+async def build_input_metadata(
+    client: dp.DataPlatformDataServiceStub,
+    location_uuid: str,
+    input_paths: dict[str, str],
+    app_version: str,
+) -> Struct:
+    """Get metadata for the forecast."""
+    metadata = {"app_version": Value(string_value=app_version)}
+
+    # Add timestamp when ground truths were last updated
+    latest_observations = (
+        await client.get_latest_observations(
+            dp.GetLatestObservationsRequest(
+                location_uuids=[location_uuid],
+                energy_source=dp.EnergySource.SOLAR,
+                observer_name="pvlive_in_day",
+            ),
+        )
+    ).observations
+
+    if len(latest_observations) > 0:
+        metadata["gsp_last_updated"] = Value(
+            string_value=latest_observations[-1].timestamp_utc.isoformat(),
+        )
+
+    # Add timestamp when the NWP and satellite were last updated
+    for name, path in input_paths.items():
+        if path is not None:
+            try:
+                fs = fsspec.open(path).fs
+                if path.endswith(".zarr"):
+                    modified_date = fs.modified(f"{path}/.zattrs")
+                elif path.endswith(".icechunk"):
+                    modified_date = fs.modified(f"{path}/refs/branch.main/ref.json")
+                else:
+                    logger.warning(f"Unknown file type for {name}: {path}; skipping")
+                    continue
+                metadata[f"{name}_last_modified"] = Value(string_value=modified_date.isoformat())
+            except Exception as e:
+                logger.warning(f"Could not get metadata for {name}: {e}")
+
+    return Struct(fields=metadata)
+
+
+async def build_multi_forecast_creation_request(
+    da_forecast: xr.DataArray,
+    locations: dict[int, dp.ListLocationsResponseLocationSummary],
+    model_tag: str,
+    init_time_utc: pd.Timestamp,
+    client: dp.DataPlatformDataServiceStub,
+    metadata: Struct | None,
+) -> list[dp.CreateForecastRequest]:
+    """Build a list of create-forecast requests for all forecasted locations.
+
+    Args:
+        da_forecast: DataArray of normalized forecasts for all locations
+        locations: Mapping of location IDs to location summaries
+        model_tag: The name of the model to saved to the database
+        init_time_utc: Forecast initialization time
+        client: A connected data-platform service client
+        metadata: Optional metadata to assign to each location forecast
+    """
+    # Fetch the forecaster and adjuster forecaster in parallel
+    forecaster, adjuster_forecaster = await asyncio.gather(
+        fetch_or_create_forecaster(client=client, model_tag=model_tag),
+        fetch_or_create_forecaster(client=client, model_tag=f"{model_tag}_adjust"),
+    )
+
+    forecast_requests: list[dp.CreateForecastRequest] = []
+
+    for loc_id in da_forecast.location_id.values.tolist():
+        request = build_forecast_creation_request(
+            da_forecast.sel(location_id=loc_id),
+            forecaster=forecaster,
+            location_uuid=locations[loc_id].location_uuid,
+            init_time_utc=init_time_utc,
+            metadata=metadata,
+        )
+
+        forecast_requests.append(request)
+
+    # Only make adjuster forecasts for national
+    da_adjusted_forecast = await calculate_adjusted_forecast(
+        client=client,
+        location=locations[0],
+        init_time_utc=init_time_utc,
+        da_forecast=da_forecast.sel(location_id=0),
+        forecaster=forecaster,  # We get the adjuster values for the original forecaster
+        model_name=model_tag,
+    )
+
+    request = build_forecast_creation_request(
+        da_forecast=da_adjusted_forecast,
+        forecaster=adjuster_forecaster,
+        location_uuid=locations[0].location_uuid,
+        init_time_utc=init_time_utc,
+        metadata=metadata,
+    )
+
+    forecast_requests.append(request)
+
+    return forecast_requests
+
+
+def _build_forecast_value(
+    horizon_mins: int,
+    pvalues: np.ndarray,
+    plevels: list[str],
+    clipped_horizons_by_plevels: dict[tuple[str, ...], list[int]],
+) -> dp.CreateForecastRequestForecastValue:
+
+    if len(pvalues) != len(plevels):
+        raise ValueError("pvalues and plevels must have the same length")
+
+    if "p50" not in plevels:
+        raise ValueError("p50 must be in plevels")
+
+    if (pvalues > DATAPLATFORM_MAX_VALUE).any():
+        high_plevels = tuple(np.array(plevels)[pvalues > DATAPLATFORM_MAX_VALUE].tolist())
+        clipped_horizons_by_plevels[high_plevels].append(horizon_mins)
+        pvalues = pvalues.clip(None, DATAPLATFORM_MAX_VALUE)
+
+    return dp.CreateForecastRequestForecastValue(
+        horizon_mins=horizon_mins,
+        p50_fraction=pvalues[plevels.index("p50")],
+        other_statistics_fractions={
+            k: v for k, v in zip(plevels, pvalues, strict=True) if k != "p50"
+        },
+    )
+
+
+def build_forecast_creation_request(
+    da_forecast: xr.DataArray,
+    forecaster: dp.Forecaster,
+    location_uuid: str,
+    init_time_utc: pd.Timestamp,
+    metadata: Struct | None,
+) -> dp.CreateForecastRequest:
+    """Build a create-forecast request from a DataArray forecast for a single location.
+
+    Args:
+        da_forecast: Normalized DataArray for a single location
+        forecaster: Forecaster object
+        location_uuid: UUID of the location
+        init_time_utc: Forecast initialization time
+        metadata: Optional metadata to assign to the forecast
+    """
+    location_id = int(da_forecast.location_id.values)
+    horizons_mins = da_forecast.horizon_mins.values.tolist()
+
+    allowed_plevels = NATIONAL_ALLOWED_PLEVELS if location_id == 0 else REGIONAL_ALLOWED_PLEVELS
+
+    # If the regional and summation models output different p-levels, then this DataArray will have
+    # NaNs for the missing p-levels for this location. Drop the p-levels with NaNs
+    da_forecast = da_forecast.dropna(dim="output_label", how="any")
+
+    # Filter the p-levels to the allowed set
+    plevels = [level for level in allowed_plevels if level in da_forecast.output_label.values]
+    forecast_array = (
+        da_forecast.sel(output_label=plevels).transpose("valid_times_utc", "output_label")
+    ).values
+
+    clipped_horizons_by_plevels: dict[tuple[str, ...], list[int]] = defaultdict(list)
+
+    forecast_value_requests = [
+        _build_forecast_value(
+            horizon_mins=h,
+            pvalues=pvalues,
+            plevels=plevels,
+            clipped_horizons_by_plevels=clipped_horizons_by_plevels,
+        )
+        for h, pvalues in zip(horizons_mins, forecast_array, strict=True)
+    ]
+
+    if clipped_horizons_by_plevels:
+        clipping_summaries = [
+            f"p-levels={list(high_plevels)} horizon_mins={_format_horizon_ranges(clipped_horizons)}"
+            for high_plevels, clipped_horizons in clipped_horizons_by_plevels.items()
+        ]
+        logger.warning(
+            "Clipped forecast values above %s for model=%s, location_id=%s: %s",
+            DATAPLATFORM_MAX_VALUE,
+            forecaster.forecaster_name,
+            location_id,
+            "; ".join(clipping_summaries),
+        )
+
+    return dp.CreateForecastRequest(
+        forecaster=forecaster,
+        location_uuid=location_uuid,
+        energy_source=dp.EnergySource.SOLAR,
+        init_time_utc=convert_to_utc_datetime(init_time_utc),
+        values=forecast_value_requests,
+        metadata=metadata,
+        # Floor the created timestamp to last minute to avoid issues in the data-platform
+        created_timestamp_utc=datetime.now(UTC).replace(second=0, microsecond=0),
+    )
+
+
+async def write_forecasts_to_data_platform(
+    client: dp.DataPlatformDataServiceStub,
+    forecasts: dict[str, "xr.DataArray"],
+    locations: dict[int, dp.ListLocationsResponseLocationSummary],
+    t0: pd.Timestamp,
+    input_paths: dict[str, str],
+    app_version: str,
+) -> None:
+    """Build requests and write all model forecasts to the data platform.
+
+    Builds the input metadata once, then builds and writes a forecast request for
+    every model and location. All writes are issued concurrently; if any fail, the
+    rest still complete and the failures are raised together as an ExceptionGroup.
+
+    Args:
+        client: A connected data-platform service client
+        forecasts: Normed national + regional forecasts keyed by model name
+        locations: Mapping of GSP ID to location summary, including national (0)
+        t0: The forecast init-time, as a naive-UTC timestamp
+        input_paths: Source data input paths, keyed by source name, for metadata
+        app_version: The app version to record against the forecasts
+
+    Raises:
+        ExceptionGroup: If one or more forecast writes fail
+    """
+    input_metadata = await build_input_metadata(
+        client=client,
+        location_uuid=locations[0].location_uuid,
+        input_paths=input_paths,
+        app_version=app_version,
+    )
+
+    all_requests: list[list[dp.CreateForecastRequest]] = await asyncio.gather(
+        *(
+            build_multi_forecast_creation_request(
+                da_forecast=da_normed_forecast,
+                locations=locations,
+                model_tag=model_name,
+                init_time_utc=t0,
+                client=client,
+                metadata=input_metadata,
+            )
+            for model_name, da_normed_forecast in forecasts.items()
+        ),
+    )
+
+    # Write the forecasts whilst limiting the number of concurrent writes to the data-platform to
+    # avoid overwhelming it
+    semaphore = asyncio.Semaphore(MAX_INFLIGHT_FORECAST_WRITES)
+
+    write_results = await asyncio.gather(
+        *(
+            _create_forecast_bounded(client, req, semaphore)
+            for reqs in all_requests
+            for req in reqs
+        ),
+        return_exceptions=True,
+    )
+
+    errors = [r for r in write_results if isinstance(r, Exception)]
+    if errors:
+        raise ExceptionGroup("Failed writing forecasts to data platform", errors)
+
+
+async def _create_forecast_bounded(
+    client: dp.DataPlatformDataServiceStub,
+    request: dp.CreateForecastRequest,
+    semaphore: asyncio.Semaphore,
+) -> dp.CreateForecastResponse:
+    async with semaphore:
+        return await client.create_forecast(request)

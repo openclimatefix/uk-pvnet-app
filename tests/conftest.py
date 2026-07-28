@@ -1,7 +1,7 @@
 import datetime
 import os
 import time
-from datetime import timedelta
+from collections.abc import AsyncIterator, Iterator
 from importlib.metadata import version
 
 import numpy as np
@@ -16,21 +16,26 @@ from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import PortWaitStrategy
 from testcontainers.postgres import PostgresContainer
 
-test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/test_data"
+from pvnet_app.data.gsp import get_gsp_locations
+
+test_data_dir = os.path.dirname(os.path.abspath(__file__)) + "/fixtures"
 
 DATA_PLATFORM_GRPC_PORT = 50051
 DATA_PLATFORM_STARTUP_TIMEOUT_SECONDS = 60
 
-xr.set_options(keep_attrs=True)
+
+@pytest.fixture(scope="session")
+def test_t0() -> pd.Timestamp:
+    return pd.Timestamp.now(tz=None).floor("30min")
 
 
 @pytest.fixture(scope="session")
-def test_t0():
-    return pd.Timestamp.now(tz=None).floor(timedelta(minutes=30))
+def location_ids() -> list[int]:
+    return get_gsp_locations().index.tolist()
 
 
 @pytest.fixture(scope="session")
-def dp_client():
+def dp_host_and_port() -> Iterator[tuple[str, int]]:
     """Spin up a single shared Data Platform gRPC server for the entire test session.
 
     Yields (host, port) only. Callers must create their own Channel+stub within
@@ -73,40 +78,34 @@ def dp_client():
 
             port = data_platform_server.get_exposed_port(DATA_PLATFORM_GRPC_PORT)
             host = data_platform_server.get_container_host_ip()
-
-            # Set env vars so app.py connects to the test container
-            os.environ["DATA_PLATFORM_HOST"] = host
-            os.environ["DATA_PLATFORM_PORT"] = str(port)
-
             yield host, port
 
 
 @pytest_asyncio.fixture(scope="session")
-async def client(dp_client):
+async def dp_client(
+    dp_host_and_port: tuple[str, int],
+) -> AsyncIterator[dp.DataPlatformDataServiceStub]:
     """Create a gRPC client connected to the shared Data Platform server."""
-    host, port = dp_client
-    channel = Channel(host=host, port=port)
-    client_stub = dp.DataPlatformDataServiceStub(channel)
-
-    yield client_stub
-    channel.close()
+    host, port = dp_host_and_port
+    async with Channel(host=host, port=port) as channel:
+        yield dp.DataPlatformDataServiceStub(channel)
 
 
 @pytest_asyncio.fixture(scope="session")
-async def setup_dp_locations(dp_client):
+async def dp_client_with_locations(
+    dp_client: dp.DataPlatformDataServiceStub,
+    location_ids: list[int],
+) -> dp.DataPlatformDataServiceStub:
     """Set up GSP locations and observer in the shared Data Platform for integration tests."""
-    host, port = dp_client
-    channel = Channel(host=host, port=port)
-    client = dp.DataPlatformDataServiceStub(channel)
 
-    total_gsps = 342
-    for i in range(total_gsps + 1):
-        metadata = Struct(fields={"gsp_id": Value(number_value=i)})
-        location_type = dp.LocationType.NATION if i == 0 else dp.LocationType.GSP
-        effective_capacity_watts = 15_000_000_000 if i == 0 else 1_000_000
+    for location_id in location_ids:
+        metadata = Struct(fields={"gsp_id": Value(number_value=location_id)})
+        location_type = dp.LocationType.NATION if location_id == 0 else dp.LocationType.GSP
+        effective_capacity_watts = 15_000_000_000 if location_id == 0 else 1_000_000
+        location_name = "uk" if location_id == 0 else f"gsp{location_id}"
 
         req = dp.CreateLocationRequest(
-            location_name=f"gsp{i}",
+            location_name=location_name,
             energy_source=dp.EnergySource.SOLAR,
             geometry_wkt="POINT(0 0)",
             location_type=location_type,
@@ -114,27 +113,23 @@ async def setup_dp_locations(dp_client):
             metadata=metadata,
             valid_from_utc=datetime.datetime(2020, 1, 1, tzinfo=datetime.UTC),
         )
-        await client.create_location(req)
+        await dp_client.create_location(req)
 
     # Setup observer
-    await client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
+    await dp_client.create_observer(dp.CreateObserverRequest(name="pvlive_day_after"))
 
-    channel.close()
+    return dp_client
 
 
-def make_nwp_data(shell_path, varname, init_time):
+def make_nwp_data(shell_path: str, varname: str, init_time: pd.Timestamp) -> xr.Dataset:
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(shell_path).compute()
 
-    ds.init_time.values[:] = init_time
+    ds = ds.assign_coords(init_time=[init_time])
 
     # This is important to avoid saving errors
     for v in list(ds.coords.keys()):
         if ds.coords[v].dtype == object:
-            ds[v].encoding.clear()
-
-    for v in list(ds.variables.keys()):
-        if ds[v].dtype == object:
             ds[v].encoding.clear()
 
     # Add data to dataset
@@ -151,9 +146,9 @@ def make_nwp_data(shell_path, varname, init_time):
 
 
 @pytest.fixture(scope="session")
-def nwp_ukv_data(test_t0):
+def nwp_ukv_data(test_t0: pd.Timestamp) -> xr.Dataset:
     # The init time was at least 8 hours ago and floor to 3-hour interval
-    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
+    init_time = (test_t0 - pd.Timedelta("8h")).floor("3h")
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_ukv_shell.zarr",
         varname="um-ukv",
@@ -162,9 +157,9 @@ def nwp_ukv_data(test_t0):
 
 
 @pytest.fixture(scope="session")
-def nwp_ecmwf_data(test_t0):
+def nwp_ecmwf_data(test_t0: pd.Timestamp) -> xr.Dataset:
     # The init time was at least 8 hours ago and floor to 3-hour interval
-    init_time = (test_t0 - timedelta(hours=8)).floor(timedelta(hours=3))
+    init_time = (test_t0 - pd.Timedelta("8h")).floor("3h")
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_ecmwf_shell.zarr",
         varname="hres-ifs_uk",
@@ -173,7 +168,7 @@ def nwp_ecmwf_data(test_t0):
 
 
 @pytest.fixture(scope="session")
-def cloudcasting_data(test_t0):
+def cloudcasting_data(test_t0: pd.Timestamp) -> xr.Dataset:
     # The init time is the same as test_t0
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_cloudcasting_shell.zarr",
@@ -183,23 +178,18 @@ def cloudcasting_data(test_t0):
 
 
 @pytest.fixture(scope="session")
-def config_filename():
+def config_filename() -> str:
     return f"{test_data_dir}/test.yaml"
 
 
-def make_sat_data(test_t0, delay_mins, freq_mins):
+def make_sat_data(test_t0: pd.Timestamp, delay_mins: int, freq_mins: int) -> xr.Dataset:
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(f"{test_data_dir}/non_hrv_shell.zarr").compute()
 
-    # Expand time dim to be len 36 = 3 hours of 5 minute data
-    n_hours = 3
-
-    # Add times so they lead up to present
-    t0_datetime_utc = test_t0 - timedelta(minutes=delay_mins)
     times = pd.date_range(
-        t0_datetime_utc - timedelta(hours=n_hours),
-        t0_datetime_utc,
-        freq=timedelta(minutes=freq_mins),
+        test_t0 - pd.Timedelta(hours=3),
+        test_t0 - pd.Timedelta(minutes=delay_mins),
+        freq=f"{freq_mins}min",
     )
     ds = ds.expand_dims(time=times)
 
@@ -209,28 +199,24 @@ def make_sat_data(test_t0, delay_mins, freq_mins):
         coords=[ds[c] for c in ds.xindexes],
     )
 
-    # Add stored attributes to DataArray
-    ds.data.attrs = ds.attrs["_data_attrs"]
-    del ds.attrs["_data_attrs"]
-
     return ds
 
 
 @pytest.fixture(scope="session")
-def sat_5_data(test_t0):
+def sat_5_data(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_sat_data(test_t0, delay_mins=10, freq_mins=5)
 
 
 @pytest.fixture(scope="session")
-def sat_5_data_zero_delay(test_t0):
+def sat_5_data_zero_delay(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_sat_data(test_t0, delay_mins=0, freq_mins=5)
 
 
 @pytest.fixture(scope="session")
-def sat_5_data_delayed(test_t0):
+def sat_5_data_delayed(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_sat_data(test_t0, delay_mins=120, freq_mins=5)
 
 
 @pytest.fixture(scope="session")
-def sat_15_data(test_t0):
+def sat_15_data(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_sat_data(test_t0, delay_mins=0, freq_mins=15)

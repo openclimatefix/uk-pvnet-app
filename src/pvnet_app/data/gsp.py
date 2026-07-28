@@ -1,86 +1,60 @@
 """Functions to get GSP data from the data platform."""
-import asyncio
-import itertools
-import logging
+
+from functools import cache
 from importlib.resources import files
 
-import betterproto
+import numpy as np
 import pandas as pd
-from ocf import dp
-
-logger = logging.getLogger()
+import xarray as xr
 
 
-BACKUP_CAPACITIES: pd.Series = pd.read_csv(
-    files("pvnet_app.data").joinpath("gsp_backup_capacities_2026_02_04.csv"),
-    index_col="gsp_id",
-)["capacity_mwp"]
+@cache
+def get_gsp_locations() -> pd.DataFrame:
+    """Load the GSP locations metadata."""
+    return pd.read_csv(
+        files("pvnet_app.data").joinpath("uk_gsp_locations_20260209_no_shetlands.csv"),
+        index_col="location_id",
+    )
 
 
-async def get_gsp_and_national_capacities_from_dp(
-    client: dp.DataPlatformDataServiceStub,
-    gsp_ids: list[int],
-) -> tuple[pd.Series, float]:
-    """Get GSP and national capacities from the data platform.
+def create_null_generation_data(t0: pd.Timestamp, capacities_mwp: dict[int, float]) -> xr.Dataset:
+    """Create generation-like xarray-data filled with value -1.
 
     Args:
-        client: Data platform client
-        gsp_ids: List of GSP IDs to get capacities for
-
-    Returns:
-        Tuple containing:
-        - Pandas series of GSP capacities (MWp)
-        - National capacity value (MWp)
+        t0: The forecast init-time
+        capacities_mwp: A dictionary mapping location IDs to their capacities in MWp
     """
-    try:
-        tasks = [
-            client.list_locations(
-                dp.ListLocationsRequest(
-                    location_type_filter=loc_type,
-                    energy_source_filter=dp.EnergySource.SOLAR,
-                ),
-            )
-            for loc_type in [dp.LocationType.GSP, dp.LocationType.NATION]
-        ]
-        responses = await asyncio.gather(*tasks)
+    # Load the GSP location data
+    df_locs = get_gsp_locations()
 
-        locations_df = (
-            pd.DataFrame.from_dict(
-                itertools.chain(
-                    *[
-                        r.to_dict(casing=betterproto.Casing.SNAKE, include_default_values=True)[
-                            "locations"
-                        ]
-                        for r in responses
-                    ],
-                ),
-            )
-            .loc[lambda df: df["metadata"].apply(lambda x: "gsp_id" in x)]
-            .assign(
-                gsp_id=lambda df: df["metadata"].apply(
-                    lambda x: int(x["gsp_id"]["number_value"]),
-                ),
-                capacity_mwp=lambda df: df["effective_capacity_watts"].astype(float) / 1_000_000.0,
-            ).set_index("gsp_id")
+    if missing := set(df_locs.index.tolist()) - set(capacities_mwp.keys()):
+        raise ValueError(
+            f"The following location IDs are in the GSP locations metadata but missing from "
+            f"capacities_mwp: {sorted(missing)}"
         )
 
-        missing = [gid for gid in [0, *gsp_ids] if gid not in locations_df.index]
-        if missing:
-            raise ValueError(f"Missing capacities from data platform for GSP IDs: {missing}")
+    capacities_array = np.array(
+        [capacities_mwp[loc_id] for loc_id in df_locs.index.tolist()],
+        dtype=np.float32,
+    )
 
-        if locations_df.loc[[0, *gsp_ids], "capacity_mwp"].isna().any():
-            raise ValueError("Capacities from data platform contain NaNs")
+    # Generate null generation values
+    time_utc = pd.date_range(t0 - pd.Timedelta("2D"), t0 + pd.Timedelta("3D"), freq="30min")
+    gen_data = np.full((len(time_utc), len(df_locs)), fill_value=-1, dtype=np.float32)
+    cap_data = np.tile(capacities_array, (len(time_utc), 1))
 
-        national_capacity = float(locations_df.loc[0, "capacity_mwp"])
-        gsp_capacities = locations_df.loc[gsp_ids, "capacity_mwp"]
+    # Construct generation dataset
+    ds_gen = xr.Dataset(
+        data_vars={
+            "generation_mw": (("time_utc", "location_id"), gen_data),
+            "capacity_mwp": (("time_utc", "location_id"), cap_data),
+        },
+        coords={
+            "time_utc": ("time_utc", time_utc),
+            "location_id": ("location_id", df_locs.index.values),
+            "longitude": ("location_id", df_locs.longitude.values),
+            "latitude": ("location_id", df_locs.latitude.values),
+        },
+    )
 
-    except Exception as e:
-        logger.error(f"Error in loading GSP capacities from data platform: {e}")
-        logger.warning(
-            "We couldnt load all the capacities from the data platform, "
-            "so we are using back up ones from 2026-02-04",
-        )
-        national_capacity = BACKUP_CAPACITIES.loc[0].item()
-        gsp_capacities = BACKUP_CAPACITIES.loc[gsp_ids]
-
-    return gsp_capacities, national_capacity
+    return ds_gen

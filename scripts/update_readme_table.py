@@ -1,6 +1,6 @@
 """This script updates the model summary table in the package README to the current models.
 
-It adds all models in src/pvnet_app/model_configs/all_models.py
+It adds all models in src/pvnet_app/models/catalogue.py
 """
 
 import os
@@ -8,11 +8,11 @@ from pathlib import Path
 
 from pvnet.models.base_model import BaseModel as PVNetBaseModel
 
-from pvnet_app.config import load_yaml_config
-from pvnet_app.model_configs.pydantic_models import HuggingFaceCommit, get_all_models
+from pvnet_app.model_input_config import get_required_nwp_providers, load_yaml_config
+from pvnet_app.models.registry import HuggingFaceCommit, get_model_specs
 
 
-def make_huffingface_link(model_commit: HuggingFaceCommit) -> str:
+def make_huggingface_link(model_commit: HuggingFaceCommit) -> str:
     """Make a link to the model on huggingface.
 
     Args:
@@ -22,8 +22,8 @@ def make_huffingface_link(model_commit: HuggingFaceCommit) -> str:
 
 
 def generate_table() -> str:
-    """Make a new summary table for the models descriobed in the model configs."""
-    model_configs = get_all_models()
+    """Make a new summary table for the models described in the model configs."""
+    model_specs = get_model_specs()
     columns = [
         "Model Name",
         "Uses satellite",
@@ -40,43 +40,36 @@ def generate_table() -> str:
     hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
 
 
-    for model_config in model_configs:
-        pvnet_link = make_huffingface_link(model_config.pvnet)
-        summation_link = make_huffingface_link(model_config.summation)
+    for model_spec in model_specs:
+        pvnet_link = make_huggingface_link(model_spec.pvnet)
+        summation_link = make_huggingface_link(model_spec.summation)
 
         data_config_path = PVNetBaseModel.get_data_config(
-            model_config.pvnet.repo,
-            revision=model_config.pvnet.commit,
+            model_spec.pvnet.repo,
+            revision=model_spec.pvnet.commit,
             token=hf_token,
         )
         data_config = load_yaml_config(data_config_path)
 
-        providers = set()
-        if "nwp" in data_config["input_data"]:
-            for source in data_config["input_data"]["nwp"].values():
-                providers.add(source["provider"])
+        providers = get_required_nwp_providers([data_config])
 
-        uses_ecmwf = "ecmwf" in providers
-        uses_ukv = "ukv" in providers
-        uses_cloud = "cloudcasting" in providers
-        uses_sat = "satellite" in data_config["input_data"]
+        def yes_or_blank(value: bool) -> str:
+            return "yes" if value else "-"
 
         row = " | ".join(
             [
-                model_config.name,
-                "yes" if uses_sat else "-",
-                "yes" if uses_ukv else "-",
-                "yes" if uses_ecmwf else "-",
-                "yes" if uses_cloud else "-",
+                model_spec.name,
+                yes_or_blank("satellite" in data_config["input_data"]),
+                yes_or_blank("ukv" in providers),
+                yes_or_blank("ecmwf" in providers),
+                yes_or_blank("cloudcasting" in providers),
                 f"[HF Link]({pvnet_link})",
                 f"[Summation HF Link]({summation_link})",
             ],
         )
         rows.append(row)
 
-    table = ""
-    for row in rows:
-        table += f"| {row} |\n"
+    table = "".join([f"| {row} |\n" for row in rows])
 
     return table
 

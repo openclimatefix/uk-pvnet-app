@@ -11,122 +11,65 @@ The app supports multiple model versions being deployed to live environments and
 
 ## Environment Variables
 
-The following environment variables are used in the app:
+The app is configured at runtime with many environmental variables. See [settings.py](src/pvnet_app/settings.py).
 
-### Required Environment Variables
-
-- `NWP_UKV_ZARR_PATH`: The path to the UKV NWP data in Zarr format.
-- `NWP_ECMWF_ZARR_PATH`: The path to the ECMWF NWP data in Zarr format.
-- `CLOUDCASTING_ZARR_PATH`: The path to the cloudcasting forecast data in Zarr format.
-- `SATELLITE_ZARR_PATH`: The path to the satellite data in Zarr format.
-
-### Optional Environment Variables
-
-#### These control the data sources
-
-- `SATELLITE_15_ZARR_PATH`: The path to the 15 minute satellite data in Zarr format. If 
-this is not set then the `SATELLITE_ZARR_PATH` is used by `.zarr` is repalced with `_15.zarr`
-
-#### These control the data platform connection
-
-Forecasts and GSP capacities are read from and written to the data platform.
-
-- `DATA_PLATFORM_HOST`: The host address for the data platform, default is localhost.
-- `DATA_PLATFORM_PORT`: The port for the data platform, default is 50051.
-
-#### These control the model(s) run
-
-- `RUN_CRITICAL_MODELS_ONLY`: Option to run critical models only. Defaults to false.
-
-#### These control the saved results
-
-- `ALLOW_ADJUSTER`: Option to allow the adjuster to be used. If false this overwrites the adjuster 
-  option in the model configs so it is not used. Defaults to true.
-- `ALLOW_SAVE_GSP_SUM`: Option to allow model to save the GSP sum. If false this overwrites the
-  model configs so saving of the GSP sum is not used. Defaults to false.
-
-#### These extra variables control validation and logging
-
-- `SENTRY_DSN`: Optional link to Sentry.
-- `ENVIRONMENT`: The environment this is running in. Defaults to local.
-- `FORECAST_VALIDATE_ZIG_ZAG_WARNING`: Threshold for warning on forecast zig-zag, defaults to 250MW.
-- `FORECAST_VALIDATE_ZIG_ZAG_ERROR`: Threshold for error on forecast zig-zag, defaults to 500MW.
-- `FORECAST_VALIDATE_SUN_ELEVATION_LOWER_LIMIT`, when the solar elevation is above this,
-  we expect positive forecast values. Defaults to 10 degrees.
-- `FILTER_BAD_FORECASTS`: If set to true and the forecast fails validation checks, it will not be 
-  saved. Defaults to false, where all forecasts are saved even if they fail the checks.
-- `RAISE_MODEL_FAILURE`: Option to raise an exception if a model fails to run. If set to "any" it 
-  will raise an exception if any model fails. If set to "critical" it will raise an exception if any
-  critical model fails. If not set, it will not raise an exception.
-
-### Examples
-
-Here are some examples of how to set these environment variables:
-
-```sh
-export NWP_UKV_ZARR_PATH="s3://bucket/path/to/ukv.zarr"
-export NWP_ECMWF_ZARR_PATH="s3://bucket/path/to/ecmwf.zarr"
-export CLOUDCASTING_ZARR_PATH="s3://bucket/path/to/cloudcasting.zarr"
-export SATELLITE_ZARR_PATH="s3://bucket/path/to/satellite.zarr"
-export ALLOW_ADJUSTER="true"
-export ALLOW_SAVE_GSP_SUM="false"
-export RUN_CRITICAL_MODELS_ONLY="true"
-export SENTRY_DSN="https://examplePublicKey@o0.ingest.sentry.io/0"
-export ENVIRONMENT="production"
-```
 
 ## ML Models Used for PVNet
 
 <!-- START model-config-table -->
 | Model Name | Uses satellite | Uses UKV | Uses ECMWF | Uses cloudcasting | PVNet Hugging Face Link | PVNet Summation Hugging Face Link |
 | ----|----|----|----|----|----|---- |
-| pvnet_v2 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/cfcb233576c3c8110daed0179452e3d9913c744c) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/e43006c1359c5ea4df03fe4f6ce3d0da8a4c68f0) |
-| pvnet_cloud | - | yes | yes | yes | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/117bd0f1b9454f6995d3d2fa00ef125c9c9a7190) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/da7cd536bd3cdd9c9bae2d4974484dc68599143d) |
-| pvnet_v2_sat0 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/bcd70352e2d77a69e1aec7670749c2c675a5a14e) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/89082d95fd569e4d976f0eaba1d0d26142e2903c) |
-| pvnet_ecmwf | - | - | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/6b7cc5fec03b83837672a759d7e00f249685de6b) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/0c26b19ab90001ee51f9886227be8286e84a393c) |
-| pvnet-sat-only | yes | - | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/86140b77d015fce1d5fa1a518d340127e488fcfd) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/0f6336d5a4258b3b43b45ea554521bee69df4622) |
-| pvnet-ukv-only | - | yes | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/30c406ea8455d9d43aa1284cba23c3a59102f549) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_v2_summation/tree/e6d6af7cae45c16e76e02e959772fba981182897) |
-| pvnet_day_ahead | - | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region_day_ahead/tree/ace3469f6fb6db7356afe401c1aaf1a78505f4f7) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_summation_uk_national_day_ahead/tree/fba62ff05d1465076d2cfb4a40f18d9896e7a457) |
+| pvnet_v2 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/0f6a00de0c6a12b36f6c050ba7d9916949803ad8) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/f5b6b7fab06d762e900f6caeb3ec6af07db3ec4c) |
+| pvnet_intra_allbells30 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/b88eae46dd40d8670de00b0c0e64d6363886aadf) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/b10af61ef303566dee6647f0b9eba07432d91957) |
+| pvnet_ecmwf | - | - | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/bd376303f753dd869dd0fd194906451b91b2dcd1) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/2e301b599ab8a15ed02d09aceea43c7f7c6f4516) |
+| pvnet_sat_only | yes | - | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/14f2223681c9741163a3099493d97bcd1c4e0025) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/ac6d5dc380628f15ad02c53a2ddb8727e1e2907e) |
+| pvnet_ukv_only | - | yes | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/b242aad4ed243efe4e701b9ae61136615795faa8) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/2263afba597d231c0699782b9e44c7208a751345) |
+| pvnet_day_ahead | - | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/723603423d1b2b74fe49715a2d52fa7593a9451e) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/fe1c826c4141d8cefc5c5b60618ad1654a06f9b0) |
 
 <!-- END model-config-table -->
 
 ## Validation Checks
 
-We run a number of different validation checks on the data and the forecasts that are made. 
-These are in place to ensure quality forecasts are made and saved to the data-platform.
+We run a number of validation checks on the input data and on the forecasts that are
+produced.
 
-Before feeding data into the model(s) we check whether the data avilable is compatible with the 
-data that the model expects.
+Before feeding data into the model(s) we check whether the available data is compatible
+with what each model expects.
 
 ### Satellite data
 
 We check:
-- Whether 5 minute and/or 15 minute satellite data is available
-- If more than 5% of satellite data is NaN - if so the satellite data is treated as missing
-- If more that 10% of satellite data is zero - if so the satellite data is treated as missing
-- Whether there are any missing timestamps in the satellite data. We linearly interpolate
-any gaps less that 15 minutes.
-- Whether the exact timestamps that the model expects are all available after infilling and checks
+- Whether 5-minute and/or 15-minute satellite data is available.
+- If more than 5% of the satellite data in the required area is NaN. If so, the satellite data is 
+  treated as completely missing.
+- Whether there are any missing timestamps in the satellite data. Gaps of up to 15 minutes are 
+  linearly interpolated.
+- After interpolation, the most recent missing timestamps are extended forward with NaNs up to the 
+  delay the model allows.
+- Whether the exact timestamps the model expects are all available after infilling.
 
 ### NWP data
 
 We check:
-- If the NWP data contains any NaNs - if so that NWP source is treated as missing
-- Whether the exact timestamps that the model expects from each NWP are available
+- If the NWP data contains any NaNs — if so, that NWP source is treated as missing.
+- Whether the exact timestamps the model expects from each NWP source are available.
 
 ### ML batch checks
 
-Just before the batch data goes into the ML models, we check that 
-- All the NWP are not zeros. We raise an error if, for any nwp provider, all the NWP data is zero. 
-- TODO: https://github.com/openclimatefix/PVNet/issues/324
+Just before the batch goes into the ML models, we check that:
+- The NWP data for each provider is not entirely zeros. We raise an error if, for any
+  NWP provider, all the NWP data is zero.
 
 ### Forecast checks
 
-After the ML models have run, we check the following
-- The forecast is not above 110% of the national capacity. An error is raised if any forecast value is above 110% of the national capacity.
-- The forecast is not above 100 GW, any forecast value above 30 GW we get a warning but any forecast value above 100 GW we raise an error. 
-- If the forecast goes up, then down, then up, more than 500 MW we raise an error. A warning is made for 250 MW. This stops zig-zag forecasts. 
-- Check positive values in day. If the sun is up, we expect positive values. 
+After the ML models have run, we check the national forecast only:
+- It does not exceed 100% of the national capacity. The forecast fails validation if any
+  value is above this.
+- It does not exceed an absolute ceiling of 20 GW. The forecast fails validation if any
+  value is above this.
+- It does not zig-zag (go up, then down, then up). Swings above 500\* MW fail validation;
+  swings above 250\* MW produce a warning. \*configurable - see setting.py
+- Forecast values are positive when the sun is up (above the configured elevation).
 
 ## Development
 
@@ -136,7 +79,7 @@ To be able to run the tests locally it is recommended to use `conda` and `uv`. T
 
 ### Running the app locally
 
-It is possbile to run the app locally by setting the required environment variables listed at the top of the [app](pvnet_app/app.py), these should point to the relevant data sources and the data platform instance for the environment you want to run the app in. You will need to make sure the data platform at `DATA_PLATFORM_HOST:DATA_PLATFORM_PORT` is reachable, as well as authenticating against any cloud providers where data may be stored (e.g if using AWS S3 then can do this via the AWS CLI command `aws configure`), a simple [notebook](scripts/run_app_local_example.ipynb) has been created as an example.  
+It is possbile to run the app locally by setting the required environment variables listed in [settings.py](pvnet_app/settings.py), these should point to the relevant data sources and the data platform instance for the environment you want to run the app in. You will need to make sure the data platform at `DATA_PLATFORM_HOST:DATA_PLATFORM_PORT` is reachable, as well as authenticating against any cloud providers where data may be stored (e.g if using AWS S3 then can do this via the AWS CLI command `aws configure`).
 
 
 ## Contributors ✨

@@ -1,41 +1,18 @@
 import os
-import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
-import pytest
 import xarray as xr
-import zarr
-from ocf_data_sampler.load.gsp import get_gsp_boundaries
 
-from pvnet_app.consts import sat_path
 from pvnet_app.data.satellite import (
     SatelliteDownloader,
     check_model_satellite_inputs_available,
     contains_too_many_of_value,
     extend_satellite_data_with_nans,
-    get_satellite_source_paths,
     interpolate_missing_satellite_timestamps,
 )
-
-# ------------------------------------------------------------
-# Utility functions for the tests
-
-
-@pytest.fixture()
-def gsp_ids():
-    return get_gsp_boundaries(version="20250109").iloc[1:].index.tolist()
-
-
-def save_to_zarr_zip(ds: xr.Dataset, filename: str) -> None:
-    """Save the given xarray dataset to a zarr file in a zip archive
-
-    Args:
-        ds: Dataset to save
-        filename: Name of the zip archive
-    """
-    with zarr.storage.ZipStore(filename, mode="w") as store:
-        ds.to_zarr(store, compute=True)
 
 
 def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[int]) -> bool:
@@ -45,11 +22,7 @@ def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[
         sat_path: Path to the satellite data
         expected_freq_mins: Expected frequency of timesteps in minutes
     """
-    if "zip" in sat_path:
-        with zarr.storage.ZipStore(sat_path, mode="r") as store:
-            ds_sat = xr.open_zarr(store)
-    else:
-        ds_sat = xr.open_zarr(sat_path)
+    ds_sat = xr.open_zarr(sat_path)
 
     if not isinstance(expected_freq_mins, list):
         expected_freq_mins = [expected_freq_mins]
@@ -58,222 +31,152 @@ def timesteps_match_expected_freq(sat_path: str, expected_freq_mins: int | list[
     return np.isin(dts, pd.to_timedelta(expected_freq_mins, unit="min")).all()
 
 
-# ------------------------------------------------------------
-# Tests begin here
-
-
-def test_download_sat_5_data(sat_5_data, test_t0, gsp_ids):
-    """Download only the 5 minute satellite data"""
-
-    # make temporary directory
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        # Change to temporary working directory
-        os.chdir(tmpdirname)
-
-        # Make 5-minutely satellite data available
-        save_to_zarr_zip(sat_5_data, filename="latest.zarr.zip")
-
-        sat_downloader = SatelliteDownloader(
-            t0=test_t0,
-            gsp_ids=gsp_ids,
-            source_path_5="latest.zarr.zip",
-            source_path_15="latest_15.zarr.zip",
-        )
-        sat_downloader.download_data()
-
-        # Assert that the 5-minute file exists
-        assert os.path.exists(sat_downloader.destination_path_5)
-        assert not os.path.exists(sat_downloader.destination_path_15)
-
-        # Check the satellite data is 5-minutely
-        assert timesteps_match_expected_freq(
-            sat_downloader.destination_path_5,
-            expected_freq_mins=5,
-        )
-
-
-def test_download_sat_15_data(sat_15_data, test_t0, gsp_ids):
-    """Download only the 15 minute satellite data"""
-
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
-
-        # Make 15-minutely satellite data available
-        save_to_zarr_zip(sat_15_data, filename="latest_15.zarr.zip")
-
-        sat_downloader = SatelliteDownloader(
-            t0=test_t0,
-            gsp_ids=gsp_ids,
-            source_path_5="latest.zarr.zip",
-            source_path_15="latest_15.zarr.zip",
-        )
-        sat_downloader.download_data()
-
-        # Assert that the 15-minute file exists
-        assert not os.path.exists(sat_downloader.destination_path_5)
-        assert os.path.exists(sat_downloader.destination_path_15)
-
-        # Check the satellite data is 15-minutely
-        assert timesteps_match_expected_freq(
-            sat_downloader.destination_path_15,
-            expected_freq_mins=15,
-        )
-
-
-def test_download_sat_5_and_15_data(sat_5_data, sat_15_data, test_t0, gsp_ids):
-    """Download 5 minute sat and 15 minute satellite data"""
-
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
-
-        # Make 5- and 15-minutely satellite data available
-        save_to_zarr_zip(sat_5_data, filename="latest.zarr.zip")
-        save_to_zarr_zip(sat_15_data, filename="latest_15.zarr.zip")
-
-        sat_downloader = SatelliteDownloader(
-            t0=test_t0,
-            gsp_ids=gsp_ids,
-            source_path_5="latest.zarr.zip",
-            source_path_15="latest_15.zarr.zip",
-        )
-        sat_downloader.download_data()
-
-        assert os.path.exists(sat_downloader.destination_path_5)
-        assert os.path.exists(sat_downloader.destination_path_15)
-
-        # Check this satellite data is 5-minutely
-        assert timesteps_match_expected_freq(
-            sat_downloader.destination_path_5,
-            expected_freq_mins=5,
-        )
-
-        # Check this satellite data is 15-minutely
-        assert timesteps_match_expected_freq(
-            sat_downloader.destination_path_15,
-            expected_freq_mins=15,
-        )
-
-
-def test_run_sat_5_data(sat_5_data, test_t0, gsp_ids):
+def test_run_sat_5_data(sat_5_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path: Path):
     """Download and process only the 5 minute satellite data"""
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    dst_path = f"{tmp_path}/sat.zarr"
 
-        # Make 5-minutely satellite data available
-        save_to_zarr_zip(sat_5_data, filename="latest.zarr.zip")
-
+    with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[sat_5_data]):
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
-            source_path_5="latest.zarr.zip",
-            source_path_15="latest_15.zarr.zip",
+            source_path_5="s3://fake/sat5",
+            source_path_15=None,
+            s3_region="fake-region",
+            destination_path=dst_path,
+            interval_start_minutes=-60,
+            interval_end_minutes=0,
+            window_size_pixels=24,
         )
         sat_downloader.run()
 
-        # Check the satellite data is 5-minutely and is saved in the correct place
-        assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
+    assert os.path.exists(dst_path)
+    assert sat_downloader.sat_choice == "5-min"
+
+    # Check the satellite data is 5-minutely and is saved in the correct place
+    assert timesteps_match_expected_freq(dst_path, expected_freq_mins=5)
 
 
-def test_run_sat_15_data(sat_15_data, test_t0, gsp_ids):
+def test_run_sat_15_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path: Path):
     """Download and process only the 15 minute satellite data"""
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    dst_path = f"{tmp_path}/sat.zarr"
 
-        # Make 15-minutely satellite data available
-        save_to_zarr_zip(sat_15_data, filename="latest_15.zarr.zip")
-
+    with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[sat_15_data]):
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
-            source_path_5="latest.zarr.zip",
-            source_path_15="latest_15.zarr.zip",
+            source_path_5=None,
+            source_path_15="s3://fake/sat15",
+            s3_region="fake-region",
+            destination_path=dst_path,
+            interval_start_minutes=-60,
+            interval_end_minutes=0,
+            window_size_pixels=24,
         )
         sat_downloader.run()
 
-        assert not os.path.exists(sat_downloader.destination_path_5)
-        assert os.path.exists(sat_downloader.destination_path_15)
-        assert os.path.exists(sat_downloader.destination_path)
+    assert os.path.exists(dst_path)
+    assert sat_downloader.sat_choice == "15-min"
 
-        # We infill the satellite data to 5 minutes in the process step
-        assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
+    # We infill the satellite data to 5 minutes in the process step
+    assert timesteps_match_expected_freq(dst_path, expected_freq_mins=5)
 
 
-def test_run_sat_delayed_5_and_15_data(sat_5_data_delayed, sat_15_data, test_t0, gsp_ids):
+def test_run_sat_too_delayed(
+    sat_5_data_delayed: xr.Dataset,
+    sat_15_data: xr.Dataset,
+    test_t0: pd.Timestamp,
+    tmp_path: Path,
+):
+    """Download and process 5 and 15 minute satellite data where both are extremely delayed"""
+
+    dst_path = f"{tmp_path}/sat.zarr"
+
+    with patch(
+        "pvnet_app.data.satellite.open_satellite_data",
+        side_effect=[sat_5_data_delayed, sat_15_data],
+    ):
+        sat_downloader = SatelliteDownloader(
+            t0=test_t0 + pd.Timedelta("12h"),
+            source_path_5="s3://fake/sat5",
+            source_path_15="s3://fake/sat15",
+            s3_region="fake-region",
+            destination_path=dst_path,
+            interval_start_minutes=-60,
+            interval_end_minutes=0,
+            window_size_pixels=24,
+        )
+        sat_downloader.run()
+
+    # If the satellite data is too delayed the valid_times attribute should be None and the
+    # satellite data should not be saved
+    assert sat_downloader.valid_times is None
+    assert not os.path.exists(dst_path)
+
+
+def test_run_sat_delayed_5_and_15_data(
+    sat_5_data_delayed: xr.Dataset,
+    sat_15_data: xr.Dataset,
+    test_t0: pd.Timestamp,
+    tmp_path: Path,
+):
     """Download and process 5 and 15 minute satellite data. Use the 15 minute data since the
     5 minute data is too delayed
     """
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    dst_path = f"{tmp_path}/sat.zarr"
 
-        save_to_zarr_zip(sat_5_data_delayed, filename="latest.zarr.zip")
-        save_to_zarr_zip(sat_15_data, filename="latest_15.zarr.zip")
-
+    with patch(
+        "pvnet_app.data.satellite.open_satellite_data",
+        side_effect=[sat_5_data_delayed, sat_15_data],
+    ):
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
-            source_path_5="latest.zarr.zip",
-            source_path_15="latest_15.zarr.zip",
+            source_path_5="s3://fake/sat5",
+            source_path_15="s3://fake/sat15",
+            s3_region="fake-region",
+            destination_path=dst_path,
+            interval_start_minutes=-60,
+            interval_end_minutes=0,
+            window_size_pixels=24,
         )
         sat_downloader.run()
 
-        # We infill the satellite data to 5 minutes in the process step
-        assert timesteps_match_expected_freq(sat_path, expected_freq_mins=5)
+    assert os.path.exists(dst_path)
+    assert sat_downloader.sat_choice == "15-min"
+
+    # We infill the satellite data to 5 minutes in the process step
+    assert timesteps_match_expected_freq(dst_path, expected_freq_mins=5)
 
 
-def test_run_zeros_in_sat_data(sat_15_data, test_t0, gsp_ids):
-    """Check that the satellite data is considered invalid if it contains too many zeros"""
-
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
-
-        # Make half the values zeros
-        ds = sat_15_data.copy(deep=True)
-        ds.data[::2] = 0
-
-        # Make satellite data available
-        save_to_zarr_zip(ds, filename="latest.zarr.zip")
-
-        sat_downloader = SatelliteDownloader(
-            t0=test_t0,
-            gsp_ids=gsp_ids,
-            source_path_5="latest.zarr.zip",
-            source_path_15="latest_15.zarr.zip",
-        )
-        sat_downloader.run()
-
-        # If the satellite data is invalid the valid_times attribute should be None
-        assert sat_downloader.valid_times is None
-
-
-def test_run_nan_in_sat_data(sat_15_data, test_t0, gsp_ids):
+def test_run_nan_in_sat_data(sat_15_data: xr.Dataset, test_t0: pd.Timestamp, tmp_path: Path):
     """Check that the satellite data is considered invalid if it contains too many NaNs"""
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    dst_path = f"{tmp_path}/sat.zarr"
 
-        # Make half the values zeros
-        ds = sat_15_data.copy(deep=True)
-        ds.data[::2] = np.nan
+    # Make half the values zeros
+    ds = sat_15_data.copy(deep=True)
+    ds.data[::2] = np.nan
 
-        # Make satellite data available
-        save_to_zarr_zip(ds, filename="latest.zarr.zip")
-
+    with patch("pvnet_app.data.satellite.open_satellite_data", side_effect=[ds]):
         sat_downloader = SatelliteDownloader(
             t0=test_t0,
-            gsp_ids=gsp_ids,
-            source_path_5="latest.zarr.zip",
-            source_path_15="latest_15.zarr.zip",
+            source_path_5=None,
+            source_path_15="s3://fake/sat15",
+            s3_region="fake-region",
+            destination_path=dst_path,
+            interval_start_minutes=-60,
+            interval_end_minutes=0,
+            window_size_pixels=24,
         )
         sat_downloader.run()
 
-        # If the satellite data is invalid the valid_times attribute should be None
-        assert sat_downloader.valid_times is None
+    # If the satellite data is invalid the valid_times attribute should be None and the
+    # satellite data should not be saved
+    assert sat_downloader.valid_times is None
+    assert not os.path.exists(dst_path)
 
 
-def test_check_model_satellite_inputs_available(config_filename):
+def test_check_model_satellite_inputs_available(config_filename: str):
     t0 = pd.Timestamp("2023-01-01 00:00")
     sat_datetime_1 = pd.date_range(
         t0 - pd.Timedelta("120min"),
@@ -300,20 +203,20 @@ def test_check_model_satellite_inputs_available(config_filename):
     assert not check_model_satellite_inputs_available(config_filename, t0, sat_datetime_5)
 
 
-def test_extend_satellite_data_with_nans(sat_5_data):
+def test_extend_satellite_data_with_nans(sat_5_data: xr.Dataset):
     limit = pd.Timedelta("3h")
     max_sat_time = pd.to_datetime(sat_5_data.time).max()
 
     # This test should do nothing since the satellite data is not delayed
     t0 = max_sat_time
-    ds_extended = extend_satellite_data_with_nans(sat_5_data, t0=t0, limit=limit)
+    ds_extended = extend_satellite_data_with_nans(sat_5_data, interval_end_datetime=t0, limit=limit)
 
     assert (ds_extended.time.values == sat_5_data.time.values).all()
 
     # This test should add nans to the end of the satellite data
     delay = pd.Timedelta("2h")
     t0 = max_sat_time + delay
-    ds_extended = extend_satellite_data_with_nans(sat_5_data, t0=t0, limit=limit)
+    ds_extended = extend_satellite_data_with_nans(sat_5_data, interval_end_datetime=t0, limit=limit)
 
     assert ds_extended.time.values[-1] == t0
     assert len(sat_5_data.time) + int(delay / pd.Timedelta("5min")) == len(ds_extended.time)
@@ -321,7 +224,7 @@ def test_extend_satellite_data_with_nans(sat_5_data):
     # This test should add nans to the end of the satellite data but only up to a limit
     delay = pd.Timedelta("4h")
     t0 = max_sat_time + delay
-    ds_extended = extend_satellite_data_with_nans(sat_5_data, t0=t0, limit=limit)
+    ds_extended = extend_satellite_data_with_nans(sat_5_data, interval_end_datetime=t0, limit=limit)
 
     assert ds_extended.time.values[-1] == (t0 - delay + limit)
     assert len(sat_5_data.time) + int(limit / pd.Timedelta("5min")) == len(ds_extended.time)
@@ -355,7 +258,7 @@ def test_interpolate_missing_satellite_timestamps():
     assert (ds_interp.data.values == 1).all().item()
 
 
-def test_contains_too_many_of_value(sat_5_data):
+def test_contains_too_many_of_value(sat_5_data: xr.Dataset):
     # The original data has no zeros or NaNs
     assert not contains_too_many_of_value(sat_5_data, value=0, threshold=0.0)
     assert not contains_too_many_of_value(sat_5_data, value=np.nan, threshold=0.0)
@@ -369,22 +272,3 @@ def test_contains_too_many_of_value(sat_5_data):
     ds = sat_5_data.copy(deep=True)
     ds["data"].values[:] = np.nan
     assert contains_too_many_of_value(ds, value=np.nan, threshold=0.1)
-
-
-def test_get_satellite_source_paths():
-    os.environ["SATELLITE_ZARR_PATH"] = "temp_sat.zarr.zip"
-    path_5, path_15 = get_satellite_source_paths()
-
-    assert path_5 == "temp_sat.zarr.zip"
-    assert path_15 == "temp_sat_15.zarr.zip"
-
-    os.environ["SATELLITE_ZARR_PATH"] = "temp_sat.zarr.zip"
-    os.environ["SATELLITE_15_ZARR_PATH"] = "15_temp_sat.zarr.zip"
-    path_5, path_15 = get_satellite_source_paths()
-
-    assert path_5 == "temp_sat.zarr.zip"
-    assert path_15 == "15_temp_sat.zarr.zip"
-
-    # remove environment variables
-    del os.environ["SATELLITE_ZARR_PATH"]
-    del os.environ["SATELLITE_15_ZARR_PATH"]

@@ -1,81 +1,120 @@
-import os
-import tempfile
+from pathlib import Path
+
+import pandas as pd
+import xarray as xr
 
 from pvnet_app.data.nwp import CloudcastingDownloader, ECMWFDownloader, UKVDownloader
 
 
-def test_download_nwp(nwp_ukv_data, nwp_ecmwf_data, cloudcasting_data):
-    temp_ukv_path = "temp_nwp_ukv.zarr"
-    temp_ecmwf_path = "temp_nwp_ecmwf.zarr"
-    temp_cloudcasting_path = "temp_cloudcasting.zarr"
+def test_download_nwp(
+    nwp_ukv_data: xr.Dataset,
+    nwp_ecmwf_data: xr.Dataset,
+    cloudcasting_data: xr.Dataset,
+    tmp_path: Path,
+):
+    source_ukv_path = f"{tmp_path}/source_ukv.zarr"
+    source_ecmwf_path = f"{tmp_path}/source_ecmwf.zarr"
+    source_cloudcasting_path = f"{tmp_path}/source_cloudcasting.zarr"
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    nwp_ukv_data.to_zarr(source_ukv_path)
+    nwp_ecmwf_data.to_zarr(source_ecmwf_path)
+    cloudcasting_data.to_zarr(source_cloudcasting_path)
 
-        nwp_ukv_data.to_zarr(temp_ukv_path)
-        nwp_ecmwf_data.to_zarr(temp_ecmwf_path)
-        cloudcasting_data.to_zarr(temp_cloudcasting_path)
+    ukv_downloader = UKVDownloader(
+        source_path=source_ukv_path,
+        destination_path=f"{tmp_path}/ukv.zarr",
+    )
+    ukv_downloader.run()
 
-        ukv_downloader = UKVDownloader(source_path=temp_ukv_path)
-        ukv_downloader.run()
+    ecmwf_downloader = ECMWFDownloader(
+        source_path=source_ecmwf_path,
+        destination_path=f"{tmp_path}/ecmwf.zarr",
+    )
+    ecmwf_downloader.run()
 
-        ecmwf_downloader = ECMWFDownloader(source_path=temp_ecmwf_path)
-        ecmwf_downloader.run()
+    cloudcasting_downloader = CloudcastingDownloader(
+        source_path=source_cloudcasting_path,
+        destination_path=f"{tmp_path}/cloudcasting.zarr",
+    )
+    cloudcasting_downloader.run()
 
-        cloudcasting_downloader = CloudcastingDownloader(source_path=temp_cloudcasting_path)
-        cloudcasting_downloader.run()
 
+def test_check_model_nwp_inputs_available(
+    config_filename: str,
+    test_t0: pd.Timestamp,
+    nwp_ukv_data: xr.Dataset,
+    nwp_ecmwf_data: xr.Dataset,
+    tmp_path: Path,
+):
+    # ---- Test case where all inputs are available
 
-def test_check_model_nwp_inputs_available(config_filename, test_t0, nwp_ukv_data, nwp_ecmwf_data):
-    temp_ukv_path = "temp_nwp_ukv.zarr"
-    temp_ecmwf_path = "temp_nwp_ecmwf.zarr"
+    # Create the required NWP data
+    source_ukv_path = f"{tmp_path}/source_ukv.zarr"
+    source_ecmwf_path = f"{tmp_path}/source_ecmwf.zarr"
 
-    # Test in a case where all inputs are available
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    nwp_ukv_data.to_zarr(source_ukv_path)
+    nwp_ecmwf_data.to_zarr(source_ecmwf_path)
 
-        # Create the required NWP data
-        nwp_ukv_data.to_zarr(temp_ukv_path)
-        nwp_ecmwf_data.to_zarr(temp_ecmwf_path)
+    ukv_downloader = UKVDownloader(
+        source_path=source_ukv_path,
+        destination_path=f"{tmp_path}/ukv.zarr",
+        window_size_pixels=2,
+    )
+    ukv_downloader.run()
 
-        ukv_downloader = UKVDownloader(source_path=temp_ukv_path)
-        ukv_downloader.run()
+    ecmwf_downloader = ECMWFDownloader(
+        source_path=source_ecmwf_path,
+        destination_path=f"{tmp_path}/ecmwf.zarr",
+        window_size_pixels=2,
+    )
+    ecmwf_downloader.run()
 
-        ecmwf_downloader = ECMWFDownloader(source_path=temp_ecmwf_path)
-        ecmwf_downloader.run()
+    # The inputs are all available so these should return True
+    assert ukv_downloader.check_model_inputs_available(config_filename, test_t0)
+    assert ecmwf_downloader.check_model_inputs_available(config_filename, test_t0)
 
-        # The inputs are all available so these should return True
-        assert ukv_downloader.check_model_inputs_available(config_filename, test_t0)
-        assert ecmwf_downloader.check_model_inputs_available(config_filename, test_t0)
+    # ---- Test case where no NWP data is available
+    ukv_downloader = UKVDownloader(
+        source_path="empty_ukv_path.zarr",
+        destination_path="dummy.zarr",
+        window_size_pixels=2,
+    )
+    ukv_downloader.run()
 
-    # Test in a case where no NWP data is available
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    ecmwf_downloader = ECMWFDownloader(
+        source_path="empty_ecmwf_path.zarr",
+        destination_path="dummy.zarr",
+        window_size_pixels=2,
+    )
+    ecmwf_downloader.run()
 
-        ukv_downloader = UKVDownloader(source_path=temp_ukv_path)
-        ukv_downloader.run()
+    # No inputs are available so these should return False
+    assert not ukv_downloader.check_model_inputs_available(config_filename, test_t0)
+    assert not ecmwf_downloader.check_model_inputs_available(config_filename, test_t0)
 
-        ecmwf_downloader = ECMWFDownloader(source_path=temp_ecmwf_path)
-        ecmwf_downloader.run()
+    # ---- Test case where NWP data is available but not all the required time steps
 
-        # No inputs are available so these should return False
-        assert not ukv_downloader.check_model_inputs_available(config_filename, test_t0)
-        assert not ecmwf_downloader.check_model_inputs_available(config_filename, test_t0)
+    # Save the NWP data, but with less time steps
+    source_ukv_path = f"{tmp_path}/short_source_ukv.zarr"
+    source_ecmwf_path = f"{tmp_path}/short_source_ecmwf.zarr"
 
-    # Test in a case where NWP data is available but not all the required time steps
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        os.chdir(tmpdirname)
+    nwp_ukv_data.isel(step=slice(0, 4)).to_zarr(source_ukv_path)
+    nwp_ecmwf_data.isel(step=slice(0, 4)).to_zarr(source_ecmwf_path)
 
-        # Save the NWP data, but with less time steps
-        nwp_ukv_data.isel(step=slice(0, 4)).to_zarr(temp_ukv_path)
-        nwp_ecmwf_data.isel(step=slice(0, 4)).to_zarr(temp_ecmwf_path)
+    ukv_downloader = UKVDownloader(
+        source_path=source_ukv_path,
+        destination_path=f"{tmp_path}/short_ukv.zarr",
+        window_size_pixels=2,
+    )
+    ukv_downloader.run()
 
-        ukv_downloader = UKVDownloader(source_path=temp_ukv_path)
-        ukv_downloader.run()
+    ecmwf_downloader = ECMWFDownloader(
+        source_path=source_ecmwf_path,
+        destination_path=f"{tmp_path}/short_ecmwf.zarr",
+        window_size_pixels=2,
+    )
+    ecmwf_downloader.run()
 
-        ecmwf_downloader = ECMWFDownloader(source_path=temp_ecmwf_path)
-        ecmwf_downloader.run()
-
-        # Some steps are missing so these should return False
-        assert not ukv_downloader.check_model_inputs_available(config_filename, test_t0)
-        assert not ecmwf_downloader.check_model_inputs_available(config_filename, test_t0)
+    # Some steps are missing so these should return False
+    assert not ukv_downloader.check_model_inputs_available(config_filename, test_t0)
+    assert not ecmwf_downloader.check_model_inputs_available(config_filename, test_t0)

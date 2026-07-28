@@ -1,7 +1,9 @@
 """Functions and classes to download and process NWP data."""
+
 import logging
 import shutil
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from importlib.resources import files
 from typing import override
 
@@ -13,9 +15,22 @@ import xarray as xr
 import xesmf as xe
 from ocf_data_sampler.config.load import load_yaml_configuration
 
-from pvnet_app.consts import nwp_cloudcasting_path, nwp_ecmwf_path, nwp_ukv_path
+from pvnet_app.data.utils import slice_to_pvnet_spatial_area
+
+# ESMF binds to whichever thread first initialises it, and every subsequent call
+# must come from that same thread. All xesmf work is therefore funnelled through
+# this single persistent thread, regardless of which thread the caller is on.
+_ESMF_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="esmf")
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_lon_lat_contiguous(ds: xr.Dataset) -> xr.Dataset:
+    """Return a dataset whose longitude/latitude coords are contiguous."""
+    return ds.assign_coords(
+        longitude=(ds.longitude.dims, np.ascontiguousarray(ds.longitude.values)),
+        latitude=(ds.latitude.dims, np.ascontiguousarray(ds.latitude.values)),
+    )
 
 
 def download_data(source: str, destination: str) -> bool:
@@ -35,21 +50,33 @@ def download_data(source: str, destination: str) -> bool:
 
 def regrid_nwp_data(
     ds: xr.Dataset,
-    target_coords_path: str,
+    ds_target_coords: xr.Dataset,
     method: str,
     nwp_source: str,
 ) -> xr.Dataset:
     """This function regrids the input NWP data to the grid of the target path.
 
+    The regridding is done using xESMF which uses ESMF under the hood. ESMF is not thread-safe so
+    all regridding is done on a single thread. This function will block until the regridding is
+    complete.
+
     Args:
         ds: The NWP data to regrid
-        target_coords_path: The path to the target grid
+        ds_target_coords: The target grid dataset
         method: The regridding method to use
         nwp_source: The source of the NWP data (only used for logging messages)
     """
-    # These are the coords we are aiming for
-    ds_target_coords = xr.load_dataset(target_coords_path)
+    return _ESMF_EXECUTOR.submit(
+        _regrid_nwp_data_on_esmf_thread, ds, ds_target_coords, method, nwp_source
+    ).result()
 
+
+def _regrid_nwp_data_on_esmf_thread(
+    ds: xr.Dataset,
+    ds_target_coords: xr.Dataset,
+    method: str,
+    nwp_source: str,
+) -> xr.Dataset:
     # Check if regridding step needs to be done
     needs_regridding = not (
         ds.latitude.equals(ds_target_coords.latitude)
@@ -60,18 +87,12 @@ def regrid_nwp_data(
         logger.info(f"No regridding required for {nwp_source} - skipping this step")
         return ds
 
-    logger.info(f"Regridding {nwp_source} to expected grid to {target_coords_path}")
+    ds = _ensure_lon_lat_contiguous(ds)
+    ds_target_coords = _ensure_lon_lat_contiguous(ds_target_coords)
 
-    regridder = xe.Regridder(ds, ds_target_coords, method=method)
+    regridder = xe.Regridder(ds, ds_target_coords, method=method, unmapped_to_nan=True)
 
-    # Regrid in a loop to keep RAM usage lower
-    ds_list = []
-    for step in ds.step:
-        # Copy to make sure the data is C-contiguous for efficient regridding
-        ds_step = ds.sel(step=step).copy(deep=True)
-        ds_list.append(regridder(ds_step))
-
-    return xr.concat(ds_list, dim="step")
+    return regridder(ds)
 
 
 def check_model_nwp_inputs_available(
@@ -107,8 +128,8 @@ def check_model_nwp_inputs_available(
         # Get the NWP valid times required by the model
         freq = pd.Timedelta(f"{nwp_config.time_resolution_minutes}min")
 
+        # ocf-data-sampler uses ceil to round up to the nearest timestep; match that here
         req_start_time = (t0 + pd.Timedelta(f"{nwp_config.interval_start_minutes}min")).ceil(freq)
-
         req_end_time = (t0 + pd.Timedelta(f"{nwp_config.interval_end_minutes}min")).ceil(freq)
 
         # If we diff accumulated channels in time we'll need one more timestamp
@@ -133,23 +154,29 @@ def check_model_nwp_inputs_available(
 
 class NWPDownloader(ABC):
     """Abstract base class to download and process NWP data."""
-    destination_path: str = None
-    nwp_source: str = None
-    save_chunk_dict: dict = None
 
-    def __init__(self, source_path: str | None) -> None:
+    nwp_source: str
+    save_chunk_dict: dict[str, int]
+
+    def __init__(
+        self,
+        source_path: str | None,
+        destination_path: str,
+        window_size_pixels: int | None = None,
+    ) -> None:
         """Initialise the NWP downloader."""
         self.source_path = source_path
+        self.destination_path = destination_path
         # Initially no valid times are available. This will only change is the data can be
         # downloaded, processed, and saved successfully
         self.valid_times = None
+        self.window_size_pixels = window_size_pixels
 
     @abstractmethod
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         """Apply all processing steps to the NWP data in order to match the training data."""
         pass
 
-    @abstractmethod
     def data_is_okay(self, ds: xr.Dataset) -> bool:
         """Apply quality checks to the NWP data.
 
@@ -159,7 +186,15 @@ class NWPDownloader(ABC):
         Returns:
             bool: Whether the data passes the quality checks
         """
-        pass
+        # ocf-data-sampler expects there to be only one variable and no NaNs
+        vars = list(ds.data_vars)
+        if len(vars) != 1:
+            logger.warning(f"{self.nwp_source} data has unexpected variables: {vars}")
+            return False
+        else:
+            contains_nans = ds[vars[0]].isnull().any().compute().item()
+
+        return not contains_nans
 
     def resave(self, ds: xr.Dataset) -> None:
         """Resave the NWP data to the destination path."""
@@ -176,8 +211,6 @@ class NWPDownloader(ABC):
 
     def run(self) -> None:
         """Download, process, and save the NWP data."""
-        logger.info(f"Downloading and processing the {self.nwp_source} data")
-
         if self.source_path is None:
             logger.warning(f"Source file for {self.nwp_source} is not set. Skipping download.")
             return
@@ -190,29 +223,27 @@ class NWPDownloader(ABC):
             )
             return
 
-        ds = xr.open_zarr(self.destination_path).compute()
+        ds = xr.open_zarr(self.destination_path, decode_timedelta=True).compute()
 
         init_time = pd.to_datetime(ds.init_time.values[0])
         valid_times = init_time + pd.to_timedelta(ds.step)
         logger.info(
-            f"{self.nwp_source} has init-time {init_time} and valid times: {valid_times}",
+            f"{self.nwp_source} has init-time {init_time} and valid times:\n{valid_times}",
         )
 
-        # Check the data is okay before processing
-        if not self.data_is_okay(ds):
-            logger.warning(f"{self.nwp_source} NWP data did not pass quality checks.")
-            return
-
+        # Process the data to match the training data, then check the quality of the data, and
+        # resave if it passes
         ds = self.process(ds)
-        self.resave(ds)
 
-        # Only store the valid_times if the NWP data has been successfully downloaded,
-        # quality checked, and processed. Else valid_times will be None
-        self.valid_times = valid_times
+        if self.data_is_okay(ds):
+            self.resave(ds)
 
-    def clean_up(self) -> None:
-        """Remove the downloaded data."""
-        shutil.rmtree(self.destination_path, ignore_errors=True)
+            # Only store the valid_times if the NWP data has been successfully downloaded,
+            # quality checked, and processed. Else valid_times will be None
+            self.valid_times = valid_times
+
+        else:
+            logger.warning(f"{self.nwp_source} NWP data did not pass quality checks.")
 
     def check_model_inputs_available(
         self,
@@ -235,134 +266,63 @@ class NWPDownloader(ABC):
 
 class ECMWFDownloader(NWPDownloader):
     """Class to download and process the ECMWF data."""
-    destination_path = nwp_ecmwf_path
+
     nwp_source = "ecmwf"
-    save_chunk_dict = { # noqa: RUF012
+    save_chunk_dict = {  # noqa: RUF012
         "step": 10,
         "latitude": 50,
         "longitude": 50,
     }
 
-    @staticmethod
-    def rename_variables(ds: xr.Dataset) -> xr.Dataset:
-        """Rename the ECMWF variables to match the training data.
-
-        Rename variable names in the variable coordinate to match the names the model expects and
-        was trained on.
-
-        This change happened in the new nwp-consumer>=1.0.0. Ideally we won't need this step in the
-        future once the training data is updated.
-        """
-        logger.info("Renaming the ECMWF variables")
-
-        ds = ds.rename({"hres-ifs_uk": "ECMWF_UK"})
-
-        varname_mapping = {
-            "cloud_cover_high": "hcc",
-            "cloud_cover_low": "lcc",
-            "cloud_cover_medium": "mcc",
-            "cloud_cover_total": "tcc",
-            "snow_depth_gl": "sd",
-            "direct_shortwave_radiation_flux_gl": "sr",
-            "downward_longwave_radiation_flux_gl": "dlwrf",
-            "downward_shortwave_radiation_flux_gl": "dswrf",
-            "downward_ultraviolet_radiation_flux_gl": "duvrs",
-            "temperature_sl": "t2m",
-            "total_precipitation_rate_gl": "prate",
-            "visibility_sl": "vis",
-            "wind_u_component_100m": "u100",
-            "wind_u_component_10m": "u10",
-            "wind_u_component_200m": "u200",
-            "wind_v_component_100m": "v100",
-            "wind_v_component_10m": "v10",
-            "wind_v_component_200m": "v200",
-        }
-
-        variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
-
-        ds = ds.assign_coords(variable=variable_coords)
-
-        return ds
-
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-        ds = self.rename_variables(ds)
-        return ds
 
-    @override
-    def data_is_okay(self, ds: xr.Dataset) -> bool:
-        contains_nans = ds[next(iter(ds.data_vars.keys()))].isnull().any().compute().item()
-        return not contains_nans
+        if self.window_size_pixels is not None:
+            # Slice the data to the spatial extent used in PVNet
+            ds = slice_to_pvnet_spatial_area(
+                ds,
+                width_pixels=self.window_size_pixels,
+                height_pixels=self.window_size_pixels,
+            )
+
+        return ds
 
 
 class UKVDownloader(NWPDownloader):
     """Class to download and process the UKV data."""
-    destination_path = nwp_ukv_path
+
     nwp_source = "ukv"
-    save_chunk_dict = { # noqa: RUF012
+    save_chunk_dict = {  # noqa: RUF012
         "step": 10,
-        "x": 100,
-        "y": 100,
+        "x_osgb": 100,
+        "y_osgb": 100,
     }
 
-    @staticmethod
-    def regrid(ds: xr.Dataset) -> xr.Dataset:
+    def regrid(self, ds: xr.Dataset) -> xr.Dataset:
         """Regrid the UKV data to the target grid.
 
         In production the UKV data is on a different grid structure to the training data. The
-        training data from CEDA is on a regular OSGB grid. The production data is on some other
-        curvilinear grid.
+        training data from CEDA is on a regular OSGB grid. The production data is on a Lambert
+        Azimuthal Equal Area grid
         """
+        ds_target_coords = xr.load_dataset(
+            files("pvnet_app.data").joinpath("nwp_ukv_target_coords.nc")
+        )
+
+        if self.window_size_pixels is not None:
+            # Slice the data to the spatial extent used in PVNet
+            ds_target_coords = slice_to_pvnet_spatial_area(
+                ds_target_coords,
+                width_pixels=self.window_size_pixels,
+                height_pixels=self.window_size_pixels,
+            )
+
         return regrid_nwp_data(
             ds=ds,
-            target_coords_path=files("pvnet_app.data").joinpath("nwp_ukv_target_coords.nc"),
+            ds_target_coords=ds_target_coords,
             method="bilinear",
             nwp_source="UKV",
         )
-
-    @staticmethod
-    def fix_dtype(ds: xr.Dataset) -> xr.Dataset:
-        """Fix the dtype of the UKV data.
-
-        In training the UKV data is float16. This caused it to overflow into inf values for the
-        visibility channel which is measured in metres and can be above 2**16=65km. We
-        need to force this overflow to happen in production to be consistent with training.
-        """
-        return ds.astype(np.float16)
-
-    @staticmethod
-    def rename_variables(ds: xr.Dataset) -> xr.Dataset:
-        """Change the UKV variable names to match the training data."""
-        # This is for nwp-consumer>=1.0.0
-        logger.info("Renaming the UKV variables")
-
-        ds = ds.rename({"um-ukv": "UKV"})
-
-        varname_mapping = {
-            "cloud_cover_high": "hcc",
-            "cloud_cover_low": "lcc",
-            "cloud_cover_medium": "mcc",
-            "cloud_cover_total": "tcc",
-            "snow_depth_gl": "sde",
-            "direct_shortwave_radiation_flux_gl": "sr",
-            "downward_longwave_radiation_flux_gl": "dlwrf",
-            "downward_shortwave_radiation_flux_gl": "dswrf",
-            "downward_ultraviolet_radiation_flux_gl": "duvrs",
-            "relative_humidity_sl": "r",
-            "temperature_sl": "t",
-            "total_precipitation_rate_gl": "prate",
-            "visibility_sl": "vis",
-            "wind_direction_10m": "wdir10",
-            "wind_speed_10m": "si10",
-            "wind_v_component_10m": "v10",
-            "wind_u_component_10m": "u10",
-        }
-
-        variable_coords = [varname_mapping.get(v, v) for v in ds.variable.values]
-
-        ds = ds.assign_coords(variable=variable_coords)
-
-        return ds
 
     @staticmethod
     def add_lon_lat_coords(ds: xr.Dataset) -> xr.Dataset:
@@ -372,11 +332,6 @@ class UKVDownloader(NWPDownloader):
         Equal Area grid. We need to add longitudes and latitudes coords so we can regrid the data
         to the training grid.
         """
-        # This is for nwp-consumer>=1.0.0
-        logger.info("Adding lon-lat coords to the UKV data")
-
-        ds = ds.rename({"x_laea": "x", "y_laea": "y"})
-
         # This is the Lambert Azimuthal Equal Area projection used in the UKV live data
         laea = pyproj.Proj(
             proj="laea",
@@ -389,47 +344,43 @@ class UKVDownloader(NWPDownloader):
         )
 
         # WGS84 is short for "World Geodetic System 1984". This is a lon-lat coord system
-        wgs84 = pyproj.Proj("+init=EPSG:4326")
+        wgs84 = pyproj.CRS("EPSG:4326")
 
-        laea_to_lon_lat = pyproj.Transformer.from_proj(laea, wgs84, always_xy=True).transform
+        laea_to_lon_lat = pyproj.Transformer.from_crs(
+            laea.crs,
+            wgs84,
+            always_xy=True,
+        ).transform
 
         # Calculate longitude and latitude from x_laea and y_laea
         # - x is an array of shape (455,)
         # - y is an array of shape (639,)
-        # We need to change x and y to a 2D arrays of shape (455, 639)
-        x, y = ds.x.values, ds.y.values
-        x = x.reshape(1, -1).repeat(len(ds.y.values), axis=0)
-        y = y.reshape(-1, 1).repeat(len(ds.x.values), axis=1)
+        # We need to change x and y to a 2D arrays
+        x_laea, y_laea = np.meshgrid(ds.x_laea, ds.y_laea)
 
-        lons, lats = laea_to_lon_lat(xx=x, yy=y)
+        lons, lats = laea_to_lon_lat(xx=x_laea, yy=y_laea)
 
         ds = ds.assign_coords(
-            longitude=(["y", "x"], lons),
-            latitude=(["y", "x"], lats),
+            longitude=(["y_laea", "x_laea"], lons),
+            latitude=(["y_laea", "x_laea"], lats),
         )
 
         return ds
 
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
-        ds = self.rename_variables(ds)
         ds = self.add_lon_lat_coords(ds)
+        # The regrid step also slices the data to the spatial extent used in PVNet if
+        # self.window_size_pixels is not None
         ds = self.regrid(ds)
-        ds = self.fix_dtype(ds)
-
         return ds
-
-    @override
-    def data_is_okay(self, ds: xr.Dataset) -> bool:
-        contains_nans = ds[next(iter(ds.data_vars.keys()))].isnull().any().compute().item()
-        return not contains_nans
 
 
 class CloudcastingDownloader(NWPDownloader):
     """Class to download and process the cloudcasting data."""
-    destination_path = nwp_cloudcasting_path
+
     nwp_source = "cloudcasting"
-    save_chunk_dict: dict[str, int] = { # noqa: RUF012
+    save_chunk_dict: dict[str, int] = {  # noqa: RUF012
         "step": -1,
         "x_geostationary": 100,
         "y_geostationary": 100,
@@ -438,9 +389,12 @@ class CloudcastingDownloader(NWPDownloader):
     @override
     def process(self, ds: xr.Dataset) -> xr.Dataset:
         # The cloudcasting data needs no changes
-        return ds
+        if self.window_size_pixels is not None:
+            # Slice the data to the spatial extent used in PVNet
+            ds = slice_to_pvnet_spatial_area(
+                ds,
+                width_pixels=self.window_size_pixels,
+                height_pixels=self.window_size_pixels,
+            )
 
-    @override
-    def data_is_okay(self, ds: xr.Dataset) -> bool:
-        contains_nans = ds[next(iter(ds.data_vars.keys()))].isnull().any().compute().item()
-        return not contains_nans
+        return ds

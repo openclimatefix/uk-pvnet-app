@@ -2,7 +2,7 @@
 
 VENV_DIR := .venv
 PYTHON_VERSION := 3.12
-CONDA_DEPS := esmpy gdal hdf5=1.14.4
+CONDA_DEPS := esmpy hdf5=1.14.4
 
 # Create the conda virtual environment with required system packages
 $(VENV_DIR):
@@ -16,4 +16,4 @@ sync: $(VENV_DIR)
 
 # Run the test suite (after syncing dependencies)
 test: sync
-	conda run --no-capture-output -p $(VENV_DIR) uv run python -m pytest tests
+	@echo "Run: conda activate ./$(VENV_DIR); pytest"

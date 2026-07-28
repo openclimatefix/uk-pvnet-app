@@ -1,0 +1,268 @@
+{
+  "attributes": {
+    "georef_offset_corrected": "True",
+    "area": {
+      "msg_seviri_rss_3km": {
+        "description": "MSG SEVIRI Rapid Scanning Service area definition with 3 km resolution",
+        "projection": {
+          "proj": "geos",
+          "lon_0": 9.5,
+          "h": 35785831,
+          "x_0": 0,
+          "y_0": 0,
+          "a": 6378169,
+          "rf": 295.488065897014,
+          "no_defs": null,
+          "type": "crs"
+        },
+        "shape": {
+          "height": 1392,
+          "width": 3712
+        },
+        "area_extent": {
+          "lower_left_xy": [
+            5567248.0,
+            5570248.5
+          ],
+          "upper_right_xy": [
+            -5570248.5,
+            1393687.25
+          ],
+          "units": "m"
+        }
+      }
+    },
+    "reader": "seviri_l1b_native",
+    "sensor": "seviri",
+    "satellite_consumer_version": "0.9.0.post9+git.cbd8206e.dirty",
+    "channels": {
+      "VIS006": {
+        "units": "%",
+        "wavelength": "0.635\u00a0\u00b5m\u00a0(0.56-0.71\u00a0\u00b5m)",
+        "standard_name": "toa_bidirectional_reflectance",
+        "resolution": "3000.403165817",
+        "calibration": "reflectance"
+      },
+      "VIS008": {
+        "units": "%",
+        "wavelength": "0.81\u00a0\u00b5m\u00a0(0.74-0.88\u00a0\u00b5m)",
+        "standard_name": "toa_bidirectional_reflectance",
+        "resolution": "3000.403165817",
+        "calibration": "reflectance"
+      },
+      "IR_016": {
+        "units": "%",
+        "wavelength": "1.64\u00a0\u00b5m\u00a0(1.5-1.78\u00a0\u00b5m)",
+        "standard_name": "toa_bidirectional_reflectance",
+        "resolution": "3000.403165817",
+        "calibration": "reflectance"
+      },
+      "IR_039": {
+        "units": "K",
+        "wavelength": "3.92\u00a0\u00b5m\u00a0(3.48-4.36\u00a0\u00b5m)",
+        "standard_name": "toa_brightness_temperature",
+        "resolution": "3000.403165817",
+        "calibration": "brightness_temperature"
+      },
+      "WV_062": {
+        "units": "K",
+        "wavelength": "6.25\u00a0\u00b5m\u00a0(5.35-7.15\u00a0\u00b5m)",
+        "standard_name": "toa_brightness_temperature",
+        "resolution": "3000.403165817",
+        "calibration": "brightness_temperature"
+      },
+      "WV_073": {
+        "units": "K",
+        "wavelength": "7.35\u00a0\u00b5m\u00a0(6.85-7.85\u00a0\u00b5m)",
+        "standard_name": "toa_brightness_temperature",
+        "resolution": "3000.403165817",
+        "calibration": "brightness_temperature"
+      },
+      "IR_087": {
+        "units": "K",
+        "wavelength": "8.7\u00a0\u00b5m\u00a0(8.3-9.1\u00a0\u00b5m)",
+        "standard_name": "toa_brightness_temperature",
+        "resolution": "3000.403165817",
+        "calibration": "brightness_temperature"
+      },
+      "IR_097": {
+        "units": "K",
+        "wavelength": "9.66\u00a0\u00b5m\u00a0(9.38-9.94\u00a0\u00b5m)",
+        "standard_name": "toa_brightness_temperature",
+        "resolution": "3000.403165817",
+        "calibration": "brightness_temperature"
+      },
+      "IR_108": {
+        "units": "K",
+        "wavelength": "10.8\u00a0\u00b5m\u00a0(9.8-11.8\u00a0\u00b5m)",
+        "standard_name": "toa_brightness_temperature",
+        "resolution": "3000.403165817",
+        "calibration": "brightness_temperature"
+      },
+      "IR_120": {
+        "units": "K",
+        "wavelength": "12.0\u00a0\u00b5m\u00a0(11.0-13.0\u00a0\u00b5m)",
+        "standard_name": "toa_brightness_temperature",
+        "resolution": "3000.403165817",
+        "calibration": "brightness_temperature"
+      },
+      "IR_134": {
+        "units": "K",
+        "wavelength": "13.4\u00a0\u00b5m\u00a0(12.4-14.4\u00a0\u00b5m)",
+        "standard_name": "toa_brightness_temperature",
+        "resolution": "3000.403165817",
+        "calibration": "brightness_temperature"
+      }
+    }
+  },
+  "zarr_format": 3,
+  "consolidated_metadata": {
+    "kind": "inline",
+    "must_understand": false,
+    "metadata": {
+      "channel": {
+        "shape": [
+          11
+        ],
+        "data_type": {
+          "name": "fixed_length_utf32",
+          "configuration": {
+            "length_bytes": 24
+          }
+        },
+        "chunk_grid": {
+          "name": "regular",
+          "configuration": {
+            "chunk_shape": [
+              11
+            ]
+          }
+        },
+        "chunk_key_encoding": {
+          "name": "default",
+          "configuration": {
+            "separator": "/"
+          }
+        },
+        "fill_value": "",
+        "codecs": [
+          {
+            "name": "bytes",
+            "configuration": {
+              "endian": "little"
+            }
+          },
+          {
+            "name": "zstd",
+            "configuration": {
+              "level": 0,
+              "checksum": false
+            }
+          }
+        ],
+        "attributes": {},
+        "dimension_names": [
+          "channel"
+        ],
+        "zarr_format": 3,
+        "node_type": "array",
+        "storage_transformers": []
+      },
+      "x_geostationary": {
+        "shape": [
+          614
+        ],
+        "data_type": "float64",
+        "chunk_grid": {
+          "name": "regular",
+          "configuration": {
+            "chunk_shape": [
+              614
+            ]
+          }
+        },
+        "chunk_key_encoding": {
+          "name": "default",
+          "configuration": {
+            "separator": "/"
+          }
+        },
+        "fill_value": "NaN",
+        "codecs": [
+          {
+            "name": "bytes",
+            "configuration": {
+              "endian": "little"
+            }
+          },
+          {
+            "name": "zstd",
+            "configuration": {
+              "level": 0,
+              "checksum": false
+            }
+          }
+        ],
+        "attributes": {
+          "units": "meter",
+          "coordinate_reference_system": "geostationary",
+          "_FillValue": "AAAAAAAA+H8="
+        },
+        "dimension_names": [
+          "x_geostationary"
+        ],
+        "zarr_format": 3,
+        "node_type": "array",
+        "storage_transformers": []
+      },
+      "y_geostationary": {
+        "shape": [
+          372
+        ],
+        "data_type": "float64",
+        "chunk_grid": {
+          "name": "regular",
+          "configuration": {
+            "chunk_shape": [
+              372
+            ]
+          }
+        },
+        "chunk_key_encoding": {
+          "name": "default",
+          "configuration": {
+            "separator": "/"
+          }
+        },
+        "fill_value": "NaN",
+        "codecs": [
+          {
+            "name": "bytes",
+            "configuration": {
+              "endian": "little"
+            }
+          },
+          {
+            "name": "zstd",
+            "configuration": {
+              "level": 0,
+              "checksum": false
+            }
+          }
+        ],
+        "attributes": {
+          "units": "meter",
+          "coordinate_reference_system": "geostationary",
+          "_FillValue": "AAAAAAAA+H8="
+        },
+        "dimension_names": [
+          "y_geostationary"
+        ],
+        "zarr_format": 3,
+        "node_type": "array",
+        "storage_transformers": []
+      }
+    }
+  },
+  "node_type": "group"
+}
