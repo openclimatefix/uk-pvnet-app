@@ -1,5 +1,17 @@
 models:
 
+  # This uses 2NWP + satellite with 0-minute delay
+  - name: pvnet_v2
+    pvnet:
+        repo: openclimatefix-models/pvnet_uk_region
+        commit: 0f6a00de0c6a12b36f6c050ba7d9916949803ad8
+    summation:
+        repo: openclimatefix-models/pvnet_uk_summation
+        commit: f5b6b7fab06d762e900f6caeb3ec6af07db3ec4c
+    is_critical: True
+    is_day_ahead: False
+    log_level: DEBUG
+
   # This uses only UKV data
   - name: pvnet_day_ahead
     pvnet:
@@ -11,3 +23,5 @@ models:
     is_critical: True
     is_day_ahead: True
     log_level: INFO
+
+

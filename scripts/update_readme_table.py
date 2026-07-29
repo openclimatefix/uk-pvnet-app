@@ -38,6 +38,7 @@ def generate_table() -> str:
     rows = [header, separator]
 
     hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
+    print(hf_token)
 
 
     for model_spec in model_specs:

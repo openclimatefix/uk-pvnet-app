@@ -6,10 +6,10 @@ def test_get_model_specs():
 
     # Test getting all model
     models = get_model_specs()
-    assert len(models) == 1
-    assert models[0].name == "pvnet_day_ahead"
+    assert len(models) == 2
+    assert models[0].name == "pvnet_v2"
 
     # Test getting only critical models
     models = get_model_specs(get_critical_only=True)
-    assert len(models) == 1
+    assert len(models) == 2
     assert all(m.is_critical for m in models)

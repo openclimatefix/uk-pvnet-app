@@ -19,6 +19,7 @@ The app is configured at runtime with many environmental variables. See [setting
 <!-- START model-config-table -->
 | Model Name | Uses satellite | Uses UKV | Uses ECMWF | Uses cloudcasting | PVNet Hugging Face Link | PVNet Summation Hugging Face Link |
 | ----|----|----|----|----|----|---- |
+| pvnet_v2 | yes | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/0f6a00de0c6a12b36f6c050ba7d9916949803ad8) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/f5b6b7fab06d762e900f6caeb3ec6af07db3ec4c) |
 | pvnet_day_ahead | - | yes | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/b242aad4ed243efe4e701b9ae61136615795faa8) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/2263afba597d231c0699782b9e44c7208a751345) |
 
 <!-- END model-config-table -->
