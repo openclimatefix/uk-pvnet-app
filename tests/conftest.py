@@ -121,7 +121,7 @@ async def dp_client_with_locations(
     return dp_client
 
 
-def make_nwp_data(shell_path: str, varname: str, time_dim: str, time: pd.Timestamp ) -> xr.Dataset:
+def make_nwp_data(shell_path: str, varname: str, time_dim: str, time: pd.Timestamp) -> xr.Dataset:
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(shell_path).compute()
 
