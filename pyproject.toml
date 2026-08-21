@@ -24,7 +24,7 @@ dependencies = [
     "fsspec[s3]==2025.2.0",
     "huggingface-hub==0.28.1",
     "numpy==2.0.0",
-    "ocf_data_sampler==1.0.18",
+    "ocf_data_sampler==1.0.24",
     "pandas==2.2.3",
     "pvnet==5.3.12",
     "pvlib==0.15.2",

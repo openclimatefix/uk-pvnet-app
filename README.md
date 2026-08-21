@@ -25,6 +25,7 @@ The app is configured at runtime with many environmental variables. See [setting
 | pvnet_sat_only | yes | - | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/14f2223681c9741163a3099493d97bcd1c4e0025) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/ac6d5dc380628f15ad02c53a2ddb8727e1e2907e) |
 | pvnet_ukv_only | - | yes | - | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/b242aad4ed243efe4e701b9ae61136615795faa8) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/2263afba597d231c0699782b9e44c7208a751345) |
 | pvnet_day_ahead | - | yes | yes | - | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/723603423d1b2b74fe49715a2d52fa7593a9451e) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/fe1c826c4141d8cefc5c5b60618ad1654a06f9b0) |
+| pvnet_cloud | yes | yes | yes | yes | [HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_region/tree/e860daaad545795414215b0ad8ba9d271ea65654) | [Summation HF Link](https://huggingface.co/openclimatefix-models/pvnet_uk_summation/tree/804902a77b2f5f02e632bba044b5262d1f7455e5) |
 
 <!-- END model-config-table -->
 

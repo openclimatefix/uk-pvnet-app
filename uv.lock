@@ -1121,7 +1121,7 @@ wheels = [
 
 [[package]]
 name = "ocf-data-sampler"
-version = "1.0.18"
+version = "1.0.24"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dask" },
@@ -1142,9 +1142,9 @@ dependencies = [
     { name = "xarray-tensorstore" },
     { name = "zarr" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ef/0e/2b32d3a9627c1ae0ec599a37c0f7f8484fac5ab7dd8a8f2bf563d03e2575/ocf_data_sampler-1.0.18.tar.gz", hash = "sha256:f0d72472a19d87edf1bb3a068392bec43c7b3aec6a0fd90dd773261145f268f8", size = 7344776, upload-time = "2026-04-02T13:03:55.534Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/e4/0950fc58db255df76157126aff7a185bf6201169462fa2faefb193d43215/ocf_data_sampler-1.0.24.tar.gz", hash = "sha256:4d5c2e6f63c04507b5d83c2fa05e7ada738ba90b7b13e390e4e28e60bfd954db", size = 7344299, upload-time = "2026-08-18T15:36:06.495Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c5/5d/b33e35c02ca7efdeb6376abc50fccf8b9c38502c13151fd815690202a581/ocf_data_sampler-1.0.18-py3-none-any.whl", hash = "sha256:ad8db16f58c10ace8905d6280662ba8c101420959f7511035d64a4f7d5e3498b", size = 7369113, upload-time = "2026-04-02T13:03:57.571Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/6a/380daaa9475383af56cced638018ce3fcae3697ea7319668cbc83bcab9b4/ocf_data_sampler-1.0.24-py3-none-any.whl", hash = "sha256:21a8546551de11898ad7f5e4c3e25cd792bbeb5f654f2918688dab0792131f57", size = 7366272, upload-time = "2026-08-18T15:36:03.998Z" },
 ]
 
 [[package]]
@@ -1414,7 +1414,7 @@ requires-dist = [
     { name = "icechunk", specifier = "==2.0.6" },
     { name = "numcodecs", specifier = "<0.16" },
     { name = "numpy", specifier = "==2.0.0" },
-    { name = "ocf-data-sampler", specifier = "==1.0.18" },
+    { name = "ocf-data-sampler", specifier = "==1.0.24" },
     { name = "pandas", specifier = "==2.2.3" },
     { name = "pvlib", specifier = "==0.15.2" },
     { name = "pvnet", specifier = "==5.3.12" },

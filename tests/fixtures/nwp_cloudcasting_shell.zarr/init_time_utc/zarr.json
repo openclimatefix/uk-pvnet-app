@@ -1,18 +1,13 @@
 {
   "shape": [
-    11
+    1
   ],
-  "data_type": {
-    "name": "fixed_length_utf32",
-    "configuration": {
-      "length_bytes": 24
-    }
-  },
+  "data_type": "int64",
   "chunk_grid": {
     "name": "regular",
     "configuration": {
       "chunk_shape": [
-        11
+        1
       ]
     }
   },
@@ -22,7 +17,7 @@
       "separator": "/"
     }
   },
-  "fill_value": "",
+  "fill_value": 0,
   "codecs": [
     {
       "name": "bytes",
@@ -38,9 +33,12 @@
       }
     }
   ],
-  "attributes": {},
+  "attributes": {
+    "units": "days since 2026-08-21T12:00:00",
+    "calendar": "proleptic_gregorian"
+  },
   "dimension_names": [
-    "variable"
+    "init_time_utc"
   ],
   "zarr_format": 3,
   "node_type": "array",

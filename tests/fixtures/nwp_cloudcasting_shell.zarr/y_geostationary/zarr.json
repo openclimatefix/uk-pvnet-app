@@ -17,7 +17,7 @@
       "separator": "/"
     }
   },
-  "fill_value": 0.0,
+  "fill_value": "NaN",
   "codecs": [
     {
       "name": "bytes",
@@ -34,8 +34,6 @@
     }
   ],
   "attributes": {
-    "coordinate_reference_system": "geostationary",
-    "units": "meter",
     "_FillValue": "AAAAAAAA+H8="
   },
   "dimension_names": [

@@ -60,7 +60,7 @@ models:
     is_day_ahead: True
     log_level: INFO
 
-  # This uses 2NWP but no satellite
+  # This uses 2NWP
   - name: pvnet_day_ahead
     pvnet:
         repo: openclimatefix-models/pvnet_uk_region
@@ -70,4 +70,16 @@ models:
         commit: fe1c826c4141d8cefc5c5b60618ad1654a06f9b0
     is_critical: True
     is_day_ahead: True
+    log_level: INFO
+
+  # This uses 2NWP, satellite with 0-minute delay, and cloudcasting
+  - name: pvnet_cloud
+    pvnet:
+        repo: openclimatefix-models/pvnet_uk_region
+        commit: e860daaad545795414215b0ad8ba9d271ea65654
+    summation:
+        repo: openclimatefix-models/pvnet_uk_summation
+        commit: 804902a77b2f5f02e632bba044b5262d1f7455e5
+    is_critical: False
+    is_day_ahead: False
     log_level: INFO
