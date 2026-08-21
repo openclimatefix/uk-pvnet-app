@@ -201,8 +201,6 @@ class NWPDownloader(ABC):
         # Overwrite the old data
         shutil.rmtree(self.destination_path, ignore_errors=True)
 
-        ds["variable"] = ds["variable"].astype(str)
-
         # Clear old encoding
         for v in list(ds.variables.keys()):
             ds[v].encoding.clear()
@@ -225,7 +223,9 @@ class NWPDownloader(ABC):
 
         ds = xr.open_zarr(self.destination_path, decode_timedelta=True).compute()
 
-        init_time = pd.to_datetime(ds.init_time.values[0])
+        time_dim = "init_time_utc" if self.nwp_source == "cloudcasting" else "init_time"
+
+        init_time = pd.to_datetime(ds[time_dim].values[0])
         valid_times = init_time + pd.to_timedelta(ds.step)
         logger.info(
             f"{self.nwp_source} has init-time {init_time} and valid times:\n{valid_times}",

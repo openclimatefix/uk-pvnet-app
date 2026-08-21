@@ -121,11 +121,11 @@ async def dp_client_with_locations(
     return dp_client
 
 
-def make_nwp_data(shell_path: str, varname: str, init_time: pd.Timestamp) -> xr.Dataset:
+def make_nwp_data(shell_path: str, varname: str, time_dim: str, time: pd.Timestamp, ) -> xr.Dataset:
     # Load dataset which only contains coordinates, but no data
     ds = xr.open_zarr(shell_path).compute()
 
-    ds = ds.assign_coords(init_time=[init_time])
+    ds = ds.assign_coords({time_dim: [time]})
 
     # This is important to avoid saving errors
     for v in list(ds.coords.keys()):
@@ -152,7 +152,8 @@ def nwp_ukv_data(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_ukv_shell.zarr",
         varname="um-ukv",
-        init_time=init_time,
+        time_dim="init_time",
+        time=init_time,
     )
 
 
@@ -163,7 +164,8 @@ def nwp_ecmwf_data(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_ecmwf_shell.zarr",
         varname="hres-ifs_uk",
-        init_time=init_time,
+        time_dim="init_time",
+        time=init_time,
     )
 
 
@@ -173,7 +175,8 @@ def cloudcasting_data(test_t0: pd.Timestamp) -> xr.Dataset:
     return make_nwp_data(
         shell_path=f"{test_data_dir}/nwp_cloudcasting_shell.zarr",
         varname="sat_pred",
-        init_time=test_t0,
+        time_dim="init_time_utc",
+        time=test_t0,
     )
 
 

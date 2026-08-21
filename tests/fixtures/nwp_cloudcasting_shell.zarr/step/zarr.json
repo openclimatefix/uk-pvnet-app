@@ -2,7 +2,7 @@
   "shape": [
     12
   ],
-  "data_type": "int32",
+  "data_type": "int64",
   "chunk_grid": {
     "name": "regular",
     "configuration": {
