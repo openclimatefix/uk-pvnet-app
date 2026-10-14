@@ -80,6 +80,6 @@ models:
     summation:
         repo: openclimatefix-models/pvnet_uk_summation
         commit: 804902a77b2f5f02e632bba044b5262d1f7455e5
-    is_critical: False
+    is_critical: True
     is_day_ahead: False
     log_level: INFO
