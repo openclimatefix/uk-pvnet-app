@@ -216,18 +216,27 @@ async def test_save_forecast_and_adjusted_forecast(
     assert len(forecast_response.values) == n_steps
 
     # Check: The adjusted forecast p50 values
+    triangle = {k: 5 - abs(k) for k in range(-4, 5)}
     # - The previous day's forecast was 0.5 for all horizons
     # - The previous day's observed values are 0.5, 0.51, 0.52, ...
     # - The deltas are 0, -0.01, -0.02, ...
+    # - The deltas are smoothed across horizon with a triangular window (weights 1,2,3,4,5,4,3,2,1)
+    #   renormalised at the array edges. A linear ramp is unchanged away from the edges.
     # - Limited to 10% of forecasted value
-    expected_adjustments = np.clip(
-        p50_frac - prev_values / capacity_watts,
-        -p50_frac * 0.1,
-        p50_frac * 0.1,
+    deltas = p50_frac - prev_values / capacity_watts
+    smoothed_deltas = np.array(
+        [
+            sum(w * deltas[i + k] for k, w in triangle.items() if 0 <= i + k < n_steps)
+            / sum(w for k, w in triangle.items() if 0 <= i + k < n_steps)
+            for i in range(n_steps)
+        ],
     )
+    expected_adjustments = np.clip(smoothed_deltas, -p50_frac * 0.1, p50_frac * 0.1)
 
     for i, value in enumerate(forecast_response.values):
         expected_adjustment = expected_adjustments[i]
         assert np.isclose(value.p50_value_fraction, p50_frac - expected_adjustment, atol=1e-4)
-        assert np.isclose(value.other_statistics_fractions["p10"], p10_frac - expected_adjustment)
-        assert np.isclose(value.other_statistics_fractions["p90"], p90_frac - expected_adjustment)
+        p10_value = value.other_statistics_fractions["p10"]
+        p90_value = value.other_statistics_fractions["p90"]
+        assert np.isclose(p10_value, p10_frac - expected_adjustment, atol=1e-4)
+        assert np.isclose(p90_value, p90_frac - expected_adjustment, atol=1e-4)

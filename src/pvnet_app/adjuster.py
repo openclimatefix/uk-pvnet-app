@@ -17,6 +17,43 @@ ADJUSTER_LIMIT_ABSOLUTE_WATTS: float = 1e9
 # Limit adjuster so it doesn't change the forecast by more than this fraction of the forecast value
 ADJUSTER_LIMIT_FORECAST_FRACTION: float = 0.1
 
+# The per-horizon adjuster values are noisy, independent weekly means, so they are smoothed across
+# horizon before use. Total width in minutes of the centered triangular smoothing window; the
+# window in bins is derived from the forecast's horizon spacing (9 bins at 30-minute steps).
+ADJUSTER_SMOOTHING_WINDOW_MINS: int = 270
+
+
+def smoothing_window_bins(horizon_mins: list[int]) -> int:
+    """Odd number of horizon bins spanning ADJUSTER_SMOOTHING_WINDOW_MINS, at least 1."""
+    if len(horizon_mins) < 2:
+        return 1
+    spacing_mins = horizon_mins[1] - horizon_mins[0]
+    half = round((ADJUSTER_SMOOTHING_WINDOW_MINS / spacing_mins - 1) / 2)
+    return 2 * max(half, 0) + 1
+
+
+def smooth_across_horizon(values: np.ndarray, window: int) -> np.ndarray:
+    """Smooth a 1-D array with a centered triangular window of `window` bins, ignoring NaNs.
+
+    At each position only the non-NaN entries inside the window are used, and the weights are
+    renormalised by the weights actually used. Positions whose whole window is NaN stay NaN.
+    """
+    if len(values) == 0:
+        return values.astype(float)
+
+    half = window // 2
+    weights = (half + 1 - np.abs(np.arange(-half, half + 1))).astype(float)
+    valid = ~np.isnan(values)
+
+    # Slide the weights along for a weighted sum per bin, sliced so short inputs also work
+    centre = slice(half, half + len(values))
+    weighted_sum = np.convolve(np.where(valid, values, 0.0), weights, mode="full")[centre]
+    weight_total = np.convolve(valid.astype(float), weights, mode="full")[centre]
+
+    smoothed = np.full(len(values), np.nan, dtype=float)
+    np.divide(weighted_sum, weight_total, out=smoothed, where=weight_total > 0)
+    return smoothed
+
 
 async def fetch_adjuster_values(
     client: dp.DataPlatformDataServiceStub,
@@ -48,7 +85,7 @@ def apply_adjuster_values(
 ) -> xr.DataArray:
     """Apply adjuster values to a forecast DataArray."""
     horizon_mins = da_forecast.horizon_mins.values.tolist()
-    adjuster_values_array = np.zeros(len(horizon_mins), dtype=float)
+    adjuster_values_array = np.full(len(horizon_mins), np.nan, dtype=float)
     missing_horizon_mins: list[int] = []
 
     for i, h in enumerate(horizon_mins):
@@ -66,10 +103,18 @@ def apply_adjuster_values(
             )
         else:
             logger.warning(
-                "%s: no adjuster values found for horizon_mins=%s; using 0.0 as default",
+                "%s: no adjuster values found for horizon_mins=%s; "
+                "filling from neighbouring horizons",
                 model_name,
                 missing_horizon_mins,
             )
+
+    # Smooth across horizon, then use 0.0 where there are no values at all
+    window = smoothing_window_bins(horizon_mins)
+    adjuster_values_array = np.nan_to_num(
+        smooth_across_horizon(adjuster_values_array, window),
+        nan=0.0,
+    )
 
     # Apply absolute limit to the adjuster
     absolute_limit = ADJUSTER_LIMIT_ABSOLUTE_WATTS / effective_capacity_watts
