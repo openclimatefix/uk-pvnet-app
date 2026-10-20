@@ -22,6 +22,10 @@ ADJUSTER_LIMIT_FORECAST_FRACTION: float = 0.1
 # window in bins is derived from the forecast's horizon spacing (9 bins at 30-minute steps).
 ADJUSTER_SMOOTHING_WINDOW_MINS: int = 270
 
+# The week-average correction is a noisy estimate of the next day's error, so only this fraction
+# of it is applied: full strength chases last week's noise as well as the systematic error.
+ADJUSTER_GAIN: float = 0.8
+
 
 def smoothing_window_bins(horizon_mins: list[int]) -> int:
     """Odd number of horizon bins spanning ADJUSTER_SMOOTHING_WINDOW_MINS, at least 1."""
@@ -115,6 +119,9 @@ def apply_adjuster_values(
         smooth_across_horizon(adjuster_values_array, window),
         nan=0.0,
     )
+
+    # Damp the correction
+    adjuster_values_array = adjuster_values_array * ADJUSTER_GAIN
 
     # Apply absolute limit to the adjuster
     absolute_limit = ADJUSTER_LIMIT_ABSOLUTE_WATTS / effective_capacity_watts
