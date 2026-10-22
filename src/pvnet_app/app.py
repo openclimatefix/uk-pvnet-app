@@ -359,6 +359,7 @@ async def _run_forecast_pipeline(
                     "satellite_15": settings.satellite_icechunk_path_15,
                 },
                 app_version=__version__,
+                run_blend_alpha=settings.run_blend_alpha,
             )
 
     logger.info("Finished forecast")

@@ -14,6 +14,7 @@ from ocf import dp
 
 from pvnet_app.adjuster import calculate_adjusted_forecast
 from pvnet_app.consts import forecast_version
+from pvnet_app.run_blending import blend_with_previous_run, fetch_previous_run_values
 from pvnet_app.utils import convert_to_utc_datetime
 
 logger = logging.getLogger(__name__)
@@ -203,6 +204,7 @@ async def build_multi_forecast_creation_request(
     init_time_utc: pd.Timestamp,
     client: dp.DataPlatformDataServiceStub,
     metadata: Struct | None,
+    run_blend_alpha: float = 1.0,
 ) -> list[dp.CreateForecastRequest]:
     """Build a list of create-forecast requests for all forecasted locations.
 
@@ -213,6 +215,8 @@ async def build_multi_forecast_creation_request(
         init_time_utc: Forecast initialization time
         client: A connected data-platform service client
         metadata: Optional metadata to assign to each location forecast
+        run_blend_alpha: Weight on the fresh run when blending the adjusted forecast
+            with the previous run; 1.0 disables blending
     """
     # Fetch the forecaster and adjuster forecaster in parallel
     forecaster, adjuster_forecaster = await asyncio.gather(
@@ -242,6 +246,20 @@ async def build_multi_forecast_creation_request(
         forecaster=forecaster,  # We get the adjuster values for the original forecaster
         model_name=model_tag,
     )
+
+    if run_blend_alpha < 1.0:
+        previous_values = await fetch_previous_run_values(
+            client=client,
+            forecaster=adjuster_forecaster,
+            location_uuid=locations[0].location_uuid,
+            init_time_utc=init_time_utc,
+        )
+        da_adjusted_forecast = blend_with_previous_run(
+            da_forecast=da_adjusted_forecast,
+            previous_values=previous_values,
+            alpha=run_blend_alpha,
+            model_name=f"{model_tag}_adjust",
+        )
 
     request = build_forecast_creation_request(
         da_forecast=da_adjusted_forecast,
@@ -358,6 +376,7 @@ async def write_forecasts_to_data_platform(
     t0: pd.Timestamp,
     input_paths: dict[str, str],
     app_version: str,
+    run_blend_alpha: float = 1.0,
 ) -> None:
     """Build requests and write all model forecasts to the data platform.
 
@@ -372,6 +391,8 @@ async def write_forecasts_to_data_platform(
         t0: The forecast init-time, as a naive-UTC timestamp
         input_paths: Source data input paths, keyed by source name, for metadata
         app_version: The app version to record against the forecasts
+        run_blend_alpha: Weight on the fresh run when blending each adjusted forecast
+            with the previous run; 1.0 disables blending
 
     Raises:
         ExceptionGroup: If one or more forecast writes fail
@@ -392,6 +413,7 @@ async def write_forecasts_to_data_platform(
                 init_time_utc=t0,
                 client=client,
                 metadata=input_metadata,
+                run_blend_alpha=run_blend_alpha,
             )
             for model_name, da_normed_forecast in forecasts.items()
         ),

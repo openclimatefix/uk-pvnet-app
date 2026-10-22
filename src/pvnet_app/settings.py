@@ -63,6 +63,10 @@ class AppSettings(BaseSettings):
     filter_bad_forecasts: bool = False
     raise_model_failure: Literal["any", "critical"] | None = None
 
+    # Weight on the fresh run when blending each published forecast with the previous
+    # run at shared target times; 1.0 = no blending. See pvnet_app/run_blending.py.
+    run_blend_alpha: float = Field(default=1.0, ge=0.0, le=1.0)
+
     forecast_validate_zig_zag_warning_threshold: float = 250.0
     forecast_validate_zig_zag_error_threshold: float = 500.0
     forecast_validate_national_max_mw: float = 20_000.0
