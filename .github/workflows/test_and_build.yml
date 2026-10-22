@@ -17,7 +17,7 @@ jobs:
       enable_linting: true
       enable_formatting: true
       enable_typechecking: false
-      tests_folder: tests
+      tests_folder: tests replay_harness/tests
       tests_conda_deps: "esmpy hdf5=1.14.4"
 
 
