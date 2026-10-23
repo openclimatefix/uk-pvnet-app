@@ -3,6 +3,7 @@ import pandas as pd
 import xarray as xr
 
 from pvnet_app.adjuster import (
+    ADJUSTER_GAIN,
     apply_adjuster_values,
     smooth_across_horizon,
     smoothing_window_bins,
@@ -97,7 +98,8 @@ def test_apply_adjuster_values_constant_deltas():
         model_name="test",
     )
 
-    np.testing.assert_allclose(result.sel(output_label="p50").values, 0.48)
+    # 0.5 - ADJUSTER_GAIN * 0.02
+    np.testing.assert_allclose(result.sel(output_label="p50").values, 0.484)
 
 
 def test_apply_adjuster_values_no_values_leaves_forecast_unchanged():
@@ -127,7 +129,22 @@ def test_apply_adjuster_values_missing_horizons_are_filled_by_smoothing():
         model_name="test",
     )
 
-    np.testing.assert_allclose(result.sel(output_label="p50").values, 0.48)
+    np.testing.assert_allclose(result.sel(output_label="p50").values, 0.484)
+
+
+def test_apply_adjuster_values_damped_by_gain():
+    horizon_mins = [i * 30 for i in range(20)]
+    da_forecast = _make_forecast(horizon_mins, p50=0.5)
+
+    result = apply_adjuster_values(
+        da_forecast=da_forecast,
+        adjuster_values=dict.fromkeys(horizon_mins, 0.01),
+        effective_capacity_watts=1_000,
+        model_name="test",
+    )
+
+    applied = 0.5 - result.sel(output_label="p50").values
+    np.testing.assert_allclose(applied, ADJUSTER_GAIN * 0.01)
 
 
 def test_smoothing_window_bins():
