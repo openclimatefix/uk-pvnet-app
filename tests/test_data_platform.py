@@ -8,6 +8,7 @@ import xarray as xr
 from betterproto.lib.google.protobuf import Struct, Value
 from ocf import dp
 
+from pvnet_app.adjuster import ADJUSTER_GAIN
 from pvnet_app.data_platform import (
     build_multi_forecast_creation_request,
     fetch_or_create_forecaster,
@@ -222,7 +223,7 @@ async def test_save_forecast_and_adjusted_forecast(
     # - The deltas are 0, -0.01, -0.02, ...
     # - The deltas are smoothed across horizon with a triangular window (weights 1,2,3,4,5,4,3,2,1)
     #   renormalised at the array edges. A linear ramp is unchanged away from the edges.
-    # - Limited to 10% of forecasted value
+    # - Damped by ADJUSTER_GAIN, then limited to 10% of the forecasted value
     deltas = p50_frac - prev_values / capacity_watts
     smoothed_deltas = np.array(
         [
@@ -231,7 +232,7 @@ async def test_save_forecast_and_adjusted_forecast(
             for i in range(n_steps)
         ],
     )
-    expected_adjustments = np.clip(smoothed_deltas, -p50_frac * 0.1, p50_frac * 0.1)
+    expected_adjustments = np.clip(smoothed_deltas * ADJUSTER_GAIN, -p50_frac * 0.1, p50_frac * 0.1)
 
     for i, value in enumerate(forecast_response.values):
         expected_adjustment = expected_adjustments[i]
