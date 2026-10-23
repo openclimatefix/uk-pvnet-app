@@ -1,0 +1,5 @@
+# The repo rules, except that the CLIs print their results.
+extend = "../pyproject.toml"
+
+[lint]
+extend-ignore = ["T20"]
